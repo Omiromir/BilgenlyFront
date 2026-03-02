@@ -52,24 +52,26 @@ export function FAQSection({ expandedItems, onToggle }: FAQSectionProps) {
   ];
 
   return (
-    <section className="relative w-full py-24">
-      <div className="max-w-[1030px] mx-auto">
-        {/* Title */}
-        <h2 className="font-['Montserrat',sans-serif] font-bold text-[36px] text-[#111827] text-center mb-12 leading-[64px]">
+    <section id="faqs" className="scroll-mt-24 w-full px-4 py-24 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-[900px]">
+        <h2 className="text-center font-['Montserrat',sans-serif] text-[32px] font-bold text-[#111827] sm:text-[40px]">
           Frequently Asked Questions
         </h2>
+        <p className="mt-4 text-center font-['Montserrat',sans-serif] text-[15px] text-[#4B5563] sm:text-[18px]">
+          Everything you need to know about our platform
+        </p>
 
-        {/* FAQ Accordion */}
-        <div className="bg-white rounded-lg overflow-hidden">
+        <div className="mt-10 space-y-4">
           {faqs.map((faq, index) => (
-            <FAQAccordionItem
-              key={index}
-              variant={faq.variant}
-              question={faq.question}
-              answer={faq.answer}
-              isOpen={expandedItems.has(index)}
-              onToggle={() => onToggle(index)}
-            />
+            <div key={index} className="overflow-hidden rounded-lg bg-white shadow-[0_2px_10px_rgba(0,0,0,0.05)]">
+              <FAQAccordionItem
+                variant={faq.variant}
+                question={faq.question}
+                answer={faq.answer}
+                isOpen={expandedItems.has(index)}
+                onToggle={() => onToggle(index)}
+              />
+            </div>
           ))}
         </div>
       </div>

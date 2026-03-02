@@ -26,7 +26,7 @@ export function FAQAccordionItem({ question, answer, isOpen, onToggle, variant =
     <div className={clsx('relative w-full', isOpen && 'bg-[#F9FAFB]')}>
       <div className="relative border-b border-[#F3F4F6]">
         <button
-          className="flex items-center justify-between w-full px-6 py-[23px] text-left hover:bg-[#F9FAFB] transition-colors"
+          className="flex w-full items-center justify-between px-6 py-[23px] text-left transition-all duration-200 ease-out hover:bg-[#F9FAFB]"
           onClick={onToggle}
           aria-expanded={isOpen}
         >

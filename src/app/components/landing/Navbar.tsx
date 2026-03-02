@@ -1,54 +1,173 @@
-import { LandingButton } from './LandingButton';
-
+import { useEffect, useState } from "react";
+import logo from "../../../assets/logo.png";
+import { LandingButton } from "./LandingButton";
 
 export function Navbar() {
+  const [isScrolled, setIsScrolled] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 8);
+    };
+
+    handleScroll();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
   return (
     <nav
       role="navigation"
       aria-label="Main navigation"
-      className="fixed top-0 left-0 right-0 bg-white h-[98px] shadow-[0px_4px_4px_0px_rgba(17,24,39,0.05)] z-50"
+      className={
+        isScrolled
+          ? "fixed inset-x-0 top-0 z-50 border-b border-white/30 bg-white/70 shadow-[0_8px_24px_rgba(17,24,39,0.12)] backdrop-blur-xl transition-all duration-300"
+          : "fixed inset-x-0 top-0 z-50 border-b border-[#E5E7EB] bg-white transition-all duration-300"
+      }
     >
-      <div className="max-w-[1440px] mx-auto h-full relative">
-        {/* Logo */}
-        <div className="absolute left-[96px] top-[17px] flex items-center gap-4">
-          <div className="h-[64px] w-[55px] overflow-hidden">
+      <div className="mx-auto flex h-20 w-full max-w-[1248px] items-center justify-between px-4 sm:px-6 md:h-[98px] lg:px-8">
+        <a href="#home" className="flex items-center gap-2 sm:gap-3">
+          <div className="h-10 w-10 sm:h-[52px] sm:w-[52px]">
             <img
               alt="Bilgenly logo"
-              className="h-[146.14%] w-[449.09%] object-cover -ml-[65.45%] -mt-[26.97%]"
-              src={"../../../assets/logo.png"}
+              className="h-full w-full object-contain"
+              src={logo}
             />
           </div>
-          <p className="font-['Anonymous_Pro',monospace] text-[28px] text-[#041320] font-bold leading-normal">
+          <span className="hidden font-['Anonymous_Pro',monospace] text-[18px] font-bold text-[#041320] sm:text-[24px] md:inline">
             Bilgenly
-          </p>
-        </div>
+          </span>
+        </a>
 
-        {/* Navigation Menu */}
-        <div className="absolute left-[485px] top-[39px] flex gap-[35px] items-center font-['Montserrat',sans-serif] text-[16px] text-[#111827]">
-          <a href="#about" className="hover:text-[#2191F6] transition-colors">
+        <div className="hidden items-center gap-[35px] font-['Montserrat',sans-serif] text-[16px] text-[#374151] md:flex">
+          <a href="#about" className="transition-colors hover:text-[#2191F6]">
             about us
           </a>
-          <a href="#features" className="hover:text-[#2191F6] transition-colors">
+          <a
+            href="#features"
+            className="transition-colors hover:text-[#2191F6]"
+          >
             features
           </a>
-          <a href="#how-it-works" className="hover:text-[#2191F6] transition-colors">
+          <a
+            href="#how-it-works"
+            className="transition-colors hover:text-[#2191F6]"
+          >
             how it works
           </a>
-          <a href="#pricing" className="hover:text-[#2191F6] transition-colors">
+          <a href="#pricing" className="transition-colors hover:text-[#2191F6]">
             pricing
           </a>
-          <a href="#faqs" className="hover:text-[#2191F6] transition-colors">
+          <a href="#faqs" className="transition-colors hover:text-[#2191F6]">
             faqs
           </a>
         </div>
 
-        {/* Auth Section */}
-        <div className="absolute right-[96px] top-[27px] flex gap-[20px] items-center">
-          <button className="font-['Montserrat',sans-serif] font-bold text-[20px] text-[#4B5563] hover:text-[#111827] transition-colors">
+        <div className="flex items-center gap-3 sm:gap-5">
+          <button className="hidden font-['Montserrat',sans-serif] text-[16px] font-bold text-[#4B5563] transition-all duration-200 ease-out hover:-translate-y-[1px] hover:text-[#111827] md:inline lg:text-[20px]">
             Log in
           </button>
-          <div className="h-[45px] w-[169px]">
-            <LandingButton variant="primary">Get started</LandingButton>
+          <LandingButton
+            variant="primary"
+            size="sm"
+            className="hidden hover:-translate-y-[1px] md:inline-flex"
+          >
+            Get started
+          </LandingButton>
+          <button
+            className="grid h-10 w-10 place-items-center rounded-lg border border-[#D1D5DB] text-[#111827] transition-colors hover:bg-[#F3F4F6] md:hidden"
+            aria-label="Toggle navigation menu"
+            aria-expanded={isMenuOpen}
+            onClick={() => setIsMenuOpen((prev) => !prev)}
+          >
+            <span className="relative h-4 w-5">
+              <span
+                className={`absolute left-0 top-1/2 h-[2px] w-5 rounded bg-current transition-all duration-200 ${
+                  isMenuOpen
+                    ? "-translate-y-1/2 rotate-45"
+                    : "-translate-y-[7px]"
+                }`}
+              />
+              <span
+                className={`absolute left-0 top-1/2 h-[2px] w-5 -translate-y-1/2 rounded bg-current transition-opacity duration-200 ${
+                  isMenuOpen ? "opacity-0" : "opacity-100"
+                }`}
+              />
+              <span
+                className={`absolute left-0 top-1/2 h-[2px] w-5 rounded bg-current transition-all duration-200 ${
+                  isMenuOpen
+                    ? "-translate-y-1/2 -rotate-45"
+                    : "translate-y-[5px]"
+                }`}
+              />
+            </span>
+          </button>
+        </div>
+      </div>
+
+      <div
+        className={`fixed inset-0 z-40 bg-[#111827]/20 transition-opacity duration-300 md:hidden ${isMenuOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
+        onClick={() => setIsMenuOpen(false)}
+      >
+        <div
+          className={`absolute left-4 right-4 top-[88px] rounded-2xl border border-white/60 bg-white/90 p-4 shadow-[0_16px_40px_rgba(17,24,39,0.2)] backdrop-blur-xl transition-all duration-300 ${
+            isMenuOpen
+              ? "translate-y-0 opacity-100"
+              : "-translate-y-3 opacity-0"
+          }`}
+          onClick={(event) => event.stopPropagation()}
+        >
+          <div className="space-y-1">
+            <a
+              href="#about"
+              className="block rounded-xl px-3 py-2.5 text-[15px] font-medium text-[#374151] transition-colors hover:bg-[#EFF6FF] hover:text-[#2563EB]"
+              onClick={() => setIsMenuOpen(false)}
+            >
+              About us
+            </a>
+            <a
+              href="#features"
+              className="block rounded-xl px-3 py-2.5 text-[15px] font-medium text-[#374151] transition-colors hover:bg-[#EFF6FF] hover:text-[#2563EB]"
+              onClick={() => setIsMenuOpen(false)}
+            >
+              Features
+            </a>
+            <a
+              href="#how-it-works"
+              className="block rounded-xl px-3 py-2.5 text-[15px] font-medium text-[#374151] transition-colors hover:bg-[#EFF6FF] hover:text-[#2563EB]"
+              onClick={() => setIsMenuOpen(false)}
+            >
+              How it works
+            </a>
+            <a
+              href="#pricing"
+              className="block rounded-xl px-3 py-2.5 text-[15px] font-medium text-[#374151] transition-colors hover:bg-[#EFF6FF] hover:text-[#2563EB]"
+              onClick={() => setIsMenuOpen(false)}
+            >
+              Pricing
+            </a>
+            <a
+              href="#faqs"
+              className="block rounded-xl px-3 py-2.5 text-[15px] font-medium text-[#374151] transition-colors hover:bg-[#EFF6FF] hover:text-[#2563EB]"
+              onClick={() => setIsMenuOpen(false)}
+            >
+              FAQs
+            </a>
+          </div>
+
+          <div className="mt-4 flex items-center gap-2 border-t border-[#E5E7EB] pt-4">
+            {" "}
+            <button className="h-10 flex-1 rounded-lg border border-[#D1D5DB] px-3 text-[14px] font-semibold text-[#4B5563] transition-colors hover:bg-[#F3F4F6] hover:text-[#111827]">
+              Log in
+            </button>
+            <LandingButton
+              variant="primary"
+              size="sm"
+              className="!h-10 !flex-1 !px-4 !text-[14px]"
+            >
+              Get started
+            </LandingButton>
           </div>
         </div>
       </div>

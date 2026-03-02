@@ -39,48 +39,48 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
-  
+
   /* Bilgenly Design Tokens */
-  --brand-primary: #2191F6;
-  --brand-primary-dark: #2563EB;
+  --brand-primary: #2191f6;
+  --brand-primary-dark: #2563eb;
   --brand-primary-light: rgba(37, 99, 235, 0.05);
   --brand-primary-opacity-30: rgba(37, 99, 235, 0.3);
-  
-  --neutral-white: #FFFFFF;
+
+  --neutral-white: #ffffff;
   --neutral-black: #000000;
-  --neutral-gray-50: #F9FAFB;
-  --neutral-gray-100: #F3F4F6;
-  --neutral-gray-200: #E5E7EB;
-  --neutral-gray-300: #D1D5DB;
-  --neutral-gray-400: #9CA3AF;
-  --neutral-gray-500: #6B7280;
-  --neutral-gray-600: #4B5563;
+  --neutral-gray-50: #f9fafb;
+  --neutral-gray-100: #f3f4f6;
+  --neutral-gray-200: #e5e7eb;
+  --neutral-gray-300: #d1d5db;
+  --neutral-gray-400: #9ca3af;
+  --neutral-gray-500: #6b7280;
+  --neutral-gray-600: #4b5563;
   --neutral-gray-700: #374151;
-  --neutral-gray-800: #1F2937;
+  --neutral-gray-800: #1f2937;
   --neutral-gray-900: #111827;
-  
+
   --text-primary: #111827;
-  --text-secondary: #4B5563;
+  --text-secondary: #4b5563;
   --text-tertiary: #878484;
-  --text-inverted: #FFFFFF;
-  --text-brand: #2191F6;
-  
-  --bg-primary: #FFFFFF;
-  --bg-secondary: #F9FAFB;
+  --text-inverted: #ffffff;
+  --text-brand: #2191f6;
+
+  --bg-primary: #ffffff;
+  --bg-secondary: #f9fafb;
   --bg-tertiary: rgba(135, 132, 132, 0.15);
   --bg-brand-light: rgba(37, 99, 235, 0.05);
-  
-  --border-default: #F3F4F6;
-  --border-subtle: #E5E7EB;
-  --border-brand: #2563EB;
-  
-  --accent-red: #ED6A5E;
-  --accent-yellow: #F4BF4F;
-  --accent-green: #61C554;
-  
-  --browser-top-bar: #4B5563;
-  --browser-address-bar: #F1F1F1;
-  --browser-icon: #8C8C8C;
+
+  --border-default: #f3f4f6;
+  --border-subtle: #e5e7eb;
+  --border-brand: #2563eb;
+
+  --accent-red: #ed6a5e;
+  --accent-yellow: #f4bf4f;
+  --accent-green: #61c554;
+
+  --browser-top-bar: #4b5563;
+  --browser-address-bar: #f1f1f1;
+  --browser-icon: #8c8c8c;
   --browser-text: #151515;
 }
 

@@ -4,29 +4,13 @@ import { HeroSection } from './components/landing/HeroSection';
 import { MVVSection } from './components/landing/MVVSection';
 import { BuiltForEveryoneSection } from './components/landing/BuiltForEveryoneSection';
 import { HowItWorksSection } from './components/landing/HowItWorksSection';
+import { PricingSection } from './components/landing/PricingSection';
 import { FAQSection } from './components/landing/FAQSection';
+import { CTASection } from './components/landing/CTASection';
 import { Footer } from './components/landing/Footer';
+import { RevealOnScroll } from './components/landing/RevealOnScroll';
 
-/**
- * Bilgenly Landing Page
- * 
- * A production-ready landing page for an AI-powered quiz generation platform.
- * 
- * Features:
- * - Responsive design with Tailwind CSS v4
- * - Smooth scroll animations with Motion (motion/react)
- * - Interactive components (Toggle, Accordion, Buttons)
- * - Browser mockup with macOS-style chrome
- * - Mission/Vision/Values section with custom icons
- * - Teacher/Student benefit showcase
- * - Step-by-step "How it Works" section
- * - FAQ accordion with expand/collapse
- * - Footer with site navigation
- * 
- * State Management:
- * - selectedAudience: Toggle between teacher/student benefits
- * - expandedFAQs: Track which FAQ items are expanded
- */
+
 export default function App() {
   const [selectedAudience, setSelectedAudience] = useState<'teachers' | 'students'>('teachers');
   const [expandedFAQs, setExpandedFAQs] = useState<Set<number>>(new Set());
@@ -46,18 +30,36 @@ export default function App() {
   };
 
   return (
-    <div className="bg-white min-h-screen w-full overflow-x-hidden">
+    <div className="min-h-screen w-full overflow-x-hidden bg-white">
       <Navbar />
 
-      <main className="relative w-full max-w-[1440px] mx-auto">
-        <HeroSection />
-        <MVVSection />
-        <BuiltForEveryoneSection selectedAudience={selectedAudience} onToggle={handleAudienceToggle} />
-        <HowItWorksSection />
-        <FAQSection expandedItems={expandedFAQs} onToggle={handleToggleFAQ} />
+      <main className="mx-auto w-full">
+        <RevealOnScroll>
+          <HeroSection />
+        </RevealOnScroll>
+        <RevealOnScroll delay={0.05}>
+          <MVVSection />
+        </RevealOnScroll>
+        <RevealOnScroll delay={0.05}>
+          <BuiltForEveryoneSection selectedAudience={selectedAudience} onToggle={handleAudienceToggle} />
+        </RevealOnScroll>
+        <RevealOnScroll delay={0.05}>
+          <HowItWorksSection />
+        </RevealOnScroll>
+        <RevealOnScroll delay={0.05}>
+          <PricingSection />
+        </RevealOnScroll>
+        <RevealOnScroll delay={0.05}>
+          <FAQSection expandedItems={expandedFAQs} onToggle={handleToggleFAQ} />
+        </RevealOnScroll>
       </main>
 
-      <Footer />
+      <RevealOnScroll>
+        <CTASection />
+      </RevealOnScroll>
+      <RevealOnScroll>
+        <Footer />
+      </RevealOnScroll>
     </div>
   );
 }

@@ -4,29 +4,24 @@ export interface BenefitCardProps {
   icon: React.ReactNode;
   title: string;
   description: string;
-  position: { left: number; top: number };
 }
 
-export function BenefitCard({ icon, title, description, position }: BenefitCardProps) {
+export function BenefitCard({ icon, title, description }: BenefitCardProps) {
   return (
-    <motion.div
-      className="absolute cursor-default"
-      style={{ left: position.left, top: position.top }}
-      whileHover={{ y: -4 }}
+    <motion.article
+      className="flex items-start gap-4 p-2"
+      whileHover={{ y: -2 }}
       transition={{ duration: 0.2 }}
     >
-      {/* Icon */}
-      <div className="absolute left-0 top-[12.45px]">{icon}</div>
-
-      {/* Title */}
-      <p className="absolute left-[78.45px] top-0 font-['Montserrat',sans-serif] font-bold text-[14px] text-[#2563EB] tracking-[0.7px] leading-[2.5] w-[217.909px]">
-        {title}
-      </p>
-
-      {/* Description */}
-      <p className="absolute left-[78.45px] top-[33.62px] font-['Montserrat',sans-serif] text-[10px] text-[#2563EB] tracking-[0.5px] leading-[1.54] w-[217.909px]">
-        {description}
-      </p>
-    </motion.div>
+      <div className="shrink-0">{icon}</div>
+      <div>
+        <h3 className="font-['Montserrat',sans-serif] text-[14px] font-bold leading-[2.5] tracking-[0.7px] text-[#2563EB]">
+          {title}
+        </h3>
+        <p className="font-['Montserrat',sans-serif] text-[10px] leading-[1.54] tracking-[0.5px] text-[#2563EB]">
+          {description}
+        </p>
+      </div>
+    </motion.article>
   );
 }

@@ -1,54 +1,56 @@
 import { StepCard } from './StepCard';
+import step1 from '../../../assets/htw-step1.png';
+import step2 from '../../../assets/htw-step2.png';
+import step3 from '../../../assets/htw-step3.png';
+import step4 from '../../../assets/htw-step4.png';
+
+const steps = [
+  {
+    stepNumber: 1,
+    title: 'Upload Your Content',
+    description: 'Start with what you already have: lecture notes, PDFs, presentations, or text.',
+    image: step1
+  },
+  {
+    stepNumber: 2,
+    title: 'AI Generates Questions',
+    description: 'Our smart AI analyzes your material and creates relevant questions instantly.',
+    image: step2
+  },
+  {
+    stepNumber: 3,
+    title: 'Customize & Share',
+    description: 'Adjust difficulty and content, then share with your class in one click.',
+    image: step3
+  },
+  {
+    stepNumber: 4,
+    title: 'Analyze Results',
+    description: 'Track scores and progress with real-time analytics and clear dashboards.',
+    image: step4
+  }
+];
 
 export function HowItWorksSection() {
   return (
-    <section className="relative h-[689px] w-full overflow-clip">
-      {/* Blue Background */}
-      <div className="absolute left-0 top-0 bg-[#2563EB] h-[331px] w-full" />
-
-      {/* Title */}
-      <h2 className="absolute left-[586px] top-[56px] font-['Montserrat',sans-serif] font-bold text-[36px] text-white tracking-[1.8px] leading-[64px]">
-        How it works
-      </h2>
-
-      {/* Description */}
-      <div className="absolute left-[298px] top-[147px] font-['Montserrat',sans-serif] text-[20px] text-white leading-normal">
-        <p className="mb-0">How educators save hours while students get better results - all in one platform.</p>
+    <section id="how-it-works" className="relative mt-8 min-h-[100svh] scroll-mt-24">
+      <div className="bg-[#2563EB] px-4 pb-24 pt-14 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-[1200px] text-center">
+          <h2 className="font-['Montserrat',sans-serif] text-[30px] font-bold tracking-[1px] text-white sm:text-[40px] sm:tracking-[2px]">
+            How it works
+          </h2>
+          <p className="mx-auto mt-3 max-w-[760px] font-['Montserrat',sans-serif] text-[15px] leading-[1.6] text-white/90 sm:text-[18px]">
+            How educators save hours while students get better results. It&apos;s all in one platform.
+          </p>
+        </div>
       </div>
 
-      {/* Step Cards */}
-      <div className="absolute left-[208px] top-[214px] w-[1024px]">
-        <StepCard
-          stepNumber={1}
-          title="Upload Your Content"
-          description="Start with what you already have: lecture notes, PDFs, presentations, or text. No reformatting needed."
-          image={"../../../assets/htw-step1.png"}
-          position={{ left: 0 }}
-        />
-
-        <StepCard
-          stepNumber={2}
-          title="AI Generates Questions"
-          description="Our smart AI analyzes your material and creates relevant, challenging questions instantly."
-          image={"../../../assets/htw-step2.png"}
-          position={{ left: 264 }}
-        />
-
-        <StepCard
-          stepNumber={3}
-          title="Review & Customize"
-          description="Tweak difficulty, add images, or accept as-is. You stay in control of the final product."
-          image={"../../../assets/htw-step3.png"}
-          position={{ left: 528 }}
-        />
-
-        <StepCard
-          stepNumber={4}
-          title="Share & Track Results"
-          description="Send to students with one click. Watch real-time progress and scores roll in."
-          image={"../../../assets/htw-step4.png"}
-          position={{ left: 792 }}
-        />
+      <div className="-mt-16 px-4 pb-20 sm:px-6 lg:px-8">
+        <div className="mx-auto grid max-w-[1030px] grid-cols-1 gap-15 sm:grid-cols-2 lg:grid-cols-4">
+          {steps.map((step) => (
+            <StepCard key={step.stepNumber} {...step} />
+          ))}
+        </div>
       </div>
     </section>
   );

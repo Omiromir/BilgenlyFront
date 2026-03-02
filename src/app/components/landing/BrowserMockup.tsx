@@ -7,9 +7,9 @@ export interface BrowserMockupProps {
 
 export function BrowserMockup({ url = 'bilgenly.com', children }: BrowserMockupProps) {
   return (
-    <div className="relative w-[1030px]">
+    <div className="relative mx-auto w-full max-w-[1030px] overflow-hidden rounded-t-[24px]">
       {/* Top Bar */}
-      <div className="bg-[#4B5563] h-[56px] rounded-tl-[50px] rounded-tr-[50px] flex items-center justify-between px-6 py-1">
+      <div className="flex h-[50px] items-center justify-between bg-[#4B5563] px-3 py-1 sm:h-[56px] sm:px-6">
         {/* Left Buttons */}
         <div className="flex gap-6 items-center">
           {/* macOS Window Controls */}
@@ -75,7 +75,7 @@ export function BrowserMockup({ url = 'bilgenly.com', children }: BrowserMockupP
         </div>
 
         {/* Address Bar */}
-        <div className="bg-[#F1F1F1] h-7 w-[480px] rounded-lg flex items-center gap-2 px-2 py-1">
+        <div className="mx-2 hidden h-7 w-full max-w-[480px] items-center gap-2 rounded-lg bg-[#F1F1F1] px-2 py-1 md:flex">
           <div className="flex items-center gap-1 flex-1">
             {/* Lock Icon */}
             <div className="relative h-4 w-4">
@@ -154,7 +154,7 @@ export function BrowserMockup({ url = 'bilgenly.com', children }: BrowserMockupP
       </div>
 
       {/* Content Area */}
-      <div className="bg-[rgba(135,132,132,0.15)] h-[267px]">{children}</div>
+      <div className="h-[220px] bg-[rgba(135,132,132,0.15)] sm:h-[267px]">{children}</div>
     </div>
   );
 }

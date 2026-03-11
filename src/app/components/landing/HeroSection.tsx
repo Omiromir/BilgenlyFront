@@ -1,8 +1,11 @@
 import { motion } from 'motion/react';
+import { useNavigate } from 'react-router';
 import { BrowserMockup } from './BrowserMockup';
 import { LandingButton } from './LandingButton';
 
 export function HeroSection() {
+  const navigate = useNavigate();
+
   return (
     <section id="home" className="relative scroll-mt-24 px-4 pb-16 pt-[120px] sm:px-6 sm:pb-20 sm:pt-[145px] lg:px-8 lg:pt-[163px]">
       <div className="mx-auto max-w-[1200px] text-center">
@@ -33,7 +36,12 @@ export function HeroSection() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.3 }}
         >
-          <LandingButton variant="primary" size="md" className="w-full max-w-[240px] rounded-[15px] sm:min-w-[169px]">
+          <LandingButton
+            variant="primary"
+            size="md"
+            className="w-full max-w-[240px] rounded-[15px] sm:min-w-[169px]"
+            onClick={() => navigate('/signup')}
+          >
             Get started
           </LandingButton>
           <LandingButton variant="secondary" size="md" className="w-full max-w-[240px] rounded-[15px] sm:min-w-[169px]">

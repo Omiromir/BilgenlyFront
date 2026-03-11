@@ -1,6 +1,9 @@
+import { useNavigate } from 'react-router';
 import { LandingButton } from './LandingButton';
 
 export function CTASection() {
+  const navigate = useNavigate();
+
   return (
     <section className="bg-[#111827] px-4 py-16 sm:px-6 lg:px-8">
       <div className="mx-auto flex w-full max-w-[1200px] flex-col items-start justify-between gap-8 md:flex-row md:items-center">
@@ -17,7 +20,12 @@ export function CTASection() {
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          <LandingButton variant="primary" size="md" className="hover:-translate-y-[1px]">
+          <LandingButton
+            variant="primary"
+            size="md"
+            className="hover:-translate-y-[1px]"
+            onClick={() => navigate('/signup')}
+          >
             Get started now
           </LandingButton>
           <button className="h-11 cursor-pointer rounded-xl border-2 border-white px-6 font-['Montserrat',sans-serif] text-[15px] text-white transition-all duration-200 ease-out hover:-translate-y-[1px] hover:bg-white hover:text-[#111827] active:translate-y-0 active:scale-[0.98]">

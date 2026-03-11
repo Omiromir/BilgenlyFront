@@ -1,10 +1,17 @@
 import { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router";
 import logo from "../../../assets/logo.png";
 import { LandingButton } from "./LandingButton";
 
 export function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const navigate = useNavigate();
+
+  const handleAuthNavigation = (path: "/signin" | "/signup") => {
+    setIsMenuOpen(false);
+    navigate(path);
+  };
 
   useEffect(() => {
     const handleScroll = () => {
@@ -27,7 +34,14 @@ export function Navbar() {
       }
     >
       <div className="mx-auto flex h-20 w-full max-w-[1248px] items-center justify-between px-4 sm:px-6 md:h-[98px] lg:px-8">
-        <a href="#home" className="flex items-center gap-2 sm:gap-3">
+        <Link
+          to="/"
+          className="flex items-center gap-2 sm:gap-3"
+          onClick={() => {
+            setIsMenuOpen(false);
+            window.scrollTo({ top: 0, behavior: "smooth" });
+          }}
+        >
           <div className="h-10 w-10 sm:h-[52px] sm:w-[52px]">
             <img
               alt="Bilgenly logo"
@@ -38,7 +52,7 @@ export function Navbar() {
           <span className="hidden font-['Anonymous_Pro',monospace] text-[18px] font-bold text-[#041320] sm:text-[24px] md:inline">
             Bilgenly
           </span>
-        </a>
+        </Link>
 
         <div className="hidden items-center gap-[35px] font-['Montserrat',sans-serif] text-[16px] text-[#374151] md:flex">
           <a href="#about" className="transition-colors hover:text-[#2191F6]">
@@ -65,13 +79,18 @@ export function Navbar() {
         </div>
 
         <div className="flex items-center gap-3 sm:gap-5">
-          <button className="hidden font-['Montserrat',sans-serif] text-[16px] font-bold text-[#4B5563] transition-all duration-200 ease-out hover:-translate-y-[1px] hover:text-[#111827] md:inline lg:text-[20px]">
+          <button
+            className="hidden font-['Montserrat',sans-serif] text-[16px] font-bold text-[#4B5563] transition-all duration-200 ease-out hover:-translate-y-[1px] hover:text-[#111827] md:inline lg:text-[20px]"
+            onClick={() => handleAuthNavigation("/signin")}
+            type="button"
+          >
             Log in
           </button>
           <LandingButton
             variant="primary"
             size="sm"
             className="hidden hover:-translate-y-[1px] md:inline-flex"
+            onClick={() => handleAuthNavigation("/signup")}
           >
             Get started
           </LandingButton>
@@ -158,13 +177,18 @@ export function Navbar() {
 
           <div className="mt-4 flex items-center gap-2 border-t border-[#E5E7EB] pt-4">
             {" "}
-            <button className="h-10 flex-1 rounded-lg border border-[#D1D5DB] px-3 text-[14px] font-semibold text-[#4B5563] transition-colors hover:bg-[#F3F4F6] hover:text-[#111827]">
+            <button
+              className="h-10 flex-1 rounded-lg border border-[#D1D5DB] px-3 text-[14px] font-semibold text-[#4B5563] transition-colors hover:bg-[#F3F4F6] hover:text-[#111827]"
+              onClick={() => handleAuthNavigation("/signin")}
+              type="button"
+            >
               Log in
             </button>
             <LandingButton
               variant="primary"
               size="sm"
               className="!h-10 !flex-1 !px-4 !text-[14px]"
+              onClick={() => handleAuthNavigation("/signup")}
             >
               Get started
             </LandingButton>

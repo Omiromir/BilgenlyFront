@@ -4,6 +4,9 @@ export const onboardingStyles = `
   .onboarding-page { padding: 0 20px; }
   .auth-mode { justify-content: center; background: #f3f5f9 !important; }
   .onboarding-shell { width: 100%; max-width: 440px; }
+  .welcome-screen { width: 100%; }
+  .welcome-screen__content { flex: 1; width: 100%; display: flex; align-items: center; justify-content: center; }
+  .welcome-screen__inner { width: 100%; max-width: 640px; margin: 0 auto; text-align: center; }
   .fade { animation: fadeUp 0.28s ease forwards; }
   @keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
   .card { background: #fff; border-radius: 20px; box-shadow: 0 4px 40px rgba(109,40,217,0.08); padding: 40px 44px; width: 100%; max-width: 440px; }
@@ -64,6 +67,7 @@ export const onboardingStyles = `
 
   @media (max-width: 640px) {
     .onboarding-page { padding: 0 14px; }
+    .welcome-screen { padding-bottom: 28px !important; }
     .onboarding-header { padding-top: 20px !important; gap: 12px; }
     .onboarding-progress { margin-top: 10px !important; }
     .onboarding-card-wrap { margin-top: 18px !important; padding-bottom: 32px !important; }

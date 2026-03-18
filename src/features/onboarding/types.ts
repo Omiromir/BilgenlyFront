@@ -1,3 +1,5 @@
+import type { UserRole } from "../../lib/auth";
+
 export type StepKey =
   | "signup"
   | "email"
@@ -11,7 +13,7 @@ export type StepKey =
   | "recommendations";
 
 export interface SelectedAnswers {
-  role?: string;
+  role?: UserRole;
   goal?: string;
   experience?: string;
   pace?: string;

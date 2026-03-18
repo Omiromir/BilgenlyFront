@@ -1,5 +1,5 @@
 import { Link } from "react-router";
-import logoPng from "../../../assets/logo.png";
+import logoPng from "../../assets/logo.png";
 
 interface BilgenlyLogoProps {
   size?: number;

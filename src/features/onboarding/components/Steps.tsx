@@ -59,31 +59,44 @@ function ChoiceList({
 
 export function WelcomeStep({ go }: SharedStepProps) {
   return (
-    <div style={{ textAlign: "center", padding: "10px 0" }}>
+    <div
+      style={{
+        textAlign: "center",
+        padding: "10px 0",
+        maxWidth: 560,
+        margin: "0 auto",
+      }}
+    >
       <h1
         style={{
           fontWeight: 700,
-          fontSize: 26,
+          fontSize: 44,
           color: "#1a1a2e",
-          marginBottom: 10,
+          marginBottom: 16,
           letterSpacing: "-0.02em",
+          lineHeight: 1.05,
         }}
       >
         Welcome to Bilgenly!
       </h1>
       <p
         style={{
-          fontSize: 14,
+          fontSize: 18,
           color: "#777",
           lineHeight: 1.6,
-          marginBottom: 30,
+          marginBottom: 36,
         }}
       >
         Your AI study companion is ready.
         <br />
         Let&apos;s set up your personalized experience.
       </p>
-      <button className="btn-primary" type="button" onClick={() => go("role")}>
+      <button
+        className="btn-primary"
+        type="button"
+        onClick={() => go("role")}
+        style={{ maxWidth: 260 }}
+      >
         Get started
       </button>
     </div>
@@ -95,7 +108,6 @@ export function RoleStep({ go, selected, setSelected }: ChoiceStepProps) {
     <div>
       <h2
         style={{
-          fontFamily: "'Syne',sans-serif",
           fontWeight: 700,
           fontSize: 20,
           color: "#1a1a2e",
@@ -131,7 +143,6 @@ export function GoalStep({ go, selected, setSelected }: ChoiceStepProps) {
     <div>
       <h2
         style={{
-          fontFamily: "'Syne',sans-serif",
           fontWeight: 700,
           fontSize: 20,
           color: "#1a1a2e",
@@ -171,7 +182,6 @@ export function ExperienceStep({
     <div>
       <h2
         style={{
-          fontFamily: "'Syne',sans-serif",
           fontWeight: 700,
           fontSize: 20,
           color: "#1a1a2e",
@@ -209,7 +219,6 @@ export function PaceStep({ go, selected, setSelected }: ChoiceStepProps) {
     <div>
       <h2
         style={{
-          fontFamily: "'Syne',sans-serif",
           fontWeight: 700,
           fontSize: 20,
           color: "#1a1a2e",
@@ -249,7 +258,6 @@ export function ReminderStep({
     <div style={{ textAlign: "center" }}>
       <h2
         style={{
-          fontFamily: "'Syne',sans-serif",
           fontWeight: 700,
           fontSize: 20,
           color: "#1a1a2e",
@@ -354,7 +362,6 @@ export function LoadingStep({ loadingPct }: LoadingStepProps) {
       </div>
       <h2
         style={{
-          fontFamily: "'Syne',sans-serif",
           fontWeight: 700,
           fontSize: 20,
           color: "#1a1a2e",
@@ -370,15 +377,18 @@ export function LoadingStep({ loadingPct }: LoadingStepProps) {
   );
 }
 
-export function RecommendationsStep({ go }: SharedStepProps) {
-  const navigate = useNavigate();
+interface RecommendationsStepProps {
+  onContinue: () => void;
+}
 
+export function RecommendationsStep({
+  onContinue,
+}: RecommendationsStepProps) {
   return (
     <div>
       <div style={{ textAlign: "center", marginBottom: 24 }}>
         <h2
           style={{
-            fontFamily: "'Syne',sans-serif",
             fontWeight: 700,
             fontSize: 22,
             color: "#1a1a2e",
@@ -432,7 +442,7 @@ export function RecommendationsStep({ go }: SharedStepProps) {
         className="btn-primary"
         style={{ marginBottom: 12 }}
         type="button"
-        onClick={() => navigate("/")}
+        onClick={onContinue}
       >
         Go to my dashboard
       </button>

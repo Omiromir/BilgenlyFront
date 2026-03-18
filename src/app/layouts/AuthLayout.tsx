@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router";
-import { BilgenlyLogo } from "../../features/onboarding/components/BilgenlyLogo";
+import { BilgenlyLogo } from "../../components/shared/BilgenlyLogo";
 import { authStyles } from "../../features/auth/authStyles";
 
 interface AuthLayoutProps {

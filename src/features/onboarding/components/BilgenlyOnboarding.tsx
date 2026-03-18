@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react";
-import { BilgenlyLogo } from "./BilgenlyLogo";
+import { useNavigate } from "react-router";
+import { useAuth } from "../../../app/providers/AuthProvider";
+import { getDashboardPathByRole } from "../../../lib/auth";
+import { BilgenlyLogo } from "../../../components/shared/BilgenlyLogo";
 import { progressMap, totalSteps } from "../content";
 import { onboardingStyles } from "../styles";
 import {
@@ -20,6 +23,9 @@ export function BilgenlyOnboarding() {
   const [reminderTime, setReminderTime] = useState("12:00 PM");
   const [loadingPct, setLoadingPct] = useState(0);
   const [fadeIn, setFadeIn] = useState(true);
+
+  const { signInAsRole } = useAuth();
+  const navigate = useNavigate();
 
   const go = (next: StepKey) => {
     setFadeIn(false);
@@ -51,7 +57,17 @@ export function BilgenlyOnboarding() {
     return () => clearInterval(interval);
   }, [step]);
 
+  const handleFinishOnboarding = () => {
+    if (!selected.role) {
+      return;
+    }
+
+    signInAsRole(selected.role);
+    navigate(getDashboardPathByRole(selected.role));
+  };
+
   const progress = progressMap[step] || 0;
+  const isWelcomeStep = step === "welcome";
 
   return (
     <div
@@ -68,94 +84,132 @@ export function BilgenlyOnboarding() {
     >
       <style>{onboardingStyles}</style>
 
-      <div
-        className="onboarding-shell onboarding-header"
-        style={{
-          width: "100%",
-          maxWidth: 440,
-          padding: "28px 0 0",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 9,
-          }}
-        >
-          <BilgenlyLogo size={30} />
-        </div>
-
-        {progress > 0 && (
-          <span style={{ fontSize: 12, color: "#888", fontWeight: 500 }}>
-            Step {progress} of {totalSteps}
-          </span>
-        )}
-      </div>
-
-      {progress > 0 && (
-        <div
-          className="onboarding-shell onboarding-progress"
+      {isWelcomeStep ? (
+        <section
+          className="welcome-screen"
           style={{
             width: "100%",
-            maxWidth: 440,
-            margin: "12px 0 0",
-            padding: "0",
+            minHeight: "100vh",
+            display: "flex",
+            flexDirection: "column",
+            padding: "28px 0 40px",
           }}
         >
-          <div className="progress-bar">
-            <div
-              className="progress-fill"
-              style={{ width: `${(progress / totalSteps) * 100}%` }}
-            />
+          <div
+            className="onboarding-shell"
+            style={{
+              width: "100%",
+              maxWidth: 440,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <BilgenlyLogo size={30} />
           </div>
-        </div>
-      )}
 
-      <div
-        className="onboarding-shell onboarding-card-wrap"
-        style={{
-          width: "100%",
-          maxWidth: 440,
-          marginTop: progress > 0 ? 24 : 40,
-          padding: "0 0 60px",
-        }}
-      >
-        <div
-          className={fadeIn ? "fade card" : "card"}
-          style={{ opacity: fadeIn ? 1 : 0 }}
-        >
-          {step === "welcome" && <WelcomeStep go={go} />}
-          {step === "role" && (
-            <RoleStep go={go} selected={selected} setSelected={setSelected} />
+          <div className="welcome-screen__content">
+            <div
+              className={fadeIn ? "fade welcome-screen__inner" : "welcome-screen__inner"}
+              style={{ opacity: fadeIn ? 1 : 0 }}
+            >
+              <WelcomeStep go={go} />
+            </div>
+          </div>
+        </section>
+      ) : (
+        <>
+          <div
+            className="onboarding-shell onboarding-header"
+            style={{
+              width: "100%",
+              maxWidth: 440,
+              padding: "28px 0 0",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 9,
+              }}
+            >
+              <BilgenlyLogo size={30} />
+            </div>
+
+            {progress > 0 && (
+              <span style={{ fontSize: 12, color: "#888", fontWeight: 500 }}>
+                Step {progress} of {totalSteps}
+              </span>
+            )}
+          </div>
+
+          {progress > 0 && (
+            <div
+              className="onboarding-shell onboarding-progress"
+              style={{
+                width: "100%",
+                maxWidth: 440,
+                margin: "12px 0 0",
+                padding: "0",
+              }}
+            >
+              <div className="progress-bar">
+                <div
+                  className="progress-fill"
+                  style={{ width: `${(progress / totalSteps) * 100}%` }}
+                />
+              </div>
+            </div>
           )}
-          {step === "goal" && (
-            <GoalStep go={go} selected={selected} setSelected={setSelected} />
-          )}
-          {step === "experience" && (
-            <ExperienceStep
-              go={go}
-              selected={selected}
-              setSelected={setSelected}
-            />
-          )}
-          {step === "pace" && (
-            <PaceStep go={go} selected={selected} setSelected={setSelected} />
-          )}
-          {step === "reminder" && (
-            <ReminderStep
-              go={go}
-              reminderTime={reminderTime}
-              setReminderTime={setReminderTime}
-            />
-          )}
-          {step === "loading" && <LoadingStep loadingPct={loadingPct} />}
-          {step === "recommendations" && <RecommendationsStep go={go} />}
-        </div>
-      </div>
+
+          <div
+            className="onboarding-shell onboarding-card-wrap"
+            style={{
+              width: "100%",
+              maxWidth: 440,
+              marginTop: 24,
+              padding: "0 0 60px",
+            }}
+          >
+            <div
+              className={fadeIn ? "fade card" : "card"}
+              style={{ opacity: fadeIn ? 1 : 0 }}
+            >
+              {step === "role" && (
+                <RoleStep go={go} selected={selected} setSelected={setSelected} />
+              )}
+              {step === "goal" && (
+                <GoalStep go={go} selected={selected} setSelected={setSelected} />
+              )}
+              {step === "experience" && (
+                <ExperienceStep
+                  go={go}
+                  selected={selected}
+                  setSelected={setSelected}
+                />
+              )}
+              {step === "pace" && (
+                <PaceStep go={go} selected={selected} setSelected={setSelected} />
+              )}
+              {step === "reminder" && (
+                <ReminderStep
+                  go={go}
+                  reminderTime={reminderTime}
+                  setReminderTime={setReminderTime}
+                />
+              )}
+              {step === "loading" && <LoadingStep loadingPct={loadingPct} />}
+              {step === "recommendations" && (
+                <RecommendationsStep onContinue={handleFinishOnboarding} />
+              )}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

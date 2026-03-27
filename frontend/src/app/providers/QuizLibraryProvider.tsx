@@ -39,6 +39,11 @@ interface QuizLibraryContextValue {
   quizzes: QuizRecord[];
   saveGeneratedQuiz: (input: SaveGeneratedQuizInput) => QuizRecord;
   getQuizById: (quizId: string) => QuizRecord | undefined;
+  publishQuiz: (
+    quizId: string,
+    viewerRole: "teacher" | "student",
+    visibility?: QuizLibraryVisibility,
+  ) => void;
   toggleSavedQuiz: (quizId: string, viewerRole: "teacher" | "student") => void;
   deleteQuiz: (quizId: string, viewerRole: "teacher" | "student") => void;
   duplicateQuizToLibrary: (
@@ -221,6 +226,32 @@ export function QuizLibraryProvider({ children }: QuizLibraryProviderProps) {
         return quiz;
       },
       getQuizById: (quizId) => quizzes.find((quiz) => quiz.id === quizId),
+      publishQuiz: (quizId, viewerRole, visibility) => {
+        setQuizzes((current) =>
+          current.map((quiz) => {
+            if (quiz.id !== quizId || quiz.ownerRole !== viewerRole) {
+              return quiz;
+            }
+
+            const nextVisibility = visibility ?? quiz.visibility;
+            const nextStatus =
+              nextVisibility === "public"
+                ? "published-public"
+                : "published-private";
+
+            return {
+              ...quiz,
+              visibility: nextVisibility,
+              status: nextStatus,
+              updatedAt: formatQuizDate(new Date()),
+              note:
+                nextStatus === "published-public"
+                  ? "Published to the public library from your draft library."
+                  : "Published privately and visible only in your owner views.",
+            };
+          }),
+        );
+      },
       toggleSavedQuiz: (quizId, viewerRole) => {
         setQuizzes((current) =>
           current.map((quiz) => {

@@ -5,7 +5,6 @@ import {
   BookmarkPlus,
   Clock3,
   Trash2,
-  Eye,
   FilePenLine,
   Layers3,
   Play,
@@ -29,7 +28,6 @@ import {
   QuizCard,
   QuizFilterBar,
   QuizGrid,
-  QuizPreviewDialog,
   SearchEmptyState,
 } from "../../../features/dashboard/components/quiz-library/QuizLibraryComponents";
 import type {
@@ -68,7 +66,6 @@ export function StudentQuizLibraryPage() {
       ? initialTab
       : "discover",
   );
-  const [selectedQuiz, setSelectedQuiz] = useState<QuizLibraryItem | null>(null);
   const [search, setSearch] = useState("");
   const [practiceState, setPracticeState] = useState("all");
   const deferredSearch = useDeferredValue(search);
@@ -261,13 +258,6 @@ export function StudentQuizLibraryPage() {
   };
 
   const getStudentActions = (item: QuizLibraryItem): QuizCardAction[] => {
-    const previewAction = {
-      label: "Preview",
-      icon: Eye,
-      variant: "secondary" as const,
-      onClick: () => setSelectedQuiz(item),
-    };
-
     if (activeTab === "history" && item.practiceState === "completed") {
       return [
         {
@@ -279,7 +269,6 @@ export function StudentQuizLibraryPage() {
           icon: BookMarked,
           variant: "secondary",
         },
-        previewAction,
       ];
     }
 
@@ -298,7 +287,6 @@ export function StudentQuizLibraryPage() {
               state: { editQuizId: item.id },
             }),
         },
-        previewAction,
         {
           label: "Delete",
           icon: Trash2,
@@ -313,7 +301,6 @@ export function StudentQuizLibraryPage() {
         label: getPracticeLabel(item),
         icon: Play,
       },
-      previewAction,
       {
         label: item.isSaved ? "Saved" : "Save",
         icon: item.isSaved ? BookMarked : BookmarkPlus,
@@ -392,17 +379,6 @@ export function StudentQuizLibraryPage() {
           />
         )}
       </section>
-
-      <QuizPreviewDialog
-        item={selectedQuiz}
-        metadata={selectedQuiz ? getStudentMetadata(selectedQuiz) : []}
-        actions={selectedQuiz ? getStudentActions(selectedQuiz) : []}
-        onOpenChange={(open) => {
-          if (!open) {
-            setSelectedQuiz(null);
-          }
-        }}
-      />
     </div>
   );
 }

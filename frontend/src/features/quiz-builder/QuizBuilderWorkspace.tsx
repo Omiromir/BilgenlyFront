@@ -5,9 +5,7 @@ import {
   ArrowUp,
   CheckCircle2,
   ChevronRight,
-  Clock3,
   Download,
-  Eye,
   FileJson,
   FileText,
   LoaderCircle,
@@ -32,7 +30,6 @@ import {
   DashboardBadge,
   DashboardButton,
   DashboardSurface,
-  dashboardIconTextRowClassName,
   dashboardInputVariants,
   dashboardInsetBlockClassName,
   dashboardPageCenteredClassName,
@@ -123,10 +120,8 @@ const workspaceCopy = {
     defaultContextValue: classOptions[0],
     defaultInstructions:
       "Prioritize conceptual clarity and keep wording friendly for secondary school students.",
-    headerPreviewLabel: "Preview as Student",
-    headerPreviewBackLabel: "Back to Editor",
     successDescription:
-      "The generation stage is complete. Move to review to edit wording, fix issues, and preview the quiz before saving.",
+      "The generation stage is complete. Move to review to edit wording, fix issues, and finalize the quiz before saving.",
     reviewReadyLabel: "The draft is ready for teacher use",
     saveLabel: "Save Draft",
     publishLabel: "Save Quiz",
@@ -143,10 +138,8 @@ const workspaceCopy = {
     defaultContextValue: studentGoalOptions[0],
     defaultInstructions:
       "Keep the wording encouraging, build confidence early, and make the quiz useful for self-checking without teacher guidance.",
-    headerPreviewLabel: "Preview Self-Test",
-    headerPreviewBackLabel: "Back to Editor",
     successDescription:
-      "Your self-study draft is ready. Move to review to refine questions, remove weak items, and preview the practice experience.",
+      "Your self-study draft is ready. Move to review to refine questions, remove weak items, and finalize the practice set.",
     reviewReadyLabel: "The draft is ready for self-study",
     saveLabel: "Save Draft",
     publishLabel: "Save Quiz",
@@ -209,11 +202,6 @@ function getQuestionStatusTone(status: QuestionStatus) {
   return "neutral";
 }
 
-function getPreviewTime(questionCount: number) {
-  const minutes = Math.max(2, Math.ceil(questionCount * 0.8));
-  return `${minutes} min`;
-}
-
 function getQuizDifficulty(questionCount: number): QuizDifficulty {
   if (questionCount <= 8) {
     return "Beginner";
@@ -274,7 +262,6 @@ export function QuizBuilderWorkspace({
     null,
   );
   const [hasEnteredReview, setHasEnteredReview] = useState(false);
-  const [showStudentPreview, setShowStudentPreview] = useState(false);
   const [generationError, setGenerationError] = useState<string | null>(null);
   const [generationDurationLabel, setGenerationDurationLabel] = useState<
     string | null
@@ -346,7 +333,6 @@ export function QuizBuilderWorkspace({
     setParseStatus("ready");
     setGenerationState("success");
     setHasEnteredReview(true);
-    setShowStudentPreview(false);
     setGenerationError(null);
   }, [editingQuiz, mode]);
 
@@ -393,7 +379,6 @@ export function QuizBuilderWorkspace({
       setQuestions([]);
       setSelectedQuestionId(null);
       setHasEnteredReview(false);
-      setShowStudentPreview(false);
     }, 1400);
 
     return () => window.clearTimeout(timeoutId);
@@ -556,7 +541,6 @@ export function QuizBuilderWorkspace({
     setQuestions([]);
     setGenerationError(null);
     setHasEnteredReview(false);
-    setShowStudentPreview(false);
   }
 
   function handleReplaceSource() {
@@ -569,7 +553,6 @@ export function QuizBuilderWorkspace({
     setGenerationError(null);
     setSelectedQuestionId(null);
     setHasEnteredReview(false);
-    setShowStudentPreview(false);
   }
 
   function toggleQuestionType(type: QuestionType) {
@@ -591,7 +574,6 @@ export function QuizBuilderWorkspace({
     setGenerationError(null);
     setGenerationDurationLabel(null);
     setHasEnteredReview(false);
-    setShowStudentPreview(false);
   }
 
   function handleCancelGeneration() {
@@ -773,26 +755,25 @@ export function QuizBuilderWorkspace({
     );
   }
 
+  function handleCancelCreation() {
+    navigate(
+      mode === "teacher"
+        ? "/dashboard/teacher/quiz-library"
+        : "/dashboard/student/quiz-library",
+      {
+        state: {
+          libraryTab: "drafts",
+        },
+      },
+    );
+  }
+
   return (
     <div className={dashboardPageCenteredClassName}>
       <DashboardPageHeader
         title={title}
         subtitle={subtitle}
         align="center"
-        actions={
-          workspaceStage === "review" ? (
-            <DashboardButton
-              type="button"
-              size="lg"
-              onClick={() => setShowStudentPreview((value) => !value)}
-            >
-              <Eye className="h-4.5 w-4.5" />
-              {showStudentPreview
-                ? copy.headerPreviewBackLabel
-                : copy.headerPreviewLabel}
-            </DashboardButton>
-          ) : null
-        }
       />
 
       <div className="flex flex-wrap items-center justify-center gap-4">
@@ -1496,7 +1477,6 @@ export function QuizBuilderWorkspace({
                           type="button"
                           size="lg"
                           onClick={() => {
-                            setShowStudentPreview(true);
                             setHasEnteredReview(true);
                           }}
                         >
@@ -1509,7 +1489,6 @@ export function QuizBuilderWorkspace({
                         size="lg"
                         variant={mode === "student" ? "secondary" : "primary"}
                         onClick={() => {
-                          setShowStudentPreview(false);
                           setHasEnteredReview(true);
                         }}
                       >
@@ -1539,41 +1518,29 @@ export function QuizBuilderWorkspace({
                   <div className="flex flex-wrap items-start justify-between gap-4">
                     <div>
                       <h2 className="text-[1.45rem] font-semibold text-[var(--dashboard-text-strong)]">
-                        {showStudentPreview
-                          ? mode === "student"
-                            ? "Self-test preview"
-                            : "Student preview"
-                          : mode === "student"
-                            ? "Practice-ready review"
-                            : "Question review"}
+                        {mode === "student" ? "Practice-ready review" : "Question review"}
                       </h2>
                       <p className="mt-2 text-[15px] leading-7 text-[var(--dashboard-text-soft)]">
-                        {showStudentPreview
-                          ? mode === "student"
-                            ? "Check how the self-test will feel before you start practicing."
-                            : "Preview the pacing, readability, and answer layout before sharing the quiz with students."
-                          : mode === "student"
-                            ? "Scan the generated practice set, then start a personal self-test when it looks right."
-                            : "Review, edit, reorder, or regenerate individual questions without leaving the page."}
+                        {mode === "student"
+                          ? "Scan the generated practice set, adjust anything you want, then start a personal self-test."
+                          : "Review, edit, reorder, or regenerate individual questions without leaving the page."}
                       </p>
                     </div>
                     <div className="flex flex-wrap gap-3">
-                      {!showStudentPreview ? (
-                        <DashboardButton
-                          type="button"
-                          variant="secondary"
-                          size="lg"
-                          onClick={handleAddQuestion}
-                        >
-                          <Plus className="h-4.5 w-4.5" />
-                          Add Question
-                        </DashboardButton>
-                      ) : null}
-                      {!showStudentPreview && mode === "student" ? (
+                      <DashboardButton
+                        type="button"
+                        variant="secondary"
+                        size="lg"
+                        onClick={handleAddQuestion}
+                      >
+                        <Plus className="h-4.5 w-4.5" />
+                        Add Question
+                      </DashboardButton>
+                      {mode === "student" ? (
                         <DashboardButton
                           type="button"
                           size="lg"
-                          onClick={() => setShowStudentPreview(true)}
+                          onClick={() => handleSaveQuiz("draft")}
                         >
                           <PlayCircle className="h-4.5 w-4.5" />
                           Start Practice
@@ -1585,64 +1552,21 @@ export function QuizBuilderWorkspace({
                         size="lg"
                         onClick={() => {
                           setHasEnteredReview(false);
-                          setShowStudentPreview(false);
                         }}
                       >
                         Back to result
                       </DashboardButton>
+                      <DashboardButton
+                        type="button"
+                        variant="ghost"
+                        size="lg"
+                        onClick={handleCancelCreation}
+                      >
+                        {editingQuiz ? "Cancel Editing" : "Cancel Creation"}
+                      </DashboardButton>
                     </div>
                   </div>
-
-                  {showStudentPreview ? (
-                    <div className="space-y-4 rounded-[28px] border border-[var(--dashboard-border-soft)] bg-white px-6 py-6">
-                      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--dashboard-border-soft)] pb-4">
-                        <div>
-                          <p className="text-sm text-[var(--dashboard-text-soft)]">
-                            Student-facing quiz
-                          </p>
-                          <h3 className="mt-1 text-[1.2rem] font-semibold text-[var(--dashboard-text-strong)]">
-                            {quizTitle}
-                          </h3>
-                        </div>
-                        <div className="flex flex-wrap gap-4 text-sm text-[var(--dashboard-text-soft)]">
-                          <span className={dashboardIconTextRowClassName}>
-                            <FileText className="h-4 w-4" />
-                            {questions.length} questions
-                          </span>
-                          <span className={dashboardIconTextRowClassName}>
-                            <Clock3 className="h-4 w-4" />
-                            {getPreviewTime(questions.length)}
-                          </span>
-                        </div>
-                      </div>
-
-                      {questions.slice(0, 2).map((question, index) => (
-                        <div
-                          key={`${question.id}-${questionSeed}`}
-                          className="rounded-[24px] border border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-muted)] px-5 py-5"
-                        >
-                          <p className="text-sm font-semibold text-[var(--dashboard-text-soft)]">
-                            Question {index + 1}
-                          </p>
-                          <h4 className="mt-3 text-[1.05rem] font-semibold text-[var(--dashboard-text-strong)]">
-                            {question.text}
-                          </h4>
-                          <div className="mt-4 space-y-3">
-                            {question.options.map((option, optionIndex) => (
-                              <div
-                                key={`${question.id}-${option}-${optionIndex}`}
-                                className="rounded-[16px] border border-[var(--dashboard-border)] bg-white px-4 py-3 text-sm text-[var(--dashboard-text-soft)]"
-                              >
-                                {String.fromCharCode(65 + optionIndex)}.{" "}
-                                {option}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="grid gap-5 xl:grid-cols-[minmax(0,0.94fr)_minmax(0,1.06fr)]">
+                  <div className="grid gap-5 xl:grid-cols-[minmax(0,0.94fr)_minmax(0,1.06fr)]">
                       <div className="space-y-4">
                         {questions.map((question, index) => (
                           <button
@@ -1942,7 +1866,6 @@ export function QuizBuilderWorkspace({
                         </div>
                       ) : null}
                     </div>
-                  )}
                 </section>
               </DashboardSurface>
 
@@ -1993,7 +1916,6 @@ export function QuizBuilderWorkspace({
                             key={issue.id}
                             type="button"
                             onClick={() => {
-                              setShowStudentPreview(false);
                               setSelectedQuestionId(issue.questionId);
                             }}
                             className={cn(
@@ -2088,7 +2010,7 @@ export function QuizBuilderWorkspace({
                         </>
                       ) : (
                         <>
-                          <DashboardButton type="button" size="lg" className="w-full" onClick={() => setShowStudentPreview(true)}>
+                          <DashboardButton type="button" size="lg" className="w-full" onClick={() => handleSaveQuiz("draft")}>
                             <PlayCircle className="h-4.5 w-4.5" />
                             {copy.runLabel}
                           </DashboardButton>

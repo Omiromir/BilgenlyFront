@@ -2,7 +2,6 @@ import { useDeferredValue, useEffect, useState } from "react";
 import {
   BookOpen,
   Clock3,
-  Eye,
   FilePenLine,
   Layers3,
   Play,
@@ -29,7 +28,6 @@ import {
   QuizCard,
   QuizFilterBar,
   QuizGrid,
-  QuizPreviewDialog,
   SearchEmptyState,
 } from "../../../features/dashboard/components/quiz-library/QuizLibraryComponents";
 import type {
@@ -54,7 +52,7 @@ export function TeacherQuizLibraryPage() {
   const meta = useDashboardPageMeta();
   const location = useLocation();
   const navigate = useNavigate();
-  const { quizzes, deleteQuiz, duplicateQuizToLibrary, toggleSavedQuiz } =
+  const { quizzes, deleteQuiz, duplicateQuizToLibrary, publishQuiz, toggleSavedQuiz } =
     useQuizLibrary();
   const teacherQuizLibraryItems = getQuizLibraryItemsForRole(quizzes, "teacher");
   const initialTab = location.state?.libraryTab as TeacherLibraryTab | undefined;
@@ -64,7 +62,6 @@ export function TeacherQuizLibraryPage() {
       ? initialTab
       : "my-quizzes",
   );
-  const [selectedQuiz, setSelectedQuiz] = useState<QuizLibraryItem | null>(null);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
   const deferredSearch = useDeferredValue(search);
@@ -221,16 +218,8 @@ export function TeacherQuizLibraryPage() {
   };
 
   const getTeacherActions = (item: QuizLibraryItem): QuizCardAction[] => {
-    const previewAction = {
-      label: "Preview",
-      icon: Eye,
-      variant: "secondary" as const,
-      onClick: () => setSelectedQuiz(item),
-    };
-
     if (!item.isOwner) {
       return [
-        previewAction,
         {
           label: item.isSaved ? "Saved Copy" : "Save Copy",
           icon: Save,
@@ -270,7 +259,6 @@ export function TeacherQuizLibraryPage() {
           icon: Layers3,
           variant: "secondary",
         },
-        previewAction,
         {
           label: "Delete",
           icon: Trash2,
@@ -294,8 +282,8 @@ export function TeacherQuizLibraryPage() {
           label: "Publish",
           icon: Send,
           variant: "secondary",
+          onClick: () => publishQuiz(item.id, "teacher", item.visibility),
         },
-        previewAction,
         {
           label: "Delete",
           icon: Trash2,
@@ -319,13 +307,12 @@ export function TeacherQuizLibraryPage() {
             state: { editQuizId: item.id },
           }),
       },
-      {
-        label: "Delete",
-        icon: Trash2,
-        variant: "ghost",
-        onClick: () => deleteQuiz(item.id, "teacher"),
-      },
-      previewAction,
+        {
+          label: "Delete",
+          icon: Trash2,
+          variant: "ghost",
+          onClick: () => deleteQuiz(item.id, "teacher"),
+        },
     ];
   };
 
@@ -389,17 +376,6 @@ export function TeacherQuizLibraryPage() {
           />
         )}
       </section>
-
-      <QuizPreviewDialog
-        item={selectedQuiz}
-        metadata={selectedQuiz ? getTeacherMetadata(selectedQuiz) : []}
-        actions={selectedQuiz ? getTeacherActions(selectedQuiz) : []}
-        onOpenChange={(open) => {
-          if (!open) {
-            setSelectedQuiz(null);
-          }
-        }}
-      />
     </div>
   );
 }

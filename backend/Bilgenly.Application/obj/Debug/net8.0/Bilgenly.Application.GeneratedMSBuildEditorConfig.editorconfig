@@ -8,6 +8,6 @@ build_property.PlatformNeutralAssembly =
 build_property.EnforceExtendedAnalyzerRules = 
 build_property._SupportedPlatformList = Linux,macOS,Windows
 build_property.RootNamespace = Bilgenly.Application
-build_property.ProjectDir = C:\BilgenlyMerged\Bilgenly\backend\Bilgenly.Application\
+build_property.ProjectDir = C:\Users\Sonya\RiderProjects\Bilgenly\Bilgenly.Application\
 build_property.EnableComHosting = 
 build_property.EnableGeneratedComInterfaceComImportInterop = 

@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "Wi+MiAYoUZg=",
+  "dgSpecHash": "FsBFTdE0bJw=",
   "success": true,
-  "projectFilePath": "C:\\BilgenlyMerged\\Bilgenly\\backend\\Bilgenly.API\\Bilgenly.API.csproj",
+  "projectFilePath": "C:\\Users\\Sonya\\RiderProjects\\Bilgenly\\Bilgenly.API\\Bilgenly.API.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\Sonya\\.nuget\\packages\\bcrypt.net-next\\4.1.0\\bcrypt.net-next.4.1.0.nupkg.sha512",
     "C:\\Users\\Sonya\\.nuget\\packages\\dotnetenv\\3.1.1\\dotnetenv.3.1.1.nupkg.sha512",

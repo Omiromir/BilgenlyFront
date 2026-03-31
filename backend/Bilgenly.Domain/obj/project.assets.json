@@ -5098,11 +5098,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\BilgenlyMerged\\Bilgenly\\backend\\Bilgenly.Domain\\Bilgenly.Domain.csproj",
+      "projectUniqueName": "C:\\Users\\Sonya\\RiderProjects\\Bilgenly\\Bilgenly.Domain\\Bilgenly.Domain.csproj",
       "projectName": "Bilgenly.Domain",
-      "projectPath": "C:\\BilgenlyMerged\\Bilgenly\\backend\\Bilgenly.Domain\\Bilgenly.Domain.csproj",
+      "projectPath": "C:\\Users\\Sonya\\RiderProjects\\Bilgenly\\Bilgenly.Domain\\Bilgenly.Domain.csproj",
       "packagesPath": "C:\\Users\\Sonya\\.nuget\\packages\\",
-      "outputPath": "C:\\BilgenlyMerged\\Bilgenly\\backend\\Bilgenly.Domain\\obj\\",
+      "outputPath": "C:\\Users\\Sonya\\RiderProjects\\Bilgenly\\Bilgenly.Domain\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
         "C:\\Users\\Sonya\\AppData\\Roaming\\NuGet\\NuGet.Config"

@@ -7642,11 +7642,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\BilgenlyMerged\\Bilgenly\\backend\\Bilgenly.API\\Bilgenly.API.csproj",
+      "projectUniqueName": "C:\\Users\\Sonya\\RiderProjects\\Bilgenly\\Bilgenly.API\\Bilgenly.API.csproj",
       "projectName": "Bilgenly.API",
-      "projectPath": "C:\\BilgenlyMerged\\Bilgenly\\backend\\Bilgenly.API\\Bilgenly.API.csproj",
+      "projectPath": "C:\\Users\\Sonya\\RiderProjects\\Bilgenly\\Bilgenly.API\\Bilgenly.API.csproj",
       "packagesPath": "C:\\Users\\Sonya\\.nuget\\packages\\",
-      "outputPath": "C:\\BilgenlyMerged\\Bilgenly\\backend\\Bilgenly.API\\obj\\",
+      "outputPath": "C:\\Users\\Sonya\\RiderProjects\\Bilgenly\\Bilgenly.API\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
         "C:\\Users\\Sonya\\AppData\\Roaming\\NuGet\\NuGet.Config"
@@ -7661,11 +7661,11 @@
         "net8.0": {
           "targetAlias": "net8.0",
           "projectReferences": {
-            "C:\\BilgenlyMerged\\Bilgenly\\backend\\Bilgenly.Application\\Bilgenly.Application.csproj": {
-              "projectPath": "C:\\BilgenlyMerged\\Bilgenly\\backend\\Bilgenly.Application\\Bilgenly.Application.csproj"
+            "C:\\Users\\Sonya\\RiderProjects\\Bilgenly\\Bilgenly.Application\\Bilgenly.Application.csproj": {
+              "projectPath": "C:\\Users\\Sonya\\RiderProjects\\Bilgenly\\Bilgenly.Application\\Bilgenly.Application.csproj"
             },
-            "C:\\BilgenlyMerged\\Bilgenly\\backend\\Bilgenly.Infrastructure\\Bilgenly.Infrastructure.csproj": {
-              "projectPath": "C:\\BilgenlyMerged\\Bilgenly\\backend\\Bilgenly.Infrastructure\\Bilgenly.Infrastructure.csproj"
+            "C:\\Users\\Sonya\\RiderProjects\\Bilgenly\\Bilgenly.Infrastructure\\Bilgenly.Infrastructure.csproj": {
+              "projectPath": "C:\\Users\\Sonya\\RiderProjects\\Bilgenly\\Bilgenly.Infrastructure\\Bilgenly.Infrastructure.csproj"
             }
           }
         }

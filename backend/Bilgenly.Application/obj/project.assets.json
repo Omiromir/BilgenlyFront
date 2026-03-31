@@ -5119,11 +5119,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\BilgenlyMerged\\Bilgenly\\backend\\Bilgenly.Application\\Bilgenly.Application.csproj",
+      "projectUniqueName": "C:\\Users\\Sonya\\RiderProjects\\Bilgenly\\Bilgenly.Application\\Bilgenly.Application.csproj",
       "projectName": "Bilgenly.Application",
-      "projectPath": "C:\\BilgenlyMerged\\Bilgenly\\backend\\Bilgenly.Application\\Bilgenly.Application.csproj",
+      "projectPath": "C:\\Users\\Sonya\\RiderProjects\\Bilgenly\\Bilgenly.Application\\Bilgenly.Application.csproj",
       "packagesPath": "C:\\Users\\Sonya\\.nuget\\packages\\",
-      "outputPath": "C:\\BilgenlyMerged\\Bilgenly\\backend\\Bilgenly.Application\\obj\\",
+      "outputPath": "C:\\Users\\Sonya\\RiderProjects\\Bilgenly\\Bilgenly.Application\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
         "C:\\Users\\Sonya\\AppData\\Roaming\\NuGet\\NuGet.Config"
@@ -5138,8 +5138,8 @@
         "net8.0": {
           "targetAlias": "net8.0",
           "projectReferences": {
-            "C:\\BilgenlyMerged\\Bilgenly\\backend\\Bilgenly.Domain\\Bilgenly.Domain.csproj": {
-              "projectPath": "C:\\BilgenlyMerged\\Bilgenly\\backend\\Bilgenly.Domain\\Bilgenly.Domain.csproj"
+            "C:\\Users\\Sonya\\RiderProjects\\Bilgenly\\Bilgenly.Domain\\Bilgenly.Domain.csproj": {
+              "projectPath": "C:\\Users\\Sonya\\RiderProjects\\Bilgenly\\Bilgenly.Domain\\Bilgenly.Domain.csproj"
             }
           }
         }

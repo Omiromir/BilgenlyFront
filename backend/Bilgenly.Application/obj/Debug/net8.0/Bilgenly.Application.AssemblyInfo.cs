@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Bilgenly.Application")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+1ad9630facaecd9380f24499e19b7c3ae0727a40")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+25c319bd52f4b516ee2243d77af3e294226fd3dd")]
 [assembly: System.Reflection.AssemblyProductAttribute("Bilgenly.Application")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Bilgenly.Application")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

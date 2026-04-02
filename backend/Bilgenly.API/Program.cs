@@ -74,12 +74,12 @@ builder.Services.AddCors(options =>
     });
 });
 var app = builder.Build();
-app.UseSwagger();
-app.UseSwaggerUI(options =>
+    
+if (app.Environment.IsDevelopment())
 {
-    options.SwaggerEndpoint("/swagger/v1/swagger.json", "Bilgenly API v1");
-    options.RoutePrefix = "swagger";   
-});
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
 app.UseCors("AllowFrontend");
 app.UseHttpsRedirection();
 app.UseAuthentication();

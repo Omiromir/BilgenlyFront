@@ -1,5 +1,6 @@
 import { type ChangeEvent, type FormEvent, useState } from "react";
 import { Link, useNavigate } from "react-router";
+import { toast } from "sonner";
 import { signUp } from "../api";
 import { usePasswordVisibility } from "../hooks";
 import type { UserRole } from "../../../lib/auth";
@@ -91,11 +92,18 @@ export function SignUpForm() {
         try {
             setIsSubmitting(true);
             const result = await signUp(normalizedValues);
-            signInAsRole(result.role.toLowerCase() as UserRole, result.token);
+            signInAsRole(result.role.toLowerCase() as UserRole, result.token, {
+                userId: result.userId ?? "",
+                username: result.username,
+                email: result.email,
+                role: result.role,
+            });
             const dashboardPath = getDashboardPathByRole(result.role.toLowerCase());
             navigate(dashboardPath);
         } catch (error) {
-            setServerError(error instanceof Error ? error.message : "Registration failed");
+            const message = error instanceof Error ? error.message : "Registration failed";
+            setServerError(message);
+            toast.error(message);
         } finally {
             setIsSubmitting(false);
         }

@@ -4,18 +4,20 @@ import { QuizLibraryProvider } from "./providers/QuizLibraryProvider";
 import { QueryProvider } from "./providers/QueryProvider";
 import { TeacherClassesProvider } from "./providers/TeacherClassesProvider";
 import { AppRoutes } from "./routes/AppRoutes";
+import { Toaster } from "../components/ui/sonner";
 
 export default function App() {
   return (
     <QueryProvider>
       <AuthProvider>
-        <QuizLibraryProvider>
-          <NotificationsProvider>
-            <TeacherClassesProvider>
+        <NotificationsProvider>
+          <TeacherClassesProvider>
+            <QuizLibraryProvider>
               <AppRoutes />
-            </TeacherClassesProvider>
-          </NotificationsProvider>
-        </QuizLibraryProvider>
+              <Toaster closeButton position="top-right" richColors />
+            </QuizLibraryProvider>
+          </TeacherClassesProvider>
+        </NotificationsProvider>
       </AuthProvider>
     </QueryProvider>
   );

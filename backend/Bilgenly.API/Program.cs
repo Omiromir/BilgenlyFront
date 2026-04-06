@@ -74,13 +74,17 @@ builder.Services.AddCors(options =>
     });
 });
 var app = builder.Build();
-app.UseDeveloperExceptionPage();
-app.UseSwagger();
-app.UseSwaggerUI(options =>
-{
-    options.SwaggerEndpoint("/swagger/v1/swagger.json", "Bilgenly API v1");
-    options.RoutePrefix = "swagger";   
-});
+if (app.Environment.IsDevelopment())
+{   
+    app.UseDeveloperExceptionPage();
+    app.UseSwagger();
+    app.UseSwaggerUI(options =>
+    {
+        options.SwaggerEndpoint("/swagger/v1/swagger.json", "Bilgenly API v1");
+        options.RoutePrefix = "swagger";   
+    });
+}
+
 app.UseCors("AllowFrontend");
 app.UseHttpsRedirection();
 app.UseAuthentication();

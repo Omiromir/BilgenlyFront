@@ -1,4 +1,5 @@
 ﻿using Bilgenly.Domain.Entities;
+
 namespace Bilgenly.Application.Interfaces;
 
 public interface IClassRepository
@@ -7,6 +8,8 @@ public interface IClassRepository
     Task<Class?> GetByInviteCodeAsync(string inviteCode);
     Task<IEnumerable<Class>> GetByTeacherIdAsync(Guid teacherId);
     Task<IEnumerable<Class>> GetByStudentIdAsync(Guid studentId);
+    Task<Assignment?> GetAssignmentByIdAsync(Guid assignmentId);
+    Task<IEnumerable<Assignment>> GetAssignmentsByClassIdAsync(Guid classId);
     Task AddAsync(Class classEntity);
     Task SaveChangesAsync();
     void Remove(Class classEntity);

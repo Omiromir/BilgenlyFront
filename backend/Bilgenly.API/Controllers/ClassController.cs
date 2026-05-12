@@ -1,4 +1,5 @@
 ﻿using Bilgenly.Application.DTOs;
+using Bilgenly.Application.Interfaces;
 using Bilgenly.Application.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -12,10 +13,12 @@ namespace Bilgenly.API.Controllers;
 public class ClassController : ControllerBase
 {
     private readonly ClassService _classService;
+    private readonly IClassRepository _classRepository; 
 
-    public ClassController(ClassService classService)
+    public ClassController(ClassService classService, IClassRepository classRepository) 
     {
         _classService = classService;
+        _classRepository = classRepository; 
     }
 
     [HttpPost]
@@ -77,31 +80,52 @@ public class ClassController : ControllerBase
 
     [HttpPost("join")]
     [Authorize(Roles = "Student")]
-    public async Task<IActionResult> JoinClass([FromBody] JoinClassDto dto)
+    public async Task<IActionResult> JoinClass([FromBody] JoinClassRequest dto)
     {
         var studentId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
-        var (result, error) = await _classService.JoinClassAsync(dto.InviteCode, studentId);
+        var (result, error) = await _classService.JoinClassAsync(dto.InviteCode, studentId); 
         if (result is null) return BadRequest(new { message = error });
         return Ok(result);
     }
 
-    [HttpPost("{classId}/quizzes")]
+    [HttpPost("{classId}/assignments")]
     [Authorize(Roles = "Teacher")]
     public async Task<IActionResult> AssignQuiz(Guid classId, [FromBody] AssignQuizDto dto)
     {
         var teacherId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
-        var (result, error) = await _classService.AssignQuizAsync(classId, dto.QuizId, teacherId);
+        var teacherName = User.FindFirst(ClaimTypes.Name)!.Value;
+        var (result, error) = await _classService.AssignQuizAsync(classId, dto, teacherId, teacherName);
         if (result is null) return BadRequest(new { message = error });
         return Ok(result);
     }
+
+    [HttpGet("{classId}/assignments")]
+    [Authorize(Roles = "Teacher")]
+    public async Task<IActionResult> GetAssignments(Guid classId)
+    {
+        var assignments = await _classRepository.GetAssignmentsByClassIdAsync(classId);
+        return Ok(assignments.Select(a => new AssignmentDto
+        {
+            Id = a.Id,
+            AssignmentId = a.Id.ToString(),
+            ClassId = a.ClassId,
+            QuizId = a.QuizId,
+            Title = a.Quiz?.Title ?? "",
+            Topic = a.Quiz?.Topic ?? "",
+            QuestionCount = a.Quiz != null ? a.Quiz.Questions.Count : 0,
+            AssignedAt = a.AssignedAt,
+            Deadline = a.Deadline,
+            MaxAttempts = a.MaxAttempts,
+            AllowLateSubmissions = a.AllowLateSubmissions,
+            AssignedBy = a.AssignedBy,
+            AssignedByName = a.AssignedByName,
+            Visibility = a.Visibility,
+            Status = a.Status
+        }));
+    }
 }
 
-public class JoinClassDto
+public class JoinClassRequest
 {
     public string InviteCode { get; set; } = string.Empty;
-}
-
-public class AssignQuizDto
-{
-    public Guid QuizId { get; set; }
 }

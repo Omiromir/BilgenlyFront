@@ -13,5 +13,5 @@ public class Class
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
     public ICollection<ClassStudent> ClassStudents { get; set; } = new List<ClassStudent>();
-    public ICollection<ClassQuiz> ClassQuizzes { get; set; } = new List<ClassQuiz>();
+    public ICollection<Assignment> Assignments { get; set; } = new List<Assignment>(); // ← было ClassQuizzes
 }

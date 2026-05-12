@@ -12,7 +12,8 @@ public class AppDbContext : DbContext
     public DbSet<AttemptAnswer> AttemptAnswers => Set<AttemptAnswer>();
     public DbSet<Class> Classes => Set<Class>();
     public DbSet<ClassStudent> ClassStudents => Set<ClassStudent>();
-    public DbSet<ClassQuiz> ClassQuizzes => Set<ClassQuiz>();
+    public DbSet<Assignment> Assignments => Set<Assignment>();
+    
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -51,15 +52,15 @@ public class AppDbContext : DbContext
                 .HasForeignKey(cs => cs.StudentId);
         });
 
-        modelBuilder.Entity<ClassQuiz>(e =>
+        modelBuilder.Entity<Assignment>(e =>
         {
-            e.HasKey(cq => new { cq.ClassId, cq.QuizId }); 
-            e.HasOne(cq => cq.Class)
-                .WithMany(c => c.ClassQuizzes)
-                .HasForeignKey(cq => cq.ClassId);
-            e.HasOne(cq => cq.Quiz)
+            e.HasKey(a => a.Id);
+            e.HasOne(a => a.Class)
+                .WithMany(c => c.Assignments)
+                .HasForeignKey(a => a.ClassId);
+            e.HasOne(a => a.Quiz)
                 .WithMany()
-                .HasForeignKey(cq => cq.QuizId);
+                .HasForeignKey(a => a.QuizId);
         });
 
         modelBuilder.Entity<Class>(e =>

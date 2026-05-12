@@ -45,6 +45,55 @@ namespace Bilgenly.Infrastructure.Migrations
                     b.ToTable("Answer");
                 });
 
+            modelBuilder.Entity("Bilgenly.Domain.Entities.Assignment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("AllowLateSubmissions")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime>("AssignedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("AssignedBy")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("AssignedByName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("ClassId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("Deadline")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("MaxAttempts")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("QuizId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Visibility")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClassId");
+
+                    b.HasIndex("QuizId");
+
+                    b.ToTable("Assignments");
+                });
+
             modelBuilder.Entity("Bilgenly.Domain.Entities.Attempt", b =>
                 {
                     b.Property<Guid>("Id")
@@ -146,24 +195,6 @@ namespace Bilgenly.Infrastructure.Migrations
                     b.HasIndex("TeacherId");
 
                     b.ToTable("Classes");
-                });
-
-            modelBuilder.Entity("Bilgenly.Domain.Entities.ClassQuiz", b =>
-                {
-                    b.Property<Guid>("ClassId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("QuizId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("AssignedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("ClassId", "QuizId");
-
-                    b.HasIndex("QuizId");
-
-                    b.ToTable("ClassQuizzes");
                 });
 
             modelBuilder.Entity("Bilgenly.Domain.Entities.ClassStudent", b =>
@@ -312,6 +343,25 @@ namespace Bilgenly.Infrastructure.Migrations
                     b.Navigation("Question");
                 });
 
+            modelBuilder.Entity("Bilgenly.Domain.Entities.Assignment", b =>
+                {
+                    b.HasOne("Bilgenly.Domain.Entities.Class", "Class")
+                        .WithMany("Assignments")
+                        .HasForeignKey("ClassId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Bilgenly.Domain.Entities.Quiz", "Quiz")
+                        .WithMany()
+                        .HasForeignKey("QuizId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Class");
+
+                    b.Navigation("Quiz");
+                });
+
             modelBuilder.Entity("Bilgenly.Domain.Entities.Attempt", b =>
                 {
                     b.HasOne("Bilgenly.Domain.Entities.Quiz", "Quiz")
@@ -369,25 +419,6 @@ namespace Bilgenly.Infrastructure.Migrations
                     b.Navigation("Teacher");
                 });
 
-            modelBuilder.Entity("Bilgenly.Domain.Entities.ClassQuiz", b =>
-                {
-                    b.HasOne("Bilgenly.Domain.Entities.Class", "Class")
-                        .WithMany("ClassQuizzes")
-                        .HasForeignKey("ClassId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Bilgenly.Domain.Entities.Quiz", "Quiz")
-                        .WithMany()
-                        .HasForeignKey("QuizId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Class");
-
-                    b.Navigation("Quiz");
-                });
-
             modelBuilder.Entity("Bilgenly.Domain.Entities.ClassStudent", b =>
                 {
                     b.HasOne("Bilgenly.Domain.Entities.Class", "Class")
@@ -436,7 +467,7 @@ namespace Bilgenly.Infrastructure.Migrations
 
             modelBuilder.Entity("Bilgenly.Domain.Entities.Class", b =>
                 {
-                    b.Navigation("ClassQuizzes");
+                    b.Navigation("Assignments");
 
                     b.Navigation("ClassStudents");
                 });

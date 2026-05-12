@@ -1,5 +1,4 @@
-﻿// Bilgenly.Application/Services/ClassService.cs
-using Bilgenly.Application.DTOs;
+﻿using Bilgenly.Application.DTOs;
 using Bilgenly.Application.Interfaces;
 using Bilgenly.Domain.Entities;
 
@@ -98,7 +97,6 @@ public class ClassService
         await _classRepository.SaveChangesAsync();
         return (true, null);
     }
-
     public async Task<(ClassDto? Result, string? Error)> JoinClassAsync(
         string inviteCode, Guid studentId)
     {
@@ -121,33 +119,64 @@ public class ClassService
         await _classRepository.SaveChangesAsync();
         return (MapToDto(classEntity), null);
     }
-
-    public async Task<(ClassDto? Result, string? Error)> AssignQuizAsync(
-        Guid classId, Guid quizId, Guid teacherId)
+    public async Task<(AssignmentDto? Result, string? Error)> AssignQuizAsync(
+        Guid classId, AssignQuizDto dto, Guid teacherId, string teacherName)
     {
         var classEntity = await _classRepository.GetByIdAsync(classId);
         if (classEntity is null) return (null, "Class not found");
         if (classEntity.TeacherId != teacherId) return (null, "Access denied");
 
-        var quiz = await _quizRepository.GetByIdAsync(quizId);
+        var quiz = await _quizRepository.GetByIdAsync(dto.QuizId);
         if (quiz is null) return (null, "Quiz not found");
 
-        var alreadyAssigned = classEntity.ClassQuizzes
-            .Any(cq => cq.QuizId == quizId);
-        if (alreadyAssigned) return (null, "Quiz already assigned");
+        var alreadyAssigned = classEntity.Assignments
+            .Any(a => a.QuizId == dto.QuizId && a.Status == "active");
+        if (alreadyAssigned) return (null, "Quiz already assigned to this class");
 
-        classEntity.ClassQuizzes.Add(new ClassQuiz
+        var status = dto.Deadline.HasValue && dto.Deadline < DateTime.UtcNow
+            ? "expired"
+            : "active";
+
+        var assignment = new Assignment
         {
+            Id = Guid.NewGuid(),
             ClassId = classId,
-            QuizId = quizId,
-            AssignedAt = DateTime.UtcNow
-        });
-        classEntity.UpdatedAt = DateTime.UtcNow;
+            QuizId = dto.QuizId,
+            AssignedAt = DateTime.UtcNow,
+            Deadline = dto.Deadline,
+            MaxAttempts = dto.MaxAttempts,
+            AllowLateSubmissions = dto.AllowLateSubmissions,
+            AssignedBy = teacherId.ToString(),
+            AssignedByName = teacherName,
+            Visibility = "class-members",
+            Status = status
+        };
 
+        classEntity.Assignments.Add(assignment);
+        classEntity.UpdatedAt = DateTime.UtcNow;
         await _classRepository.SaveChangesAsync();
-        return (MapToDto(classEntity), null);
+
+        return (MapAssignmentToDto(assignment, quiz), null);
     }
 
+    private AssignmentDto MapAssignmentToDto(Assignment a, Quiz quiz) => new()
+    {
+        Id = a.Id,
+        AssignmentId = a.Id.ToString(),
+        ClassId = a.ClassId,
+        QuizId = a.QuizId,
+        Title = quiz.Title,
+        Topic = quiz.Topic,
+        QuestionCount = quiz.Questions.Count,
+        AssignedAt = a.AssignedAt,
+        Deadline = a.Deadline,
+        MaxAttempts = a.MaxAttempts,
+        AllowLateSubmissions = a.AllowLateSubmissions,
+        AssignedBy = a.AssignedBy,
+        AssignedByName = a.AssignedByName,
+        Visibility = a.Visibility,
+        Status = a.Status
+    };
     private ClassDto MapToDto(Class c) => new()
     {
         Id = c.Id,
@@ -157,7 +186,7 @@ public class ClassService
         InviteCode = c.InviteCode,
         IsArchived = c.IsArchived,
         StudentCount = c.ClassStudents.Count,
-        QuizCount = c.ClassQuizzes.Count,
+        QuizCount = c.Assignments.Count, 
         CreatedAt = c.CreatedAt,
         UpdatedAt = c.UpdatedAt,
         Students = c.ClassStudents.Select(cs => new ClassStudentDto
@@ -167,11 +196,11 @@ public class ClassService
             Email = cs.Student?.Email ?? "",
             JoinedAt = cs.JoinedAt
         }).ToList(),
-        Quizzes = c.ClassQuizzes.Select(cq => new ClassQuizDto
+        Quizzes = c.Assignments.Select(a => new ClassQuizDto
         {
-            QuizId = cq.QuizId,
-            QuizTitle = cq.Quiz?.Title ?? "",
-            AssignedAt = cq.AssignedAt
+            QuizId = a.QuizId,
+            QuizTitle = a.Quiz?.Title ?? "",
+            AssignedAt = a.AssignedAt
         }).ToList()
     };
 }

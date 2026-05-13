@@ -39,6 +39,7 @@ import {
   validateAssignmentSettings,
   type AssignmentSettingsFormValues,
 } from "../../../features/assignments/assignmentConstraints";
+import { isGuidString } from "../../../lib/apiClient";
 import {
   LibrarySectionHeader,
   LibraryTabs,
@@ -60,6 +61,7 @@ import {
   matchesQuizSearch,
 } from "../../../features/dashboard/components/quiz-library/quizLibraryUtils";
 import { useDashboardPageMeta } from "../../../features/dashboard/hooks/useDashboardPageMeta";
+import { formatCurrentDate } from "../../../features/dashboard/settings/settingsPreferences";
 
 type TeacherLibraryTab =
   | "my-quizzes"
@@ -99,6 +101,9 @@ export function TeacherQuizLibraryPage() {
     () => classes.filter((teacherClass) => teacherClass.status === "active"),
     [classes],
   );
+  const quizPendingAssignmentHasBackendId = quizPendingAssignment
+    ? isGuidString(quizPendingAssignment.id)
+    : true;
 
   const getTeacherItemsForTab = (tab: TeacherLibraryTab) => {
     switch (tab) {
@@ -147,7 +152,7 @@ export function TeacherQuizLibraryPage() {
       id: "my-quizzes" as const,
       label: "My Quizzes",
       description:
-        "Your published private/public quizzes plus any public quizzes you saved for later reuse or inspiration.",
+        "Your published private/public quizzes plus any public quizzes you saved for later reuse, inspiration, or future assigned quiz work.",
       count: getTeacherItemsForTab("my-quizzes").length,
       emptyTitle: "No quizzes in My Quizzes yet",
       emptyDescription:
@@ -229,7 +234,7 @@ export function TeacherQuizLibraryPage() {
       )
       .map((teacherClass) => teacherClass.id);
 
-  const handleAssignQuizToClasses = () => {
+  const handleAssignQuizToClasses = async () => {
     if (!quizPendingAssignment) {
       return;
     }
@@ -246,32 +251,40 @@ export function TeacherQuizLibraryPage() {
       return;
     }
 
-    const assignedClassIds = assignQuizToClasses(
-      {
-        quizId: quizPendingAssignment.id,
-        title: quizPendingAssignment.title,
-        topic: quizPendingAssignment.topic,
-        questionCount: quizPendingAssignment.questionCount,
-      },
-      selectedClassIds,
-      {
-        deadline: validation.deadline,
-        maxAttempts: validation.maxAttempts,
-        allowLateSubmissions: false,
-      },
-    );
+    try {
+      const assignedClassIds = await assignQuizToClasses(
+        {
+          quizId: quizPendingAssignment.id,
+          title: quizPendingAssignment.title,
+          topic: quizPendingAssignment.topic,
+          questionCount: quizPendingAssignment.questionCount,
+        },
+        selectedClassIds,
+        {
+          deadline: validation.deadline,
+          maxAttempts: validation.maxAttempts,
+          allowLateSubmissions: false,
+        },
+      );
 
-    if (!assignedClassIds.length) {
-      setAssignmentError("That quiz is already assigned to the selected classes.");
-      return;
+      if (!assignedClassIds.length) {
+        setAssignmentError(
+          "That assigned quiz is already visible to the selected classes.",
+        );
+        return;
+      }
+
+      setAssignmentFeedback(
+        `"${quizPendingAssignment.title}" is now visible to class members in ${assignedClassIds.length} ${
+          assignedClassIds.length === 1 ? "class" : "classes"
+        }.`,
+      );
+      setQuizPendingAssignment(null);
+    } catch (error) {
+      setAssignmentError(
+        error instanceof Error ? error.message : "Unable to assign that quiz.",
+      );
     }
-
-    setAssignmentFeedback(
-      `"${quizPendingAssignment.title}" assigned to ${assignedClassIds.length} ${
-        assignedClassIds.length === 1 ? "class" : "classes"
-      }.`,
-    );
-    setQuizPendingAssignment(null);
   };
 
   const getTeacherMetadata = (item: QuizLibraryItem): QuizCardMetadataItem[] => [
@@ -293,7 +306,7 @@ export function TeacherQuizLibraryPage() {
       icon: SearchCheck,
       label: item.averageScore
         ? `Avg score ${item.averageScore}`
-        : `Updated ${item.updatedAt}`,
+        : `Updated ${formatCurrentDate(item.updatedAt)}`,
     },
   ];
 
@@ -438,7 +451,7 @@ export function TeacherQuizLibraryPage() {
 
       return [
         {
-          label: "Assign Quiz",
+          label: "Assign quiz",
           icon: Rocket,
           iconDisplay: "label-only",
           onClick: () => setQuizPendingAssignment(item),
@@ -544,23 +557,33 @@ export function TeacherQuizLibraryPage() {
       >
         <DashboardModalContent className="max-w-[720px]">
           <DashboardModalHeader
-            title="Assign quiz to classes"
+            title="Assign quiz to class"
             description={
               quizPendingAssignment
-                ? `Choose which classes should receive "${quizPendingAssignment.title}".`
-                : "Choose classes for this quiz."
+                ? `Choose which classes should make "${quizPendingAssignment.title}" visible to class members.`
+                : "Choose classes for this assigned quiz."
             }
           />
 
           <DashboardModalBody className="space-y-5">
             {quizPendingAssignment ? (
-              <div className="rounded-[22px] border border-[var(--dashboard-border-soft)] bg-white px-5 py-4 shadow-[0_10px_30px_rgba(18,32,58,0.04)]">
+              <div className="rounded-[22px] border border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-elevated)] px-5 py-4 shadow-[var(--dashboard-shadow-card)]">
                 <p className="text-[1.125rem] font-semibold tracking-[-0.02em] text-[var(--dashboard-text-strong)]">
                   {quizPendingAssignment.title}
                 </p>
                 <p className="mt-1 text-sm leading-6 text-[var(--dashboard-text-soft)]">
                   {quizPendingAssignment.topic} · {quizPendingAssignment.questionCount}{" "}
                   {quizPendingAssignment.questionCount === 1 ? "question" : "questions"}
+                </p>
+              </div>
+            ) : null}
+
+            {quizPendingAssignment && !quizPendingAssignmentHasBackendId ? (
+              <div className="rounded-[18px] border border-[var(--dashboard-warning-soft)] bg-[var(--dashboard-warning-soft)]/35 px-4 py-3">
+                <p className="text-sm leading-6 text-[var(--dashboard-warning)]">
+                  This quiz is still local-only and does not have a backend quiz ID yet. It can
+                  be previewed and edited, but the class assignment API will reject it until the
+                  quiz is saved through a backend-backed quiz flow.
                 </p>
               </div>
             ) : null}
@@ -578,7 +601,7 @@ export function TeacherQuizLibraryPage() {
                   return (
                     <label
                       key={teacherClass.id}
-                      className="flex items-start justify-between gap-4 rounded-[22px] border border-[var(--dashboard-border-soft)] bg-white px-5 py-4 shadow-[0_10px_30px_rgba(18,32,58,0.04)] transition-colors hover:border-[var(--dashboard-brand-soft)]"
+                      className="flex items-start justify-between gap-4 rounded-[22px] border border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-elevated)] px-5 py-4 shadow-[var(--dashboard-shadow-card)] transition-colors hover:border-[var(--dashboard-brand-soft)]"
                     >
                       <div className="flex items-start gap-4">
                         <input
@@ -614,14 +637,14 @@ export function TeacherQuizLibraryPage() {
 
                       <div className="flex flex-wrap justify-end gap-2 pt-0.5">
                         {alreadyAssigned ? (
-                          <DashboardBadge tone="info">Already assigned</DashboardBadge>
+                          <DashboardBadge tone="info">Already an assigned quiz</DashboardBadge>
                         ) : null}
                       </div>
                     </label>
                   );
                 })
               ) : (
-                <div className="rounded-[22px] border border-dashed border-[var(--dashboard-border-soft)] bg-white px-5 py-5">
+                <div className="rounded-[22px] border border-dashed border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-elevated)] px-5 py-5">
                   <p className="font-semibold text-[var(--dashboard-text-strong)]">
                     No active classes available
                   </p>
@@ -661,8 +684,13 @@ export function TeacherQuizLibraryPage() {
             >
               Cancel
             </DashboardButton>
-            <DashboardButton type="button" size="lg" onClick={handleAssignQuizToClasses}>
-              Assign to classes
+            <DashboardButton
+              type="button"
+              size="lg"
+              onClick={handleAssignQuizToClasses}
+              disabled={!quizPendingAssignmentHasBackendId}
+            >
+              Assign quiz
             </DashboardButton>
           </DashboardModalFooter>
         </DashboardModalContent>

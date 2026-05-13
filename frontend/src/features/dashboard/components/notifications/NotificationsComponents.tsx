@@ -1,4 +1,5 @@
 import { Link } from "react-router";
+import { useQuizSessions } from "../../../../app/providers/QuizSessionProvider";
 import {
   Bell,
   BookOpen,
@@ -32,6 +33,10 @@ import {
   getNotificationStatusTone,
   getQuizFollowUpLabel,
 } from "./notificationUtils";
+import {
+  buildQuizSessionPath,
+  buildQuizSessionSearch,
+} from "../../../quiz-session/quizRouting";
 
 interface NotificationListProps {
   notifications: DashboardNotification[];
@@ -50,7 +55,7 @@ export function NotificationList({
     return (
       <EmptyStateBlock
         title="No notifications yet"
-        description="Class invitations and teacher follow-ups will appear here once they exist in the shared workspace."
+        description="Class invites and assigned quiz follow-ups appear here when in-app notification delivery is enabled."
         icon={Bell}
         className="border-dashed"
       />
@@ -101,7 +106,9 @@ export function ClassInvitationNotificationCard({
       padding="md"
       className={cn(
         "border transition",
-        notification.read ? "bg-white" : "bg-[var(--dashboard-brand-soft-alt)]/45",
+        notification.read
+          ? "bg-[var(--dashboard-surface)]"
+          : "bg-[var(--dashboard-brand-soft-alt)]/45",
       )}
     >
       <article className="space-y-5">
@@ -232,13 +239,43 @@ function QuizFollowUpNotificationCard({
   notification,
   onMarkRead,
 }: QuizFollowUpNotificationCardProps) {
+  const { getLatestCompletedSession, getLatestInProgressSession } = useQuizSessions();
+  const latestCompletedSession = getLatestCompletedSession(
+    notification.quizId,
+    "student",
+    notification.assignmentId,
+  );
+  const latestInProgressSession = getLatestInProgressSession(
+    notification.quizId,
+    "student",
+    notification.assignmentId,
+  );
+  const destinationSessionId =
+    notification.followUpKind === "needs_review"
+      ? latestCompletedSession?.id
+      : notification.followUpKind === "reassign_quiz"
+        ? latestInProgressSession?.id
+        : latestInProgressSession?.id ?? latestCompletedSession?.id;
+  const destinationHref = `${buildQuizSessionPath("student", notification.quizId)}${buildQuizSessionSearch({
+    sessionId: destinationSessionId,
+    assignmentId: notification.assignmentId,
+  })}`;
+  const actionLabel =
+    notification.followUpKind === "needs_review"
+      ? "Open Review Request"
+      : notification.followUpKind === "reassign_quiz"
+        ? "Open Assigned Quiz"
+        : "Open Practice Follow-up";
+
   return (
     <DashboardSurface
       radius="xl"
       padding="md"
       className={cn(
         "border transition",
-        notification.read ? "bg-white" : "bg-[var(--dashboard-warning-soft)]/35",
+        notification.read
+          ? "bg-[var(--dashboard-surface)]"
+          : "bg-[var(--dashboard-warning-soft)]/35",
       )}
     >
       <article className="space-y-5">
@@ -306,7 +343,7 @@ function QuizFollowUpNotificationCard({
             ) : (
               <>
                 <Bell className="h-4 w-4" />
-                Teacher follow-up waiting
+                In-app follow-up available
               </>
             )}
           </div>
@@ -324,7 +361,7 @@ function QuizFollowUpNotificationCard({
               </DashboardButton>
             ) : null}
             <DashboardButton asChild type="button" size="sm" variant="secondary">
-              <Link to="/dashboard/student/classes">Open My Classes</Link>
+              <Link to={destinationHref}>{actionLabel}</Link>
             </DashboardButton>
           </div>
         </div>

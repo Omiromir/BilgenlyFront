@@ -7,6 +7,7 @@ public class Question
     public Quiz Quiz { get; set; } = null!;
     public string Text { get; set; } = string.Empty;
     public string QuestionType { get; set; } = "MCQ";
+    public string Explanation { get; set; } = string.Empty;
     public int Position { get; set; }
     public ICollection<Answer> Answers { get; set; } = new List<Answer>();
 

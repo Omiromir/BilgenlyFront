@@ -6,6 +6,7 @@ export type QuestionSelectionMode = "single" | "multiple";
 export type QuestionAnswerOrder = "fixed" | "shuffle";
 export type QuestionStatus = "unreviewed" | "edited" | "needs attention";
 export type WorkspaceStage = "input" | "configure" | "generate" | "review";
+export type QuizExportFormat = "json" | "txt" | "xml";
 
 export interface ParsedSource {
   label: string;

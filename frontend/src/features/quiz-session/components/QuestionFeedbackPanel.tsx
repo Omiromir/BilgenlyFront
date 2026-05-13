@@ -30,13 +30,13 @@ export function QuestionFeedbackPanel({
     <DashboardSurface
       radius="lg"
       padding="md"
-      className="space-y-4 border border-[var(--dashboard-border-soft)] bg-[#f8fffd]"
+      className="space-y-4 border border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface)]"
     >
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-3">
             {isCorrect ? (
-              <CheckCircle2 className="h-5 w-5 text-[#1bb7a3]" />
+              <CheckCircle2 className="h-5 w-5 text-[var(--dashboard-success)]" />
             ) : (
               <Info className="h-5 w-5 text-[var(--dashboard-warning)]" />
             )}
@@ -54,7 +54,7 @@ export function QuestionFeedbackPanel({
         <DashboardButton
           type="button"
           size="lg"
-          className="rounded-[16px] bg-[#1bb7a3] hover:bg-[#159985]"
+          className="rounded-[16px] bg-[var(--dashboard-success)] hover:brightness-110"
           onClick={onContinue}
         >
           {isLastQuestion ? (
@@ -72,7 +72,7 @@ export function QuestionFeedbackPanel({
       </div>
 
       {!isCorrect && selectedAnswerLabel ? (
-        <div className="rounded-[18px] border border-[var(--dashboard-danger-soft)] bg-white px-4 py-4">
+        <div className="rounded-[18px] border border-[var(--dashboard-danger-soft)] bg-[var(--dashboard-surface-elevated)] px-4 py-4">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--dashboard-text-faint)]">
             Your answer
           </p>
@@ -82,7 +82,7 @@ export function QuestionFeedbackPanel({
         </div>
       ) : null}
 
-      <div className="rounded-[18px] border border-[var(--dashboard-success-soft)] bg-white px-4 py-4">
+      <div className="rounded-[18px] border border-[var(--dashboard-success-soft)] bg-[var(--dashboard-surface-elevated)] px-4 py-4">
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--dashboard-text-faint)]">
           Correct answer
         </p>
@@ -91,7 +91,7 @@ export function QuestionFeedbackPanel({
         </p>
       </div>
 
-      <div className="rounded-[18px] border border-[var(--dashboard-border-soft)] bg-white px-4 py-4">
+      <div className="rounded-[18px] border border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-elevated)] px-4 py-4">
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--dashboard-text-faint)]">
           Why this matters
         </p>

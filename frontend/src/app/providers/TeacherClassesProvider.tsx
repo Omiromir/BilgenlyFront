@@ -1,9 +1,11 @@
 import {
   createContext,
   type ReactNode,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import type {
@@ -14,28 +16,47 @@ import type {
   TeacherClassStatus,
   TeacherClassStudent,
 } from "../../features/dashboard/components/classes/teacherClassesTypes";
-import { getAssignmentLevelStatus } from "../../features/assignments/assignmentConstraints";
 import {
   buildTeacherStudentNameFromEmail,
-  createTeacherClassAssignmentId,
-  createTeacherClassId,
-  createTeacherInviteCode,
-  createTeacherStudentId,
   matchesTeacherClassStudentIdentity,
-  normalizeTeacherClassFormValues,
-  type StudentIdentity,
   sortTeacherClasses,
   sortTeacherClassStudents,
+  type StudentIdentity,
 } from "../../features/dashboard/components/classes/teacherClassesUtils";
 import { normalizeEmail } from "../../features/auth/validation";
 import { useNotifications } from "./NotificationsProvider";
 import {
   getNotificationRecipientUserIdByEmail,
+  getMockStudentById,
   mockTeacherUser,
+  defaultMockStudentId,
+  type MockDashboardUser,
 } from "../../features/dashboard/mock/mockUsers";
-import { useAuth } from "./AuthProvider";
+import {
+  archiveClass as archiveClassRequest,
+  assignQuizToClass as assignQuizToClassRequest,
+  createClass as createClassRequest,
+  deleteClass as deleteClassRequest,
+  getClassAssignments,
+  getStudentClasses,
+  getTeacherClasses,
+  joinClassByInviteCode as joinClassByInviteCodeRequest,
+  updateClass as updateClassRequest,
+} from "../../features/dashboard/api/classesApi";
+import {
+  mapAssignmentDtoToTeacherAssignedQuiz,
+  mapClassDtoToTeacherClassRecord,
+  mergeRemoteClassesWithLocalCache,
+  toCreateClassRequest,
+} from "../../features/dashboard/api/classesAdapters";
+import { getRequestErrorMessage, isGuidString } from "../../lib/apiClient";
+import type { UserRole } from "../../features/auth/api";
 
 const TEACHER_CLASSES_STORAGE_KEY = "bilgenly_teacher_classes";
+const HIDDEN_ASSIGNMENTS_STORAGE_KEY = "bilgenly_hidden_class_assignments";
+const AUTH_ROLE_KEY = "bilgenly_role";
+const AUTH_TOKEN_KEY = "bilgenly_token";
+const AUTH_USER_KEY = "bilgenly_current_user";
 
 export interface StudentClassMembershipRecord {
   teacherClass: TeacherClassRecord;
@@ -44,12 +65,18 @@ export interface StudentClassMembershipRecord {
 
 interface TeacherClassesContextValue {
   classes: TeacherClassRecord[];
-  createClass: (values: TeacherClassFormValues) => TeacherClassRecord;
+  isLoading: boolean;
+  error: string | null;
+  refreshClasses: () => Promise<void>;
+  createClass: (values: TeacherClassFormValues) => Promise<TeacherClassRecord>;
   updateClass: (
     classId: string,
     values: TeacherClassFormValues,
-  ) => TeacherClassRecord | null;
-  setClassStatus: (classId: string, status: TeacherClassStatus) => void;
+  ) => Promise<TeacherClassRecord | null>;
+  setClassStatus: (
+    classId: string,
+    status: TeacherClassStatus,
+  ) => Promise<void>;
   addStudentsToClass: (
     classId: string,
     emails: string[],
@@ -63,21 +90,27 @@ interface TeacherClassesContextValue {
     studentIdentity?: StudentIdentity,
   ) => void;
   assignQuizToClasses: (
-    quiz: Pick<TeacherClassAssignedQuiz, "quizId" | "title" | "topic" | "questionCount">,
+    quiz: Pick<
+      TeacherClassAssignedQuiz,
+      "quizId" | "title" | "topic" | "questionCount"
+    >,
     classIds: string[],
     settings?: Pick<
       TeacherClassAssignedQuiz,
       "deadline" | "maxAttempts" | "allowLateSubmissions"
     >,
-  ) => string[];
+  ) => Promise<string[]>;
   syncAssignedQuizDetails: (
     quizId: string,
     values: Pick<TeacherClassAssignedQuiz, "title" | "topic" | "questionCount">,
   ) => void;
   removeQuizFromClass: (classId: string, quizId: string) => void;
-  deleteClass: (classId: string) => void;
+  deleteClass: (classId: string) => Promise<void>;
   getClassById: (classId: string) => TeacherClassRecord | undefined;
-  getStudentMemberships: (studentIdentity: StudentIdentity) => StudentClassMembershipRecord[];
+  getStudentMemberships: (
+    studentIdentity: StudentIdentity,
+  ) => StudentClassMembershipRecord[];
+  joinClassByInviteCode: (inviteCode: string) => Promise<TeacherClassRecord>;
 }
 
 const TeacherClassesContext = createContext<
@@ -88,10 +121,82 @@ interface TeacherClassesProviderProps {
   children: ReactNode;
 }
 
-function isActiveTeacherClass(
-  teacherClass: TeacherClassRecord | undefined | null,
-): teacherClass is TeacherClassRecord {
-  return Boolean(teacherClass && teacherClass.status === "active");
+interface StoredAuthUserProfile {
+  userId: string;
+  username: string;
+  email: string;
+  role: string;
+}
+
+function getInitials(name: string) {
+  return name
+    .split(" ")
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+}
+
+function mapAuthUserToDashboardUser(
+  authUser: StoredAuthUserProfile,
+  fallbackRole: UserRole | null,
+): MockDashboardUser | null {
+  const normalizedRole = authUser.role.toLowerCase() as UserRole;
+  const role = fallbackRole ?? normalizedRole;
+
+  if (role !== "teacher" && role !== "student") {
+    return null;
+  }
+
+  const fallbackUser =
+    role === "teacher"
+      ? mockTeacherUser
+      : role === "student"
+        ? getMockStudentById(defaultMockStudentId)
+        : null;
+
+  return {
+    id: authUser.userId || `email:${authUser.email.trim().toLowerCase()}`,
+    role,
+    fullName: authUser.username,
+    email: authUser.email,
+    initials: getInitials(authUser.username),
+    joinedLabel: fallbackUser?.joinedLabel ?? "Joined recently",
+    location: fallbackUser?.location ?? "Location not set",
+    bio: fallbackUser?.bio ?? "Bilgenly user",
+  };
+}
+
+function readStoredAuthSnapshot() {
+  const role = localStorage.getItem(AUTH_ROLE_KEY) as UserRole | null;
+  const token = localStorage.getItem(AUTH_TOKEN_KEY);
+  const savedUser = localStorage.getItem(AUTH_USER_KEY);
+
+  let authUser: StoredAuthUserProfile | null = null;
+
+  if (savedUser) {
+    try {
+      authUser = JSON.parse(savedUser) as StoredAuthUserProfile;
+    } catch {
+      authUser = null;
+    }
+  }
+
+  const fallbackUser =
+    role === "teacher"
+      ? mockTeacherUser
+      : role === "student"
+        ? getMockStudentById(defaultMockStudentId)
+        : null;
+  const currentUser = authUser
+    ? mapAuthUserToDashboardUser(authUser, role)
+    : fallbackUser;
+
+  return {
+    role,
+    token,
+    currentUser,
+  };
 }
 
 function getInvitationStatusFromLegacyStatus(
@@ -162,7 +267,9 @@ function sanitizeTeacherClassStudent(
     status: nextStatus,
     invitationStatus,
     invitedAt:
-      typeof student.invitedAt === "string" ? student.invitedAt : fallbackTimestamp,
+      typeof student.invitedAt === "string"
+        ? student.invitedAt
+        : fallbackTimestamp,
     joinedAt:
       typeof student.joinedAt === "string" && student.joinedAt
         ? student.joinedAt
@@ -190,115 +297,116 @@ function sanitizeTeacherClassStudent(
   };
 }
 
-function getCurrentStudentCount(students: TeacherClassStudent[]) {
-  return students.filter((student) => student.status !== "removed").length;
-}
-
 function sanitizeTeacherClassRecord(
   teacherClass: Partial<TeacherClassRecord>,
-): TeacherClassRecord {
-  const resolvedClassId =
-    typeof teacherClass.id === "string" && teacherClass.id
-      ? teacherClass.id
-      : createTeacherClassId();
+): TeacherClassRecord | null {
+  if (typeof teacherClass.id !== "string" || !teacherClass.id) {
+    return null;
+  }
+
   const students = Array.isArray(teacherClass.students)
     ? sortTeacherClassStudents(
         teacherClass.students
           .map((student) => sanitizeTeacherClassStudent(student))
-          .filter((student): student is TeacherClassStudent => student !== null),
+          .filter(
+            (student): student is TeacherClassStudent => student !== null,
+          ),
       )
     : [];
   const assignedQuizzes = Array.isArray(teacherClass.assignedQuizzes)
-    ? teacherClass.assignedQuizzes
-        .filter(
-          (quiz) =>
-            typeof quiz?.quizId === "string" && typeof quiz?.title === "string",
-        )
-        .map((quiz) => {
-          const assignmentId =
-            typeof quiz.assignmentId === "string" && quiz.assignmentId
-              ? quiz.assignmentId
-              : typeof quiz.id === "string" && quiz.id
-                ? quiz.id
-                : createTeacherClassAssignmentId();
-          const deadline =
-            typeof quiz.deadline === "string" && quiz.deadline ? quiz.deadline : null;
-          const allowLateSubmissions = Boolean(quiz.allowLateSubmissions);
-
-          return {
-            id: assignmentId,
-            assignmentId,
-            classId:
-              typeof quiz.classId === "string" && quiz.classId
-                ? quiz.classId
-                : resolvedClassId,
-            quizId: quiz.quizId,
-            title: quiz.title,
-            topic: typeof quiz.topic === "string" ? quiz.topic : "",
-            questionCount:
-              typeof quiz.questionCount === "number" &&
-              Number.isFinite(quiz.questionCount)
-                ? quiz.questionCount
-                : 0,
-            assignedAt:
-              typeof quiz.assignedAt === "string"
-                ? quiz.assignedAt
-                : new Date().toISOString(),
-            deadline,
-            maxAttempts:
-              typeof quiz.maxAttempts === "number" && quiz.maxAttempts > 0
-                ? Math.round(quiz.maxAttempts)
-                : quiz.maxAttempts === null
-                  ? null
-                  : 1,
-            allowLateSubmissions,
-            assignedBy:
-              typeof quiz.assignedBy === "string" && quiz.assignedBy
-                ? quiz.assignedBy
-                : mockTeacherUser.id,
-            assignedByName:
-              typeof quiz.assignedByName === "string" && quiz.assignedByName
-                ? quiz.assignedByName
-                : mockTeacherUser.fullName,
-            visibility: "class-members" as const,
-            status: getAssignmentLevelStatus({
-              deadline,
-              allowLateSubmissions,
-            }),
-          };
-        })
+    ? teacherClass.assignedQuizzes.filter(
+        (quiz) =>
+          typeof quiz.assignmentId === "string" &&
+          typeof quiz.quizId === "string" &&
+          typeof quiz.title === "string",
+      )
     : [];
-  const createdAt =
-    typeof teacherClass.createdAt === "string"
-      ? teacherClass.createdAt
-      : new Date().toISOString();
-  const updatedAt =
-    typeof teacherClass.updatedAt === "string" ? teacherClass.updatedAt : createdAt;
 
   return {
-    id: resolvedClassId,
+    id: teacherClass.id,
     name:
-      typeof teacherClass.name === "string" && teacherClass.name.trim()
-        ? teacherClass.name.trim()
+      typeof teacherClass.name === "string"
+        ? teacherClass.name
         : "Untitled class",
     description:
       typeof teacherClass.description === "string"
-        ? teacherClass.description.trim()
+        ? teacherClass.description
         : "",
     subject:
-      typeof teacherClass.subject === "string" ? teacherClass.subject.trim() : "",
+      typeof teacherClass.subject === "string" ? teacherClass.subject : "",
     inviteCode:
-      typeof teacherClass.inviteCode === "string" && teacherClass.inviteCode
+      typeof teacherClass.inviteCode === "string"
         ? teacherClass.inviteCode
-        : createTeacherInviteCode(),
-    createdAt,
-    updatedAt,
-    studentCount: getCurrentStudentCount(students),
-    quizCount: assignedQuizzes.length || Math.max(teacherClass.quizCount ?? 0, 0),
+        : "",
+    createdAt:
+      typeof teacherClass.createdAt === "string"
+        ? teacherClass.createdAt
+        : new Date().toISOString(),
+    updatedAt:
+      typeof teacherClass.updatedAt === "string"
+        ? teacherClass.updatedAt
+        : typeof teacherClass.createdAt === "string"
+          ? teacherClass.createdAt
+          : new Date().toISOString(),
+    studentCount:
+      typeof teacherClass.studentCount === "number"
+        ? teacherClass.studentCount
+        : students.filter((student) => student.status !== "removed").length,
+    quizCount:
+      typeof teacherClass.quizCount === "number"
+        ? teacherClass.quizCount
+        : assignedQuizzes.length,
     status: teacherClass.status === "archived" ? "archived" : "active",
     students,
     assignedQuizzes,
   };
+}
+
+function loadStoredClasses() {
+  const storedValue = localStorage.getItem(TEACHER_CLASSES_STORAGE_KEY);
+
+  if (!storedValue) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(storedValue) as Partial<TeacherClassRecord>[];
+
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return sortTeacherClasses(
+      parsed
+        .map((teacherClass) => sanitizeTeacherClassRecord(teacherClass))
+        .filter(
+          (teacherClass): teacherClass is TeacherClassRecord =>
+            teacherClass !== null,
+        ),
+    );
+  } catch {
+    return [];
+  }
+}
+
+function loadHiddenAssignments() {
+  const storedValue = localStorage.getItem(HIDDEN_ASSIGNMENTS_STORAGE_KEY);
+
+  if (!storedValue) {
+    return {} as Record<string, string[]>;
+  }
+
+  try {
+    const parsed = JSON.parse(storedValue) as Record<string, string[]>;
+    return Object.fromEntries(
+      Object.entries(parsed).map(([classId, assignmentIds]) => [
+        classId,
+        Array.isArray(assignmentIds) ? assignmentIds.filter(Boolean) : [],
+      ]),
+    );
+  } catch {
+    return {} as Record<string, string[]>;
+  }
 }
 
 function updateTeacherClassStudents(
@@ -310,104 +418,66 @@ function updateTeacherClassStudents(
   return {
     ...teacherClass,
     students,
-    studentCount: getCurrentStudentCount(students),
+    studentCount: students.filter((student) => student.status !== "removed")
+      .length,
     updatedAt: new Date().toISOString(),
   };
 }
 
-function loadTeacherClassesFromStorage() {
-  const mergedByClassId = new Map<string, Partial<TeacherClassRecord>>();
-  const legacyScopedKeys: string[] = [];
-  const mergeTeacherClasses = (records: Partial<TeacherClassRecord>[]) => {
-    records.forEach((teacherClass) => {
-      if (typeof teacherClass?.id !== "string" || !teacherClass.id) {
-        return;
-      }
+async function loadTeacherClassesFromApi(
+  localClasses: TeacherClassRecord[],
+  hiddenAssignmentIdsByClass: Record<string, string[]>,
+) {
+  const teacherClasses = await getTeacherClasses();
+  const assignmentsByClass = await Promise.all(
+    teacherClasses.map(
+      async (teacherClass) =>
+        [teacherClass.id, await getClassAssignments(teacherClass.id)] as const,
+    ),
+  );
+  const assignmentMap = new Map(assignmentsByClass);
 
-      const existingClass = mergedByClassId.get(teacherClass.id);
+  return teacherClasses.map((teacherClass) =>
+    mapClassDtoToTeacherClassRecord(
+      teacherClass,
+      assignmentMap.get(teacherClass.id) ?? [],
+      localClasses.find((candidate) => candidate.id === teacherClass.id) ??
+        null,
+      new Set(hiddenAssignmentIdsByClass[teacherClass.id] ?? []),
+    ),
+  );
+}
 
-      if (!existingClass) {
-        mergedByClassId.set(teacherClass.id, teacherClass);
-        return;
-      }
+async function loadStudentClassesFromApi(
+  localClasses: TeacherClassRecord[],
+  hiddenAssignmentIdsByClass: Record<string, string[]>,
+) {
+  const studentClasses = await getStudentClasses();
 
-      const existingUpdatedAt =
-        typeof existingClass.updatedAt === "string"
-          ? new Date(existingClass.updatedAt).getTime()
-          : 0;
-      const candidateUpdatedAt =
-        typeof teacherClass.updatedAt === "string"
-          ? new Date(teacherClass.updatedAt).getTime()
-          : 0;
-
-      if (candidateUpdatedAt >= existingUpdatedAt) {
-        mergedByClassId.set(teacherClass.id, teacherClass);
-      }
-    });
-  };
-
-  const sharedValue = localStorage.getItem(TEACHER_CLASSES_STORAGE_KEY);
-
-  if (sharedValue) {
-    try {
-      const parsed = JSON.parse(sharedValue) as Partial<TeacherClassRecord>[];
-
-      if (Array.isArray(parsed)) {
-        mergeTeacherClasses(parsed);
-      }
-    } catch {
-      localStorage.removeItem(TEACHER_CLASSES_STORAGE_KEY);
-    }
-  }
-
-  for (let index = 0; index < localStorage.length; index += 1) {
-    const storageKey = localStorage.key(index);
-
-    if (
-      !storageKey ||
-      !storageKey.startsWith(`${TEACHER_CLASSES_STORAGE_KEY}:`)
-    ) {
-      continue;
-    }
-
-    legacyScopedKeys.push(storageKey);
-
-    const scopedValue = localStorage.getItem(storageKey);
-
-    if (!scopedValue) {
-      continue;
-    }
-
-    try {
-      const parsed = JSON.parse(scopedValue) as Partial<TeacherClassRecord>[];
-
-      if (!Array.isArray(parsed)) {
-        continue;
-      }
-
-      mergeTeacherClasses(parsed);
-    } catch {
-      continue;
-    }
-  }
-
-  if (!mergedByClassId.size) {
-    return null;
-  }
-
-  const mergedValue = JSON.stringify(Array.from(mergedByClassId.values()));
-  localStorage.setItem(TEACHER_CLASSES_STORAGE_KEY, mergedValue);
-  legacyScopedKeys.forEach((storageKey) => localStorage.removeItem(storageKey));
-
-  return mergedValue;
+  return studentClasses.map((teacherClass) =>
+    mapClassDtoToTeacherClassRecord(
+      teacherClass,
+      null,
+      localClasses.find((candidate) => candidate.id === teacherClass.id) ??
+        null,
+      new Set(hiddenAssignmentIdsByClass[teacherClass.id] ?? []),
+    ),
+  );
 }
 
 export function TeacherClassesProvider({
   children,
 }: TeacherClassesProviderProps) {
-  const { currentUser, role } = useAuth();
-  const [classes, setClasses] = useState<TeacherClassRecord[]>([]);
-  const [isHydrated, setIsHydrated] = useState(false);
+  const authSnapshot = readStoredAuthSnapshot();
+  const { currentUser, role, token } = authSnapshot;
+  const [classes, setClasses] = useState<TeacherClassRecord[]>(() =>
+    loadStoredClasses(),
+  );
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [hiddenAssignmentIdsByClass, setHiddenAssignmentIdsByClass] = useState<
+    Record<string, string[]>
+  >(() => loadHiddenAssignments());
   const {
     removeClassInvitationNotification,
     removeNotificationsForClass,
@@ -415,171 +485,179 @@ export function TeacherClassesProvider({
     updateClassInvitationStatusByStudent,
     upsertClassInvitationNotification,
   } = useNotifications();
-  const teacherActor = role === "teacher" && currentUser ? currentUser : mockTeacherUser;
+  const teacherActor =
+    role === "teacher" && currentUser ? currentUser : mockTeacherUser;
+  const studentUserId = currentUser?.role === "student" ? currentUser.id : null;
+  const studentEmail =
+    currentUser?.role === "student" ? currentUser.email : null;
+
+  // Keep teacherActor values up-to-date via ref
+  const teacherActorRef = useRef(teacherActor);
+  useEffect(() => {
+    teacherActorRef.current = teacherActor;
+  }, [teacherActor]);
 
   useEffect(() => {
-    setClasses([]);
-    setIsHydrated(false);
+    localStorage.setItem(TEACHER_CLASSES_STORAGE_KEY, JSON.stringify(classes));
+  }, [classes]);
 
-    const savedValue = loadTeacherClassesFromStorage();
+  useEffect(() => {
+    localStorage.setItem(
+      HIDDEN_ASSIGNMENTS_STORAGE_KEY,
+      JSON.stringify(hiddenAssignmentIdsByClass),
+    );
+  }, [hiddenAssignmentIdsByClass]);
 
-    if (!savedValue) {
-      setIsHydrated(true);
+  const refreshClasses = useCallback(async () => {
+    if (!token || (role !== "teacher" && role !== "student")) {
+      setClasses([]);
+      setError(null);
+      setIsLoading(false);
       return;
     }
+
+    setIsLoading(true);
+    setError(null);
 
     try {
-      const parsed = JSON.parse(savedValue) as Partial<TeacherClassRecord>[];
-      setClasses(
-        Array.isArray(parsed)
-          ? sortTeacherClasses(parsed.map(sanitizeTeacherClassRecord))
-          : [],
+      const localClasses = loadStoredClasses();
+      const studentIdentity = {
+        userId: studentUserId,
+        email: studentEmail,
+      };
+      const remoteClasses =
+        role === "teacher"
+          ? await loadTeacherClassesFromApi(
+              localClasses,
+              hiddenAssignmentIdsByClass,
+            )
+          : await loadStudentClassesFromApi(
+              localClasses,
+              hiddenAssignmentIdsByClass,
+            );
+      const mergedClasses = mergeRemoteClassesWithLocalCache(
+        remoteClasses,
+        localClasses,
+        role,
+        studentIdentity,
       );
-    } catch {
-      setClasses([]);
+
+      setClasses(mergedClasses);
+    } catch (nextError) {
+      setError(
+        getRequestErrorMessage(
+          nextError,
+          role === "teacher"
+            ? "Unable to load teacher classes."
+            : "Unable to load student classes.",
+        ),
+      );
     } finally {
-      setIsHydrated(true);
+      setIsLoading(false);
     }
-  }, []);
+  }, [hiddenAssignmentIdsByClass, role, studentUserId, studentEmail, token]);
 
   useEffect(() => {
-    if (!isHydrated) {
-      return;
-    }
-
-    localStorage.setItem(TEACHER_CLASSES_STORAGE_KEY, JSON.stringify(classes));
-  }, [classes, isHydrated]);
-
-  useEffect(() => {
-    if (!isHydrated) {
-      return;
-    }
-
-    const syncAssignmentStatuses = () => {
-      setClasses((current) => {
-        let hasChanges = false;
-
-        const nextClasses = current.map((teacherClass) => {
-          let classChanged = false;
-          const assignedQuizzes = teacherClass.assignedQuizzes.map((assignment) => {
-            const nextStatus = getAssignmentLevelStatus(assignment);
-
-            if (assignment.status === nextStatus) {
-              return assignment;
-            }
-
-            classChanged = true;
-            return {
-              ...assignment,
-              status: nextStatus,
-            };
-          });
-
-          if (!classChanged) {
-            return teacherClass;
-          }
-
-          hasChanges = true;
-          return {
-            ...teacherClass,
-            assignedQuizzes,
-          };
-        });
-
-        return hasChanges ? sortTeacherClasses(nextClasses) : current;
-      });
-    };
-
-    syncAssignmentStatuses();
-
-    const hasTrackedDeadline = classes.some((teacherClass) =>
-      teacherClass.assignedQuizzes.some((assignment) => Boolean(assignment.deadline)),
-    );
-
-    if (!hasTrackedDeadline) {
-      return;
-    }
-
-    const intervalId = window.setInterval(syncAssignmentStatuses, 30000);
-
-    return () => {
-      window.clearInterval(intervalId);
-    };
-  }, [classes, isHydrated]);
+    void refreshClasses();
+  }, [refreshClasses]);
 
   const value = useMemo<TeacherClassesContextValue>(
     () => ({
       classes,
-      createClass: (values) => {
-        const normalized = normalizeTeacherClassFormValues(values);
-        const timestamp = new Date().toISOString();
-        const nextClass: TeacherClassRecord = {
-          id: createTeacherClassId(),
-          name: normalized.name,
-          description: normalized.description,
-          subject: normalized.subject,
-          inviteCode: createTeacherInviteCode(),
-          createdAt: timestamp,
-          updatedAt: timestamp,
-          studentCount: 0,
-          quizCount: 0,
-          status: "active",
-          students: [],
-          assignedQuizzes: [],
-        };
+      isLoading,
+      error,
+      refreshClasses,
+      createClass: async (values) => {
+        const createdClass = await createClassRequest(
+          toCreateClassRequest(values),
+        );
+        const mappedClass = mapClassDtoToTeacherClassRecord(
+          createdClass,
+          [],
+          null,
+          new Set(),
+        );
 
-        setClasses((current) => sortTeacherClasses([nextClass, ...current]));
-        return nextClass;
+        setClasses((current) => sortTeacherClasses([mappedClass, ...current]));
+        setError(null);
+
+        return mappedClass;
       },
-      updateClass: (classId, values) => {
+      updateClass: async (classId, values) => {
         const existingClass = classes.find((item) => item.id === classId);
 
-        if (!isActiveTeacherClass(existingClass)) {
+        if (!existingClass || existingClass.status !== "active") {
           return null;
         }
 
-        const normalized = normalizeTeacherClassFormValues(values);
-        const updatedClass: TeacherClassRecord = {
-          ...existingClass,
-          name: normalized.name,
-          description: normalized.description,
-          subject: normalized.subject,
-          updatedAt: new Date().toISOString(),
-        };
+        const updatedClass = await updateClassRequest(
+          classId,
+          toCreateClassRequest(values),
+        );
+        const mappedClass = mapClassDtoToTeacherClassRecord(
+          updatedClass,
+          existingClass.assignedQuizzes.map((assignment) => ({
+            id: assignment.assignmentId,
+            assignmentId: assignment.assignmentId,
+            classId: assignment.classId,
+            quizId: assignment.quizId,
+            title: assignment.title,
+            topic: assignment.topic,
+            questionCount: assignment.questionCount,
+            assignedAt: assignment.assignedAt,
+            deadline: assignment.deadline,
+            maxAttempts: assignment.maxAttempts,
+            allowLateSubmissions: assignment.allowLateSubmissions,
+            assignedBy: assignment.assignedBy,
+            assignedByName: assignment.assignedByName,
+            visibility: assignment.visibility,
+            status: assignment.status,
+          })),
+          existingClass,
+          new Set(hiddenAssignmentIdsByClass[classId] ?? []),
+        );
 
         setClasses((current) =>
           sortTeacherClasses(
-            current.map((item) => (item.id === classId ? updatedClass : item)),
+            current.map((item) => (item.id === classId ? mappedClass : item)),
           ),
         );
-
         syncClassInvitationMetadata(classId, {
-          relatedClassName: updatedClass.name,
-          senderName: teacherActor.fullName,
-          senderEmail: teacherActor.email,
+          relatedClassName: mappedClass.name,
+          senderName: teacherActorRef.current.fullName,
+          senderEmail: teacherActorRef.current.email,
         });
+        setError(null);
 
-        return updatedClass;
+        return mappedClass;
       },
-      setClassStatus: (classId, status) => {
+      setClassStatus: async (classId, _status) => {
+        const existingClass = classes.find((item) => item.id === classId);
+
+        if (!existingClass) {
+          return;
+        }
+
+        await archiveClassRequest(classId);
         setClasses((current) =>
           sortTeacherClasses(
             current.map((item) =>
               item.id === classId
                 ? {
                     ...item,
-                    status,
+                    status: item.status === "active" ? "archived" : "active",
                     updatedAt: new Date().toISOString(),
                   }
                 : item,
             ),
           ),
         );
+        setError(null);
       },
       addStudentsToClass: (classId, emails) => {
         const targetClass = classes.find((item) => item.id === classId);
 
-        if (!isActiveTeacherClass(targetClass)) {
+        if (!targetClass || targetClass.status !== "active") {
           return [];
         }
 
@@ -593,7 +671,7 @@ export function TeacherClassesProvider({
         const newStudents = normalizedEmails
           .filter((email) => !existingEmails.has(email))
           .map((email) => ({
-            id: createTeacherStudentId(),
+            id: `student-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
             fullName: buildTeacherStudentNameFromEmail(email),
             email,
             status: "invited" as const,
@@ -614,16 +692,18 @@ export function TeacherClassesProvider({
               }
 
               const existingByEmail = new Map(
-                item.students.map((student) => [normalizeEmail(student.email), student]),
+                item.students.map((student) => [
+                  normalizeEmail(student.email),
+                  student,
+                ]),
               );
 
               newStudents.forEach((student) => {
                 existingByEmail.set(normalizeEmail(student.email), student);
               });
 
-              return updateTeacherClassStudents(
-                item,
-                () => Array.from(existingByEmail.values()),
+              return updateTeacherClassStudents(item, () =>
+                Array.from(existingByEmail.values()),
               );
             }),
           ),
@@ -632,12 +712,13 @@ export function TeacherClassesProvider({
         newStudents.forEach((student) => {
           upsertClassInvitationNotification({
             recipientUserId:
-              student.linkedUserId ?? getNotificationRecipientUserIdByEmail(student.email),
+              student.linkedUserId ??
+              getNotificationRecipientUserIdByEmail(student.email),
             recipientEmail: student.email,
             relatedClassId: targetClass.id,
             relatedClassName: targetClass.name,
-            senderName: teacherActor.fullName,
-            senderEmail: teacherActor.email,
+            senderName: teacherActorRef.current.fullName,
+            senderEmail: teacherActorRef.current.email,
             studentId: student.id,
             studentName: student.fullName,
             studentEmail: student.email,
@@ -649,12 +730,13 @@ export function TeacherClassesProvider({
       removeStudentFromClass: (classId, studentId) => {
         const targetClass = classes.find((item) => item.id === classId);
 
-        if (!isActiveTeacherClass(targetClass)) {
+        if (!targetClass || targetClass.status !== "active") {
           return;
         }
 
         const targetStudent =
-          targetClass.students.find((student) => student.id === studentId) ?? null;
+          targetClass.students.find((student) => student.id === studentId) ??
+          null;
 
         if (!targetStudent) {
           return;
@@ -679,10 +761,12 @@ export function TeacherClassesProvider({
       resendStudentInvite: (classId, studentId) => {
         const targetClass = classes.find((item) => item.id === classId);
         const targetStudent =
-          targetClass?.students.find((student) => student.id === studentId) ?? null;
+          targetClass?.students.find((student) => student.id === studentId) ??
+          null;
 
         if (
-          !isActiveTeacherClass(targetClass) ||
+          !targetClass ||
+          targetClass.status !== "active" ||
           !targetStudent ||
           targetStudent.status === "joined"
         ) {
@@ -724,17 +808,17 @@ export function TeacherClassesProvider({
           recipientEmail: targetStudent.email,
           relatedClassId: targetClass.id,
           relatedClassName: targetClass.name,
-          senderName: teacherActor.fullName,
-          senderEmail: teacherActor.email,
+          senderName: teacherActorRef.current.fullName,
+          senderEmail: teacherActorRef.current.email,
           studentId: targetStudent.id,
           studentName: targetStudent.fullName,
           studentEmail: targetStudent.email,
         });
       },
-      respondToClassInvitation: (classId, studentId, response, studentIdentity) => {
+      respondToClassInvitation: (classId, studentId, response, identity) => {
         const targetClass = classes.find((item) => item.id === classId);
 
-        if (!isActiveTeacherClass(targetClass)) {
+        if (!targetClass || targetClass.status !== "active") {
           return;
         }
 
@@ -757,11 +841,11 @@ export function TeacherClassesProvider({
                         invitationStatus: response,
                         linkedUserId:
                           response === "accepted"
-                            ? studentIdentity?.userId ?? student.linkedUserId
+                            ? (identity?.userId ?? student.linkedUserId)
                             : student.linkedUserId,
                         joinedAt:
                           response === "accepted"
-                            ? student.joinedAt ?? responseTimestamp
+                            ? (student.joinedAt ?? responseTimestamp)
                             : undefined,
                         respondedAt: responseTimestamp,
                         removedAt: undefined,
@@ -773,78 +857,117 @@ export function TeacherClassesProvider({
           ),
         );
       },
-      assignQuizToClasses: (quiz, classIds, settings) => {
-        const activeClassIds = new Set(
-          classes
-            .filter((teacherClass) => teacherClass.status === "active")
-            .map((teacherClass) => teacherClass.id),
-        );
-        const uniqueClassIds = Array.from(
-          new Set(classIds.filter((classId) => activeClassIds.has(classId))),
+      assignQuizToClasses: async (quiz, classIds, settings) => {
+        if (!isGuidString(quiz.quizId)) {
+          throw new Error(
+            "This quiz is only stored in local library data right now. It needs a real backend quiz ID before it can be assigned to a class.",
+          );
+        }
+
+        const activeClassIds = Array.from(
+          new Set(
+            classIds.filter((classId) =>
+              classes.some(
+                (teacherClass) =>
+                  teacherClass.id === classId &&
+                  teacherClass.status === "active",
+              ),
+            ),
+          ),
         );
 
-        if (!uniqueClassIds.length) {
+        if (!activeClassIds.length) {
           return [];
         }
 
-        const assignedAt = new Date().toISOString();
-        const deadline =
-          typeof settings?.deadline === "string" && settings.deadline
-            ? settings.deadline
-            : null;
-        const maxAttempts =
-          settings?.maxAttempts === null
-            ? null
-            : typeof settings?.maxAttempts === "number" && settings.maxAttempts > 0
-              ? Math.round(settings.maxAttempts)
-              : 1;
-        const allowLateSubmissions = Boolean(settings?.allowLateSubmissions);
         const assignedClassIds: string[] = [];
+        let firstError: string | null = null;
 
-        setClasses((current) =>
-          sortTeacherClasses(
-            current.map((item) => {
-              if (!uniqueClassIds.includes(item.id)) {
-                return item;
-              }
+        await Promise.all(
+          activeClassIds.map(async (classId) => {
+            try {
+              const assignment = await assignQuizToClassRequest(classId, {
+                quizId: quiz.quizId,
+                deadline:
+                  typeof settings?.deadline === "string" && settings.deadline
+                    ? settings.deadline
+                    : null,
+                maxAttempts:
+                  settings?.maxAttempts === null
+                    ? null
+                    : typeof settings?.maxAttempts === "number" &&
+                        settings.maxAttempts > 0
+                      ? Math.round(settings.maxAttempts)
+                      : 1,
+                allowLateSubmissions: Boolean(settings?.allowLateSubmissions),
+              });
+              const mappedAssignment =
+                mapAssignmentDtoToTeacherAssignedQuiz(assignment);
 
-              if (item.assignedQuizzes.some((entry) => entry.quizId === quiz.quizId)) {
-                return item;
-              }
+              setHiddenAssignmentIdsByClass((current) => {
+                if (!current[classId]?.length) {
+                  return current;
+                }
 
-              assignedClassIds.push(item.id);
-              const assignmentId = createTeacherClassAssignmentId();
+                return {
+                  ...current,
+                  [classId]: current[classId].filter(
+                    (assignmentId) =>
+                      assignmentId !== mappedAssignment.assignmentId,
+                  ),
+                };
+              });
+              setClasses((current) =>
+                sortTeacherClasses(
+                  current.map((teacherClass) => {
+                    if (teacherClass.id !== classId) {
+                      return teacherClass;
+                    }
 
-              const assignedQuizzes = [
-                {
-                  id: assignmentId,
-                  assignmentId,
-                  classId: item.id,
-                  ...quiz,
-                  assignedAt,
-                  deadline,
-                  maxAttempts,
-                  allowLateSubmissions,
-                  assignedBy: teacherActor.id,
-                  assignedByName: teacherActor.fullName,
-                  visibility: "class-members" as const,
-                  status: getAssignmentLevelStatus({
-                    deadline,
-                    allowLateSubmissions,
+                    const assignedQuizzes = [
+                      mappedAssignment,
+                      ...teacherClass.assignedQuizzes.filter(
+                        (existingAssignment) =>
+                          existingAssignment.assignmentId !==
+                          mappedAssignment.assignmentId,
+                      ),
+                    ];
+
+                    return {
+                      ...teacherClass,
+                      assignedQuizzes,
+                      quizCount: Math.max(
+                        teacherClass.quizCount,
+                        assignedQuizzes.length,
+                      ),
+                      updatedAt: new Date().toISOString(),
+                    };
                   }),
-                },
-                ...item.assignedQuizzes,
-              ];
+                ),
+              );
+              assignedClassIds.push(classId);
+            } catch (nextError) {
+              const message = getRequestErrorMessage(
+                nextError,
+                "Unable to assign quiz to class.",
+              );
 
-              return {
-                ...item,
-                assignedQuizzes,
-                quizCount: assignedQuizzes.length,
-                updatedAt: assignedAt,
-              };
-            }),
-          ),
+              if (!message.toLowerCase().includes("already assigned")) {
+                firstError = firstError ?? message;
+              }
+            }
+          }),
         );
+
+        if (!assignedClassIds.length && firstError) {
+          throw new Error(firstError);
+        }
+
+        if (firstError) {
+          setError(firstError);
+        } else {
+          setError(null);
+        }
 
         return assignedClassIds;
       },
@@ -891,7 +1014,6 @@ export function TeacherClassesProvider({
             return {
               ...item,
               assignedQuizzes,
-              updatedAt: new Date().toISOString(),
             };
           });
 
@@ -899,10 +1021,21 @@ export function TeacherClassesProvider({
         });
       },
       removeQuizFromClass: (classId, quizId) => {
-        const targetClass = classes.find((item) => item.id === classId);
+        const removedAssignmentIds =
+          classes
+            .find((teacherClass) => teacherClass.id === classId)
+            ?.assignedQuizzes.filter(
+              (assignment) => assignment.quizId === quizId,
+            )
+            .map((assignment) => assignment.assignmentId) ?? [];
 
-        if (!isActiveTeacherClass(targetClass)) {
-          return;
+        if (removedAssignmentIds.length) {
+          setHiddenAssignmentIdsByClass((previous) => ({
+            ...previous,
+            [classId]: Array.from(
+              new Set([...(previous[classId] ?? []), ...removedAssignmentIds]),
+            ),
+          }));
         }
 
         setClasses((current) =>
@@ -913,7 +1046,7 @@ export function TeacherClassesProvider({
               }
 
               const assignedQuizzes = item.assignedQuizzes.filter(
-                (quiz) => quiz.quizId !== quizId,
+                (assignment) => assignment.quizId !== quizId,
               );
 
               return {
@@ -926,16 +1059,27 @@ export function TeacherClassesProvider({
           ),
         );
       },
-      deleteClass: (classId) => {
+      deleteClass: async (classId) => {
+        await deleteClassRequest(classId);
         removeNotificationsForClass(classId);
         setClasses((current) => current.filter((item) => item.id !== classId));
+        setHiddenAssignmentIdsByClass((current) => {
+          if (!(classId in current)) {
+            return current;
+          }
+
+          const nextState = { ...current };
+          delete nextState[classId];
+          return nextState;
+        });
+        setError(null);
       },
       getClassById: (classId) => classes.find((item) => item.id === classId),
-      getStudentMemberships: (studentIdentity) =>
+      getStudentMemberships: (identity) =>
         classes
           .flatMap((teacherClass) => {
-            const membership = teacherClass.students.find(
-              (student) => matchesTeacherClassStudentIdentity(student, studentIdentity),
+            const membership = teacherClass.students.find((student) =>
+              matchesTeacherClassStudentIdentity(student, identity),
             );
 
             if (!membership) {
@@ -964,15 +1108,38 @@ export function TeacherClassesProvider({
               new Date(left.teacherClass.updatedAt).getTime()
             );
           }),
+      joinClassByInviteCode: async (inviteCode) => {
+        const joinedClass = await joinClassByInviteCodeRequest(inviteCode);
+        const existingClass =
+          classes.find((teacherClass) => teacherClass.id === joinedClass.id) ??
+          null;
+        const mappedClass = mapClassDtoToTeacherClassRecord(
+          joinedClass,
+          null,
+          existingClass,
+          new Set(hiddenAssignmentIdsByClass[joinedClass.id] ?? []),
+        );
+
+        setClasses((current) => {
+          const withoutPrevious = current.filter(
+            (teacherClass) => teacherClass.id !== mappedClass.id,
+          );
+          return sortTeacherClasses([mappedClass, ...withoutPrevious]);
+        });
+        setError(null);
+
+        return mappedClass;
+      },
     }),
     [
       classes,
+      error,
+      hiddenAssignmentIdsByClass,
+      isLoading,
+      refreshClasses,
       removeClassInvitationNotification,
       removeNotificationsForClass,
       syncClassInvitationMetadata,
-      teacherActor.email,
-      teacherActor.fullName,
-      teacherActor.id,
       updateClassInvitationStatusByStudent,
       upsertClassInvitationNotification,
     ],

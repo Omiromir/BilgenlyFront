@@ -17,6 +17,7 @@ import {
   buildTeacherAssignedQuizAnalytics,
 } from "../teacher-analytics/teacherQuizAnalyticsUtils";
 import { normalizeEmail } from "../../../auth/validation";
+import { formatCurrentShortDate } from "../../settings/settingsPreferences";
 
 export interface TeacherOverviewStatItem {
   title: string;
@@ -115,11 +116,6 @@ interface TopicAccumulator {
   assignments: Map<string, TopicAssignmentAggregate>;
 }
 
-const shortDateFormatter = new Intl.DateTimeFormat("en-US", {
-  month: "short",
-  day: "numeric",
-});
-
 function getTimestamp(value?: string) {
   if (!value) {
     return 0;
@@ -140,7 +136,7 @@ function formatActivityDate(value?: string) {
     return "No recent activity";
   }
 
-  return shortDateFormatter.format(date);
+  return formatCurrentShortDate(date);
 }
 
 function isDraftLikeQuizStatus(status: QuizRecord["status"]) {

@@ -58,6 +58,7 @@ import type {
   GenerationState,
   ParsedSource,
   QuestionAnswerOrder,
+  QuizExportFormat,
   QuestionType,
   ValidationIssue,
   WorkspaceStage,
@@ -81,6 +82,117 @@ import type {
   QuizLibraryVisibility,
   QuizQuestionRecord,
 } from "../dashboard/components/quiz-library/quizLibraryTypes";
+
+function escapeXml(value: string | number | undefined) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
+function getMoodleCorrectIndexes(question: QuizQuestionRecord) {
+  return question.selectionMode === "multiple" && question.correctIndexes?.length
+    ? question.correctIndexes
+    : [question.correctIndex];
+}
+
+function buildMoodleAnswerXml(
+  answerText: string,
+  fraction: number,
+  explanation: string | undefined,
+  indent = "    ",
+) {
+  return [
+    `${indent}<answer fraction="${escapeXml(fraction.toFixed(5))}" format="html">`,
+    `${indent}  <text>${escapeXml(answerText)}</text>`,
+    `${indent}  <feedback format="html">`,
+    `${indent}    <text>${fraction > 0 ? escapeXml(explanation) : ""}</text>`,
+    `${indent}  </feedback>`,
+    `${indent}</answer>`,
+  ].join("\n");
+}
+
+function buildMoodleQuestionXml(question: QuizQuestionRecord, index: number) {
+  const correctIndexes = getMoodleCorrectIndexes(question);
+  const points = Math.max(1, Math.round(question.points ?? 1));
+  const baseRows = [
+    `  <name>`,
+    `    <text>${escapeXml(`Question ${index + 1}`)}</text>`,
+    `  </name>`,
+    `  <questiontext format="html">`,
+    `    <text>${escapeXml(question.text)}</text>`,
+    `  </questiontext>`,
+    `  <generalfeedback format="html">`,
+    `    <text>${escapeXml(question.explanation)}</text>`,
+    `  </generalfeedback>`,
+    `  <defaultgrade>${points.toFixed(7)}</defaultgrade>`,
+    `  <penalty>0.3333333</penalty>`,
+    `  <hidden>0</hidden>`,
+    `  <idnumber>${escapeXml(question.id)}</idnumber>`,
+  ];
+
+  if (question.questionType === "True/False") {
+    const trueIsCorrect = correctIndexes.includes(0);
+
+    return [
+      `<question type="truefalse">`,
+      ...baseRows,
+      buildMoodleAnswerXml("true", trueIsCorrect ? 100 : 0, question.explanation),
+      buildMoodleAnswerXml("false", trueIsCorrect ? 0 : 100, question.explanation),
+      `</question>`,
+    ].join("\n");
+  }
+
+  const correctCount = Math.max(1, correctIndexes.length);
+  const correctFraction =
+    question.selectionMode === "multiple" ? 100 / correctCount : 100;
+
+  return [
+    `<question type="multichoice">`,
+    ...baseRows,
+    `  <single>${question.selectionMode === "multiple" ? "false" : "true"}</single>`,
+    `  <shuffleanswers>${question.answerOrder === "shuffle" ? "true" : "false"}</shuffleanswers>`,
+    `  <answernumbering>abc</answernumbering>`,
+    ...question.options.map((option, optionIndex) =>
+      buildMoodleAnswerXml(
+        option,
+        correctIndexes.includes(optionIndex) ? correctFraction : 0,
+        question.explanation,
+      ),
+    ),
+    `</question>`,
+  ].join("\n");
+}
+
+function buildMoodleQuizXml(payload: {
+  title: string;
+  topic: string;
+  questions: QuizQuestionRecord[];
+}) {
+  return [
+    `<?xml version="1.0" encoding="UTF-8"?>`,
+    `<quiz>`,
+    `<question type="category">`,
+    `  <category>`,
+    `    <text>${escapeXml(`$course$/top/${payload.title}`)}</text>`,
+    `  </category>`,
+    `</question>`,
+    `<question type="description">`,
+    `  <name>`,
+    `    <text>${escapeXml(payload.title)}</text>`,
+    `  </name>`,
+    `  <questiontext format="html">`,
+    `    <text>${escapeXml(payload.topic)}</text>`,
+    `  </questiontext>`,
+    `</question>`,
+    ...payload.questions.map((question, index) =>
+      buildMoodleQuestionXml(question, index),
+    ),
+    `</quiz>`,
+  ].join("\n\n");
+}
 
 export function QuizBuilderWorkspace({
   mode,
@@ -616,7 +728,7 @@ export function QuizBuilderWorkspace({
     handleRegenerateQuestion(questionId);
   }
 
-  function handleDownloadQuizExport(format: "json" | "txt") {
+  function handleDownloadQuizExport(format: QuizExportFormat) {
     const payload = buildQuizSavePayload("draft");
 
     if (!payload) {
@@ -631,7 +743,9 @@ export function QuizBuilderWorkspace({
     const content =
       format === "json"
         ? JSON.stringify(payload, null, 2)
-        : [
+        : format === "xml"
+          ? buildMoodleQuizXml(payload)
+          : [
             `Title: ${payload.title}`,
             `Topic: ${payload.topic}`,
             `Visibility: ${payload.visibility}`,
@@ -655,12 +769,17 @@ export function QuizBuilderWorkspace({
           ].join("\n");
 
     const blob = new Blob([content], {
-      type: format === "json" ? "application/json" : "text/plain",
+      type:
+        format === "json"
+          ? "application/json"
+          : format === "xml"
+            ? "application/xml"
+            : "text/plain",
     });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `${fileName}.${format === "json" ? "json" : "txt"}`;
+    link.download = `${fileName}.${format}`;
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -1023,7 +1142,7 @@ export function QuizBuilderWorkspace({
                     className="hidden"
                     onChange={handleQuestionImageChange}
                   />
-                  <div className="border-b border-[var(--dashboard-border-soft)] bg-white px-5 py-4 xl:col-span-2 xl:px-6">
+                  <div className="border-b border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-elevated)] px-5 py-4 xl:col-span-2 xl:px-6">
                     <div className="flex flex-wrap items-center justify-between gap-4">
                       <div className="flex min-w-0 items-center gap-3">
                         <DashboardButton
@@ -1090,7 +1209,7 @@ export function QuizBuilderWorkspace({
                     </div>
                   </div>
 
-                  <aside className="border-b border-r border-[var(--dashboard-border-soft)] bg-[#fafafa] px-4 py-4 xl:border-b-0">
+                  <aside className="border-b border-r border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-muted)] px-4 py-4 xl:border-b-0">
                     <div className="space-y-4 xl:sticky xl:top-6">
                       <div className="flex items-center justify-between gap-3">
                         <div>
@@ -1108,7 +1227,7 @@ export function QuizBuilderWorkspace({
                           type="button"
                           size="iconSm"
                           variant="secondary"
-                          className="rounded-full border border-[var(--dashboard-border-soft)] bg-white"
+                          className="rounded-full border border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-elevated)]"
                           onClick={handleAddQuestion}
                         >
                           <Plus className="h-4 w-4" />
@@ -1130,8 +1249,8 @@ export function QuizBuilderWorkspace({
                                 className={cn(
                                   "relative w-full rounded-[18px] border px-4 py-4 text-left transition",
                                   selectedQuestion?.id === question.id
-                                    ? "border-[#d6d8df] bg-white shadow-[0_14px_30px_rgba(18,32,58,0.08)]"
-                                    : "border-[#e5e7eb] bg-white hover:border-[#cfd4dc]",
+                                    ? "border-[var(--dashboard-brand)]/35 bg-[var(--dashboard-surface-elevated)] shadow-[var(--dashboard-shadow-card)]"
+                                    : "border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface)] hover:border-[var(--dashboard-border)]",
                                 )}
                               >
                                 <div className="flex items-start justify-between gap-3">
@@ -1208,7 +1327,7 @@ export function QuizBuilderWorkspace({
                                       <MoreHorizontal className="h-4 w-4" />
                                     </DashboardButton>
                                     {openQuestionMenuId === `rail-${question.id}` ? (
-                                      <div className="absolute right-0 top-9 z-20 w-40 rounded-[16px] border border-[var(--dashboard-border-soft)] bg-white p-2 shadow-[0_20px_40px_rgba(18,32,58,0.12)]">
+                                      <div className="absolute right-0 top-9 z-20 w-40 rounded-[16px] border border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-elevated)] p-2 shadow-[var(--dashboard-shadow-card)]">
                                         {[
                                           { label: "Move up", action: "up" as const },
                                           { label: "Move down", action: "down" as const },
@@ -1246,12 +1365,12 @@ export function QuizBuilderWorkspace({
                           })}
                         </div>
                       ) : (
-                        <div className="rounded-[18px] border border-dashed border-[var(--dashboard-border-soft)] bg-white px-4 py-6 text-sm leading-6 text-[var(--dashboard-text-soft)]">
+                        <div className="rounded-[18px] border border-dashed border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-elevated)] px-4 py-6 text-sm leading-6 text-[var(--dashboard-text-soft)]">
                           No questions match the current search.
                         </div>
                       )}
 
-                      <div className="rounded-[18px] border border-[var(--dashboard-border-soft)] bg-white px-4 py-4">
+                      <div className="rounded-[18px] border border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-elevated)] px-4 py-4">
                         <p className="text-sm font-semibold text-[var(--dashboard-text-strong)]">
                           Result screen
                         </p>
@@ -1264,7 +1383,7 @@ export function QuizBuilderWorkspace({
                     </div>
                   </aside>
 
-                  <div className="space-y-5 bg-[#fcfcfd] px-5 py-5 lg:px-6">
+                  <div className="space-y-5 bg-[var(--dashboard-surface)] px-5 py-5 lg:px-6">
                     <div className="flex flex-wrap items-center gap-4 border-b border-[var(--dashboard-border-soft)] pb-5">
                       <div className="min-w-[260px] flex-1">
                         <DashboardSearchField
@@ -1278,7 +1397,7 @@ export function QuizBuilderWorkspace({
                             )
                           }
                           placeholder="Search questions..."
-                          inputClassName="h-11 rounded-[14px] border-[var(--dashboard-border-soft)] bg-white"
+                          inputClassName="h-11 rounded-[14px] border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-elevated)]"
                         />
                       </div>
                       <div className="flex flex-wrap gap-2">
@@ -1296,7 +1415,7 @@ export function QuizBuilderWorkspace({
 
                     {selectedQuestion ? (
                       <div className="space-y-5">
-                        <div className="relative rounded-[30px] border border-[var(--dashboard-border-soft)] bg-white px-6 py-6 shadow-[0_18px_40px_rgba(18,32,58,0.04)]">
+                        <div className="relative rounded-[30px] border border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-elevated)] px-6 py-6 shadow-[var(--dashboard-shadow-card)]">
                           <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[var(--dashboard-border-soft)] pb-5">
                             <div className="flex flex-wrap items-center gap-2">
                               <label className="inline-flex items-center gap-2 rounded-[12px] border border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-muted)] px-3 py-2 text-sm font-medium text-[var(--dashboard-text-strong)]">
@@ -1370,7 +1489,7 @@ export function QuizBuilderWorkspace({
                                 <MoreHorizontal className="h-4 w-4" />
                               </DashboardButton>
                               {openQuestionMenuId === `editor-${selectedQuestion.id}` ? (
-                                <div className="absolute right-0 top-10 z-20 w-44 rounded-[16px] border border-[var(--dashboard-border-soft)] bg-white p-2 shadow-[0_20px_40px_rgba(18,32,58,0.12)]">
+                                <div className="absolute right-0 top-10 z-20 w-44 rounded-[16px] border border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-elevated)] p-2 shadow-[var(--dashboard-shadow-card)]">
                                   {[
                                     {
                                       label: "Regenerate",
@@ -1593,7 +1712,7 @@ export function QuizBuilderWorkspace({
                                           ? "opacity-70"
                                           : "",
                                         selectedQuestion.correctIndex === optionIndex
-                                          ? "border-[#8dd8ca] bg-[#f2fffb]"
+                                          ? "border-[var(--dashboard-success)]/35 bg-[var(--dashboard-success-soft)]/55"
                                           : "border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-muted)]",
                                         dragOverOptionIndex === optionIndex &&
                                           draggingOptionIndex !== null &&
@@ -1666,7 +1785,7 @@ export function QuizBuilderWorkspace({
                                         maxLength={QUIZ_BUILDER_LIMITS.optionText}
                                         className={cn(
                                           dashboardInputVariants({ size: "md" }),
-                                          "border-none bg-white",
+                                          "border-none bg-[var(--dashboard-surface-elevated)]",
                                         )}
                                       />
                                       <button
@@ -1828,7 +1947,7 @@ export function QuizBuilderWorkspace({
                                   maxLength={QUIZ_BUILDER_LIMITS.explanation}
                                   className={cn(
                                     dashboardTextareaVariants({ size: "md" }),
-                                    "min-h-[200px] rounded-[20px] border-[var(--dashboard-border-soft)] bg-white",
+                                    "min-h-[200px] rounded-[20px] border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-muted)]",
                                   )}
                                 />
                                 <p className="text-xs text-[var(--dashboard-text-faint)]">
@@ -1837,7 +1956,7 @@ export function QuizBuilderWorkspace({
                                 </p>
                               </label>
 
-                              <label className="hidden space-y-2 rounded-[18px] border border-[var(--dashboard-border-soft)] bg-white px-4 py-4">
+                              <label className="hidden space-y-2 rounded-[18px] border border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-elevated)] px-4 py-4">
                                 <span className="flex items-center gap-2 text-sm font-semibold text-[var(--dashboard-text-strong)]">
                                   <Clock3 className="h-4 w-4 text-[var(--dashboard-text-soft)]" />
                                   Estimation time
@@ -1870,7 +1989,7 @@ export function QuizBuilderWorkspace({
                                 </div>
                               </label>
 
-                              <label className="hidden space-y-2 rounded-[18px] border border-[var(--dashboard-border-soft)] bg-white px-4 py-4">
+                              <label className="hidden space-y-2 rounded-[18px] border border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-elevated)] px-4 py-4">
                                 <span className="flex items-center gap-2 text-sm font-semibold text-[var(--dashboard-text-strong)]">
                                   <CircleDot className="h-4 w-4 text-[var(--dashboard-text-soft)]" />
                                   Mark as point
@@ -1903,7 +2022,7 @@ export function QuizBuilderWorkspace({
                                 </div>
                               </label>
 
-                              <div className="hidden rounded-[22px] border border-[var(--dashboard-border-soft)] bg-white px-4 py-4">
+                              <div className="hidden rounded-[22px] border border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-elevated)] px-4 py-4">
                                 <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--dashboard-text-faint)]">
                                   Source summary
                                 </p>
@@ -1974,7 +2093,7 @@ export function QuizBuilderWorkspace({
                                   }
                                   className={cn(
                                     dashboardInputVariants({ size: "sm" }),
-                                    "h-10 w-16 border-none bg-white px-3",
+                                    "h-10 w-16 border-none bg-[var(--dashboard-surface-elevated)] px-3",
                                   )}
                                 />
                                 <span className="text-sm text-[var(--dashboard-text-soft)]">
@@ -2006,7 +2125,7 @@ export function QuizBuilderWorkspace({
                                   }
                                   className={cn(
                                     dashboardInputVariants({ size: "sm" }),
-                                    "h-10 w-16 border-none bg-white px-3",
+                                    "h-10 w-16 border-none bg-[var(--dashboard-surface-elevated)] px-3",
                                   )}
                                 />
                                 <span className="text-sm text-[var(--dashboard-text-soft)]">
@@ -2057,7 +2176,7 @@ export function QuizBuilderWorkspace({
                         </div>
                       </div>
                     ) : (
-                      <div className="rounded-[24px] border border-dashed border-[var(--dashboard-border-soft)] bg-white px-6 py-10 text-center">
+                      <div className="rounded-[24px] border border-dashed border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-elevated)] px-6 py-10 text-center">
                         <p className="text-lg font-semibold text-[var(--dashboard-text-strong)]">
                           Select a question to edit
                         </p>

@@ -203,8 +203,10 @@ export function TeacherStudentsPage() {
 
     setFeedback(
       `${addedStudents.length} ${
-        addedStudents.length === 1 ? "student was" : "students were"
-      } invited to ${addTargetClass.name}.`,
+        addedStudents.length === 1
+          ? "student now has a class invite"
+          : "students now have class invites"
+      } for ${addTargetClass.name}. In-app notifications were created where preferences allow them.`,
     );
   };
 
@@ -216,7 +218,7 @@ export function TeacherStudentsPage() {
 
   const handleResendInvite = (row: TeacherStudentRosterRow) => {
     resendStudentInvite(row.classId, row.student.id);
-    setFeedback(`Invite resent to ${row.student.email}.`);
+    setFeedback(`Class invite refreshed for ${row.student.fullName}.`);
   };
 
   const handleExportCsv = () => {
@@ -320,7 +322,7 @@ export function TeacherStudentsPage() {
 
   return (
     <div className={dashboardPageClassName}>
-      <section className="rounded-[28px] border border-[var(--dashboard-border-soft)] bg-[rgba(255,255,255,0.95)] px-5 py-5 shadow-[var(--dashboard-shadow-card)] sm:px-6">
+      <section className="rounded-[28px] border border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface)] px-5 py-5 shadow-[var(--dashboard-shadow-card)] sm:px-6">
         <div className="flex flex-col gap-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
@@ -363,7 +365,7 @@ export function TeacherStudentsPage() {
                 <select
                   value={classFilter}
                   onChange={(event) => setClassFilter(event.target.value)}
-                  className={`${dashboardSelectVariants({ size: "md" })} h-10 min-w-[120px] rounded-[12px] border-[var(--dashboard-border-soft)] bg-white px-3 text-sm`}
+                  className={`${dashboardSelectVariants({ size: "md" })} h-10 min-w-[120px] rounded-[12px] border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-elevated)] px-3 text-sm`}
                   aria-label="Filter students by class"
                 >
                   <option value="all">Classes</option>
@@ -384,7 +386,7 @@ export function TeacherStudentsPage() {
                       event.target.value as "all" | "high" | "mid" | "needs-attention",
                     )
                   }
-                  className={`${dashboardSelectVariants({ size: "md" })} h-10 min-w-[130px] rounded-[12px] border-[var(--dashboard-border-soft)] bg-white px-3 text-sm`}
+                  className={`${dashboardSelectVariants({ size: "md" })} h-10 min-w-[130px] rounded-[12px] border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-elevated)] px-3 text-sm`}
                   aria-label="Filter students by average grade"
                 >
                   <option value="all">Avg. grade</option>
@@ -402,7 +404,7 @@ export function TeacherStudentsPage() {
                       event.target.value as "all" | TeacherClassStudentStatus,
                     )
                   }
-                  className={`${dashboardSelectVariants({ size: "md" })} h-10 min-w-[120px] rounded-[12px] border-[var(--dashboard-border-soft)] bg-white px-3 text-sm`}
+                  className={`${dashboardSelectVariants({ size: "md" })} h-10 min-w-[120px] rounded-[12px] border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-elevated)] px-3 text-sm`}
                   aria-label="Filter students by status"
                 >
                   <option value="all">All filters</option>
@@ -427,7 +429,7 @@ export function TeacherStudentsPage() {
           {!filteredRows.length ? (
             emptyState
           ) : (
-            <div className="overflow-hidden rounded-[18px] border border-[var(--dashboard-border-soft)] bg-white">
+            <div className="overflow-hidden rounded-[18px] border border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-elevated)]">
               <Table className="min-w-[1100px]">
                 <TableHeader className="bg-[var(--dashboard-surface-muted)]">
                   <TableRow className="border-[var(--dashboard-border-soft)] hover:bg-[var(--dashboard-surface-muted)]">
@@ -488,7 +490,7 @@ export function TeacherStudentsPage() {
                       <TableRow
                         key={row.rowId}
                         data-state={isSelected ? "selected" : undefined}
-                        className="border-[var(--dashboard-border-soft)] bg-white hover:bg-[var(--dashboard-surface-muted)]/70"
+                        className="border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-elevated)] hover:bg-[var(--dashboard-surface-muted)]/70"
                       >
                         <TableCell className="px-4 py-3">
                           <Checkbox
@@ -557,7 +559,7 @@ export function TeacherStudentsPage() {
                               onClick={() => handleResendInvite(row)}
                               disabled={isArchivedClass || row.student.status === "joined"}
                               className="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--dashboard-border-soft)] text-[var(--dashboard-text-soft)] transition hover:bg-[var(--dashboard-surface-muted)] hover:text-[var(--dashboard-text-strong)]"
-                              aria-label={`Email ${row.student.fullName}`}
+                              aria-label={`Resend class invite for ${row.student.fullName}`}
                             >
                               <Mail className="h-4 w-4" />
                             </button>
@@ -575,7 +577,7 @@ export function TeacherStudentsPage() {
                                   disabled={isArchivedClass || row.student.status === "joined"}
                                 >
                                   <Mail className="h-4 w-4" />
-                                  Resend invite
+                                  Resend class invite
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem

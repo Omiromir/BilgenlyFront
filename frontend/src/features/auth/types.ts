@@ -7,7 +7,6 @@ export interface SignUpFormValues {
     email: string;
     fullName: string;
     password: string;
-    role: string;
 }
 
 export interface ResetPasswordFormValues {

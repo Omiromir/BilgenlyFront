@@ -1,5 +1,6 @@
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { Archive, BookOpen, Trash2, Users } from "../../../components/icons/AppIcons";
+import { toast } from "sonner";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -15,7 +16,6 @@ import {
   getQuizLibraryItemsForRole,
   useQuizLibrary,
 } from "../../../app/providers/QuizLibraryProvider";
-import { useQuizSessions } from "../../../app/providers/QuizSessionProvider";
 import { DashboardPageHeader } from "../../../features/dashboard/components/DashboardPageHeader";
 import {
   DashboardButton,
@@ -23,6 +23,8 @@ import {
   dashboardMetaTextClassName,
   dashboardPageClassName,
 } from "../../../features/dashboard/components/DashboardPrimitives";
+import { EmptyStateBlock } from "../../../features/dashboard/components/EmptyStateBlock";
+import { LoadingCard } from "../../../features/dashboard/components/LoadingCard";
 import { SectionCard } from "../../../features/dashboard/components/SectionCard";
 import {
   AddStudentsDialog,
@@ -41,13 +43,15 @@ import type {
 } from "../../../features/dashboard/components/classes/teacherClassesTypes";
 import { isDraftQuiz } from "../../../features/dashboard/components/quiz-library/quizLibraryUtils";
 import { matchesTeacherClassSearch } from "../../../features/dashboard/components/classes/teacherClassesUtils";
-import { buildTeacherAssignedQuizAnalytics } from "../../../features/dashboard/components/teacher-analytics/teacherQuizAnalyticsUtils";
+import { useAssignmentInsights } from "../../../features/dashboard/hooks/useDashboardAnalytics";
 import { useDashboardPageMeta } from "../../../features/dashboard/hooks/useDashboardPageMeta";
 
 export function TeacherClassesPage() {
   const meta = useDashboardPageMeta();
   const {
     classes,
+    isLoading,
+    error,
     createClass,
     updateClass,
     setClassStatus,
@@ -57,7 +61,6 @@ export function TeacherClassesPage() {
     deleteClass,
   } = useTeacherClasses();
   const { quizzes } = useQuizLibrary();
-  const { sharedAssignedSessions } = useQuizSessions();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isAddStudentsDialogOpen, setIsAddStudentsDialogOpen] = useState(false);
   const [isAssignQuizDialogOpen, setIsAssignQuizDialogOpen] = useState(false);
@@ -87,40 +90,66 @@ export function TeacherClassesPage() {
     setMembershipFeedback(null);
   }, [selectedClassId]);
 
-  const handleCreateClass = (values: TeacherClassFormValues) => {
-    const nextClass = createClass(values);
-    setSelectedClassId(nextClass.id);
-    setIsCreateDialogOpen(false);
+  const handleCreateClass = async (values: TeacherClassFormValues) => {
+    try {
+      const nextClass = await createClass(values);
+      setSelectedClassId(nextClass.id);
+      setIsCreateDialogOpen(false);
+    } catch (nextError) {
+      toast.error(
+        nextError instanceof Error ? nextError.message : "Unable to create class.",
+      );
+    }
   };
 
-  const handleEditClass = (values: TeacherClassFormValues) => {
+  const handleEditClass = async (values: TeacherClassFormValues) => {
     if (!editingClass) {
       return;
     }
 
-    const updatedClass = updateClass(editingClass.id, values);
+    try {
+      const updatedClass = await updateClass(editingClass.id, values);
 
-    if (updatedClass) {
-      setSelectedClassId(updatedClass.id);
+      if (updatedClass) {
+        setSelectedClassId(updatedClass.id);
+      }
+
+      setEditingClass(null);
+    } catch (nextError) {
+      toast.error(
+        nextError instanceof Error ? nextError.message : "Unable to update class.",
+      );
     }
-
-    setEditingClass(null);
   };
 
-  const handleToggleArchive = (teacherClass: TeacherClassRecord) => {
-    setClassStatus(
-      teacherClass.id,
-      teacherClass.status === "active" ? "archived" : "active",
-    );
+  const handleToggleArchive = async (teacherClass: TeacherClassRecord) => {
+    try {
+      await setClassStatus(
+        teacherClass.id,
+        teacherClass.status === "active" ? "archived" : "active",
+      );
+    } catch (nextError) {
+      toast.error(
+        nextError instanceof Error
+          ? nextError.message
+          : "Unable to update class archive status.",
+      );
+    }
   };
 
-  const handleDeleteClass = () => {
+  const handleDeleteClass = async () => {
     if (!classPendingDelete) {
       return;
     }
 
-    deleteClass(classPendingDelete.id);
-    setClassPendingDelete(null);
+    try {
+      await deleteClass(classPendingDelete.id);
+      setClassPendingDelete(null);
+    } catch (nextError) {
+      toast.error(
+        nextError instanceof Error ? nextError.message : "Unable to delete class.",
+      );
+    }
   };
 
   const handleAddStudents = (emails: string[]) => {
@@ -136,8 +165,10 @@ export function TeacherClassesPage() {
 
     setMembershipFeedback(
       `${addedStudents.length} ${
-        addedStudents.length === 1 ? "student was" : "students were"
-      } invited to ${selectedClass.name}.`,
+        addedStudents.length === 1
+          ? "student now has a class invite"
+          : "students now have class invites"
+      } for ${selectedClass.name}. In-app notifications were created where preferences allow them.`,
     );
   };
 
@@ -147,12 +178,17 @@ export function TeacherClassesPage() {
     }
 
     removeQuizFromClass(selectedClass.id, quiz.quizId);
-    setMembershipFeedback(`${quiz.title} was removed from ${selectedClass.name}.`);
+    setMembershipFeedback(
+      `${quiz.title} is no longer visible to joined members of ${selectedClass.name}.`,
+    );
   };
 
   const selectedClass =
     classes.find((item) => item.id === selectedClassId) ?? null;
   const isSelectedClassActive = selectedClass?.status === "active";
+  const assignmentInsightsState = useAssignmentInsights(
+    selectedClass?.assignedQuizzes ?? [],
+  );
   const assignableQuizzes = getQuizLibraryItemsForRole(quizzes, "teacher").filter(
     (quiz) => quiz.isOwner && !isDraftQuiz(quiz.status) && quiz.status !== "archived",
   );
@@ -187,32 +223,8 @@ export function TeacherClassesPage() {
         : "",
     },
   ];
-  const assignmentInsights = useMemo(() => {
-    if (!selectedClass) {
-      return {};
-    }
 
-    return Object.fromEntries(
-      selectedClass.assignedQuizzes.map((assignment) => {
-        const analytics = buildTeacherAssignedQuizAnalytics(
-          selectedClass,
-          assignment,
-          sharedAssignedSessions,
-        );
-
-        return [
-          assignment.assignmentId,
-          {
-            attemptedStudentsCount: analytics.studentsWithAttemptsCount,
-            exhaustedStudentsCount: analytics.exhaustedAttemptsStudentsCount,
-            missedDeadlineCount: analytics.missedDeadlineStudentsCount,
-          },
-        ];
-      }),
-    );
-  }, [selectedClass, sharedAssignedSessions]);
-
-  const handleAssignQuiz = (
+  const handleAssignQuiz = async (
     quiz: (typeof assignableQuizzes)[number],
     settings: {
       deadline: string | null;
@@ -224,24 +236,36 @@ export function TeacherClassesPage() {
       return;
     }
 
-    const assignedClassIds = assignQuizToClasses(
-      {
-        quizId: quiz.id,
-        title: quiz.title,
-        topic: quiz.topic,
-        questionCount: quiz.questionCount,
-      },
-      [selectedClass.id],
-      settings,
-    );
+    try {
+      const assignedClassIds = await assignQuizToClasses(
+        {
+          quizId: quiz.id,
+          title: quiz.title,
+          topic: quiz.topic,
+          questionCount: quiz.questionCount,
+        },
+        [selectedClass.id],
+        settings,
+      );
 
-    if (!assignedClassIds.length) {
-      setMembershipFeedback(`${quiz.title} is already assigned to ${selectedClass.name}.`);
-      return;
+      if (!assignedClassIds.length) {
+        setMembershipFeedback(
+          `${quiz.title} is already visible to joined members of ${selectedClass.name}.`,
+        );
+        return;
+      }
+
+      setMembershipFeedback(
+        `${quiz.title} is now visible to joined members of ${selectedClass.name}.`,
+      );
+      setIsAssignQuizDialogOpen(false);
+    } catch (nextError) {
+      toast.error(
+        nextError instanceof Error
+          ? nextError.message
+          : "Unable to assign quiz to this class.",
+      );
     }
-
-    setMembershipFeedback(`${quiz.title} was assigned to ${selectedClass.name}.`);
-    setIsAssignQuizDialogOpen(false);
   };
 
   return (
@@ -289,6 +313,15 @@ export function TeacherClassesPage() {
           actions={null}
           contentClassName="space-y-5"
         >
+          {error ? (
+            <EmptyStateBlock
+              title="Unable to load classes"
+              description={error}
+              icon={BookOpen}
+              className="border-dashed"
+            />
+          ) : null}
+
           <TeacherClassFilterBar
             searchValue={search}
             statusFilter={statusFilter}
@@ -297,7 +330,12 @@ export function TeacherClassesPage() {
             onStatusFilterChange={setStatusFilter}
           />
 
-          {classes.length === 0 ? (
+          {isLoading && classes.length === 0 ? (
+            <div className="space-y-3">
+              <LoadingCard />
+              <LoadingCard />
+            </div>
+          ) : classes.length === 0 ? (
             <TeacherClassesListEmptyState />
           ) : filteredClasses.length === 0 ? (
             <TeacherClassesSearchEmptyState
@@ -329,7 +367,7 @@ export function TeacherClassesPage() {
           teacherClass={selectedClass}
           hasClasses={classes.length > 0}
           membershipFeedback={membershipFeedback}
-          assignmentInsights={assignmentInsights}
+          assignmentInsights={assignmentInsightsState.data}
           onOpenAddStudents={
             isSelectedClassActive ? () => setIsAddStudentsDialogOpen(true) : undefined
           }

@@ -24,7 +24,7 @@ export const dashboardMetaTextClassName =
 export const dashboardIconTextRowClassName =
   "inline-flex items-center gap-2 text-sm text-[var(--dashboard-text-soft)]";
 export const dashboardInsetBlockClassName =
-  "rounded-[18px] border border-[var(--dashboard-border-soft)] bg-white px-5 py-4";
+  "rounded-[18px] border border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-elevated)] px-5 py-4";
 export const dashboardInvertedInsetBlockClassName =
   "rounded-[18px] border border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-muted)] px-5 py-4";
 export const dashboardTextToneClassName = {
@@ -106,15 +106,15 @@ export const dashboardButtonVariants = cva(
       variant: {
         primary: "dashboard-button-primary text-white",
         secondary: "dashboard-button-secondary",
-        soft: "bg-[var(--dashboard-brand-soft-alt)] text-[var(--dashboard-brand)] hover:bg-[#e7f1ff]",
+        soft: "bg-[var(--dashboard-brand-soft-alt)] text-[var(--dashboard-brand)] hover:bg-[var(--dashboard-surface-accent)]",
         ghost:
           "text-[var(--dashboard-text-soft)] hover:bg-[var(--dashboard-surface-muted)] hover:text-[var(--dashboard-text)]",
         inverse:
-          "bg-white text-[var(--dashboard-brand)] shadow-sm hover:bg-[var(--dashboard-surface-muted)]",
+          "bg-[var(--dashboard-surface-elevated)] text-[var(--dashboard-brand)] shadow-sm hover:bg-[var(--dashboard-surface-muted)]",
         hero:
           "border border-white/20 bg-white/10 text-white hover:bg-white/15",
         danger:
-          "bg-[var(--dashboard-danger-soft)] text-[var(--dashboard-danger)] hover:bg-[#ffe7ee]",
+          "bg-[var(--dashboard-danger-soft)] text-[var(--dashboard-danger)] hover:brightness-110",
       },
       size: {
         xs: "h-9 rounded-[12px] px-3.5 text-sm",
@@ -235,7 +235,7 @@ export const dashboardIconChipVariants = cva(
 );
 
 export const dashboardInputVariants = cva(
-  "dashboard-input w-full border outline-none transition focus:border-[var(--dashboard-brand)] focus:bg-white disabled:pointer-events-none disabled:opacity-60",
+  "dashboard-input w-full border outline-none transition focus:border-[var(--dashboard-brand)] focus:bg-[var(--dashboard-surface-elevated)] disabled:pointer-events-none disabled:opacity-60",
   {
     variants: {
       size: {
@@ -257,7 +257,7 @@ export const dashboardInputVariants = cva(
 );
 
 export const dashboardSelectVariants = cva(
-  "dashboard-input border outline-none transition focus:border-[var(--dashboard-brand)] focus:bg-white",
+  "dashboard-input border outline-none transition focus:border-[var(--dashboard-brand)] focus:bg-[var(--dashboard-surface-elevated)]",
   {
     variants: {
       size: {
@@ -272,7 +272,7 @@ export const dashboardSelectVariants = cva(
 );
 
 export const dashboardTextareaVariants = cva(
-  "dashboard-input w-full resize-none border outline-none transition focus:border-[var(--dashboard-brand)] focus:bg-white",
+  "dashboard-input w-full resize-none border outline-none transition focus:border-[var(--dashboard-brand)] focus:bg-[var(--dashboard-surface-elevated)]",
   {
     variants: {
       size: {

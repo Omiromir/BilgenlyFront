@@ -50,6 +50,7 @@ import {
   getVisibilityLabel,
 } from "./quizLibraryUtils";
 import { formatTeacherClassDate } from "../classes/teacherClassesUtils";
+import { formatCurrentDate } from "../../settings/settingsPreferences";
 
 const statusToneMap = {
   draft: "warning",
@@ -264,11 +265,11 @@ export function ClassAssignmentMeta({
         </div>
         <div className={dashboardIconTextRowClassName}>
           <CalendarDays className="h-4 w-4" />
-          <span>Assigned {assignedDate}</span>
+          <span>Assigned quiz added {assignedDate}</span>
         </div>
         <div className={dashboardIconTextRowClassName}>
           <Eye className="h-4 w-4" />
-          <span>Visible through class membership</span>
+          <span>Visible through your class membership</span>
         </div>
       </div>
       <div className="mt-3 flex flex-wrap gap-2">
@@ -340,7 +341,7 @@ export function QuizCard({
 }: QuizCardProps) {
   return (
     <DashboardSurface asChild radius="xl" padding="md" className="h-full">
-      <article className="flex h-full flex-col">
+      <article className="flex h-full min-w-0 flex-col">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex flex-wrap gap-2">
             <StatusBadge status={item.status} />
@@ -354,13 +355,13 @@ export function QuizCard({
         </div>
 
         <div className="mt-5">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--dashboard-text-faint)]">
+          <p className="break-words text-xs font-semibold uppercase tracking-[0.18em] text-[var(--dashboard-text-faint)] [overflow-wrap:anywhere]">
             {item.topic}
           </p>
-          <h3 className="mt-3 text-[1.2rem] font-semibold text-[var(--dashboard-text-strong)]">
+          <h3 className="mt-3 break-words text-[1.2rem] font-semibold text-[var(--dashboard-text-strong)] [overflow-wrap:anywhere]">
             {item.title}
           </h3>
-          <p className="mt-3 text-sm leading-6 text-[var(--dashboard-text-soft)]">
+          <p className="mt-3 overflow-hidden break-words text-sm leading-6 text-[var(--dashboard-text-soft)] [overflow-wrap:anywhere]">
             {item.description}
           </p>
         </div>
@@ -415,10 +416,10 @@ export function AssignedQuizCard({
 
   return (
     <DashboardSurface asChild radius="xl" padding="md" className="h-full">
-      <article className="flex h-full flex-col">
+      <article className="flex h-full min-w-0 flex-col">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex flex-wrap gap-2">
-            <QuizSourceBadge label="Assigned" />
+            <QuizSourceBadge label="Assigned quiz" />
             <QuizStatusBadge status={item.assignmentState.status} />
             <VisibilityBadge visibility={item.visibility} />
             {badgeLabel ? (
@@ -430,13 +431,13 @@ export function AssignedQuizCard({
         </div>
 
         <div className="mt-5">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--dashboard-text-faint)]">
+          <p className="break-words text-xs font-semibold uppercase tracking-[0.18em] text-[var(--dashboard-text-faint)] [overflow-wrap:anywhere]">
             {item.topic}
           </p>
-          <h3 className="mt-3 text-[1.2rem] font-semibold text-[var(--dashboard-text-strong)]">
+          <h3 className="mt-3 break-words text-[1.2rem] font-semibold text-[var(--dashboard-text-strong)] [overflow-wrap:anywhere]">
             {item.title}
           </h3>
-          <p className="mt-3 text-sm leading-6 text-[var(--dashboard-text-soft)]">
+          <p className="mt-3 overflow-hidden break-words text-sm leading-6 text-[var(--dashboard-text-soft)] [overflow-wrap:anywhere]">
             {item.description}
           </p>
         </div>
@@ -446,7 +447,7 @@ export function AssignedQuizCard({
             item={{ icon: BookOpen, label: `${item.questionCount} questions` }}
           />
           <QuizMetadataRow
-            item={{ icon: CalendarDays, label: `Assigned ${assignedDate}` }}
+            item={{ icon: CalendarDays, label: `Assigned quiz added ${assignedDate}` }}
           />
           <QuizMetadataRow item={{ icon: UserRound, label: item.assignmentContext.assignedByName }} />
           <QuizMetadataRow
@@ -467,7 +468,7 @@ export function AssignedQuizCard({
           <ClassAssignmentMeta assignmentContext={item.assignmentContext} />
         </div>
 
-        <div className="mt-5 rounded-[20px] border border-[var(--dashboard-border-soft)] bg-white px-4 py-4">
+        <div className="mt-5 rounded-[20px] border border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-elevated)] px-4 py-4">
           <AttemptProgressIndicator
             attemptsUsed={item.assignmentState.attemptsUsed}
             maxAttempts={item.assignmentState.maxAttempts}
@@ -603,7 +604,7 @@ export function QuizPreviewDialog({
                 {metadata.map((meta) => (
                   <div
                     key={`${item.id}-preview-${meta.label}`}
-                    className="rounded-[18px] border border-[var(--dashboard-border-soft)] bg-white px-4 py-3"
+                    className="rounded-[18px] border border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-elevated)] px-4 py-3"
                   >
                     <QuizMetadataRow item={meta} />
                   </div>
@@ -620,7 +621,7 @@ export function QuizPreviewDialog({
                       {item.sourceLabel}
                     </p>
                     <p className="mt-1 text-sm leading-6 text-[var(--dashboard-text-soft)]">
-                      {item.note ?? `Last updated ${item.updatedAt}`}
+                      {item.note ?? `Last updated ${formatCurrentDate(item.updatedAt)}`}
                     </p>
                   </div>
                 </div>

@@ -21,7 +21,7 @@ export function DashboardModalContent({
   return (
     <DialogContent
       className={cn(
-        "flex min-h-0 max-h-[82vh] flex-col overflow-hidden rounded-[24px] border-[var(--dashboard-border-soft)] p-0 shadow-[0_24px_80px_rgba(18,32,58,0.18)]",
+        "flex min-h-0 max-h-[82vh] flex-col overflow-hidden rounded-[24px] border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface)] p-0 shadow-[var(--dashboard-shadow-overlay)]",
         className,
       )}
       {...props}
@@ -47,7 +47,7 @@ export function DashboardModalHeader({
   return (
     <div
       className={cn(
-        "border-b border-[var(--dashboard-border-soft)] bg-white px-6 py-5",
+        "border-b border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-elevated)] px-6 py-5",
         className,
       )}
     >
@@ -92,7 +92,7 @@ export function DashboardModalFooter({
   return (
     <DialogFooter
       className={cn(
-        "border-t border-[var(--dashboard-border-soft)] bg-white px-6 py-4 sm:justify-end",
+        "border-t border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-elevated)] px-6 py-4 sm:justify-end",
         className,
       )}
       {...props}

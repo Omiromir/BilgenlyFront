@@ -176,8 +176,8 @@ function buildAssignedQuizLibraryItems(
           ...libraryItem,
           sourceType: "assigned" as const,
           isAssigned: true as const,
-          sourceLabel: `${teacherClass.name} assignment`,
-          note: `Assigned by ${assignment.assignedByName} on ${formatTeacherClassDate(assignment.assignedAt)}.`,
+          sourceLabel: `${teacherClass.name} assigned quiz`,
+          note: `Assigned quiz from ${teacherClass.name} by ${assignment.assignedByName} on ${formatTeacherClassDate(assignment.assignedAt)}.`,
           practiceState:
             assignmentState.status === "completed"
               ? "completed"

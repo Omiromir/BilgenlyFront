@@ -39,7 +39,7 @@ export function QuizReviewList({ session }: QuizReviewListProps) {
         return (
           <article
             key={question.id}
-            className="rounded-[22px] border border-[var(--dashboard-border-soft)] bg-white px-5 py-5"
+            className="rounded-[22px] border border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-elevated)] px-5 py-5"
           >
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>

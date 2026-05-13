@@ -45,7 +45,7 @@ export function StudentBadgesPage() {
       />
 
       <SectionCard title="Your Badges">
-        <div className="flex justify-end pb-5 text-sm text-slate-500">
+        <div className="flex justify-end pb-5 text-sm text-[var(--dashboard-text-faint)]">
           0 of 50 earned
         </div>
 

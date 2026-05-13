@@ -562,7 +562,7 @@ export function buildTeacherAssignedQuizAnalytics(
         row.status === "active"
           ? "Has not started the assigned quiz yet."
           : row.status === "in_progress"
-            ? "Started the assignment but has not finished."
+            ? "Started the assigned quiz but has not finished."
             : row.status === "expired"
               ? "Missed the submission deadline."
               : row.status === "attempts_exhausted"

@@ -87,7 +87,7 @@ export function StudentNotificationsPage() {
       "declined",
       studentIdentity,
     );
-    setFeedback(`You declined the invitation to ${notification.relatedClassName}.`);
+    setFeedback(`You declined the class invite to ${notification.relatedClassName}.`);
   };
 
   return (
@@ -96,7 +96,7 @@ export function StudentNotificationsPage() {
         title={meta?.title ?? "Notifications"}
         subtitle={
           meta?.subtitle ??
-          "Review class invitations and the important updates that belong to your student workspace."
+          "Review class invites, review requests, and other supported in-app updates for your student workspace."
         }
         actions={
           studentViewer ? (
@@ -136,7 +136,7 @@ export function StudentNotificationsPage() {
 
       <SectionCard
         title="Student Inbox"
-        description="Notifications are stored in shared frontend state, so invitations stay available as you move through the dashboard."
+        description="Supported in-app notifications stay here until you review them."
         contentClassName="space-y-5"
       >
         {feedback ? (

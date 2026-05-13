@@ -107,7 +107,7 @@ export function StrugglingTopicsList({
               </div>
 
               <div className="grid gap-3 sm:grid-cols-3">
-                <div className="rounded-[18px] border border-[var(--dashboard-border-soft)] bg-white px-4 py-3">
+                <div className="rounded-[18px] border border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-elevated)] px-4 py-3">
                   <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--dashboard-text-faint)]">
                     Mastery
                   </p>
@@ -116,7 +116,7 @@ export function StrugglingTopicsList({
                     {topic.averageMastery}% average
                   </p>
                 </div>
-                <div className="rounded-[18px] border border-[var(--dashboard-border-soft)] bg-white px-4 py-3">
+                <div className="rounded-[18px] border border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-elevated)] px-4 py-3">
                   <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--dashboard-text-faint)]">
                     Students
                   </p>
@@ -125,7 +125,7 @@ export function StrugglingTopicsList({
                     {topic.studentsTracked} tracked
                   </p>
                 </div>
-                <div className="rounded-[18px] border border-[var(--dashboard-border-soft)] bg-white px-4 py-3">
+                <div className="rounded-[18px] border border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-elevated)] px-4 py-3">
                   <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--dashboard-text-faint)]">
                     Intervention
                   </p>

@@ -38,7 +38,7 @@ function getQuizStatusBadge(quiz: RecentQuizOverviewItem) {
   }
 
   if (quiz.inProgressCount > 0 || quiz.notStartedCount > 0) {
-    return <DashboardBadge tone="info">Live assignment</DashboardBadge>;
+    return <DashboardBadge tone="info">Live assigned quiz</DashboardBadge>;
   }
 
   if (quiz.assignedStudentsCount > 0) {
@@ -49,7 +49,7 @@ function getQuizStatusBadge(quiz: RecentQuizOverviewItem) {
     return <DashboardBadge tone="neutral">Draft quiz</DashboardBadge>;
   }
 
-  return <DashboardBadge tone="neutral">Ready to assign</DashboardBadge>;
+  return <DashboardBadge tone="neutral">Ready for assigned quiz</DashboardBadge>;
 }
 
 function CompactMetric({
@@ -60,7 +60,7 @@ function CompactMetric({
 }: CompactMetricProps) {
   return (
     <div className="flex min-w-[120px] items-center gap-3 rounded-[16px] border border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-muted)] px-3.5 py-3">
-      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-white text-[var(--dashboard-brand)] shadow-[0_6px_18px_rgba(18,32,58,0.04)]">
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-[var(--dashboard-surface-elevated)] text-[var(--dashboard-brand)] shadow-[0_6px_18px_rgba(18,32,58,0.08)]">
         <Icon className="h-4 w-4" />
       </div>
       <div className="min-w-0">
@@ -90,7 +90,7 @@ export function RecentQuizzesList({
     return (
       <EmptyStateBlock
         title="No recent quizzes yet"
-        description="Create or assign a quiz and this section will start showing live classroom progress automatically."
+        description="Create or assign a quiz and this section will start showing live assigned-quiz progress automatically."
         icon={BookOpen}
       />
     );
@@ -155,7 +155,7 @@ export function RecentQuizzesList({
               {quiz.needsReviewCount > 0 ? (
                 <CompactMetric
                   icon={AlertCircle}
-                  label="Need review"
+                  label="Review requests"
                   value={`${quiz.needsReviewCount} students`}
                   toneClassName="text-[var(--dashboard-warning)]"
                 />
@@ -192,7 +192,7 @@ export function RecentQuizzesList({
                 size="lg"
                 onClick={() => onAssign(quiz)}
               >
-                Assign
+                Assign quiz
               </DashboardButton>
             </div>
           </article>

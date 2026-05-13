@@ -73,6 +73,10 @@ import {
 } from "./teacherClassesUtils";
 import { normalizeEmail, validateEmail } from "../../../auth/validation";
 import type { QuizLibraryItem } from "../quiz-library/quizLibraryTypes";
+import {
+  buildQuizJoinCode,
+  formatQuizJoinCode,
+} from "../../../quiz-session/quizJoinCode";
 
 const teacherClassStatusToneMap = {
   active: "success",
@@ -202,7 +206,7 @@ export function TeacherClassCard({
       : null,
     pendingCount > 0
       ? `${pendingCount} ${
-          pendingCount === 1 ? "pending invite" : "pending invites"
+          pendingCount === 1 ? "pending class invite" : "pending class invites"
         }`
       : null,
     teacherClass.quizCount > 0
@@ -349,7 +353,7 @@ export function TeacherClassFormDialog({
                 }}
                 className={cn(
                   dashboardInputVariants({ size: "md" }),
-                  "h-14 rounded-[18px] border-[var(--dashboard-border)] bg-white px-5 text-base",
+                  "h-14 rounded-[18px] border-[var(--dashboard-border)] bg-[var(--dashboard-surface-elevated)] px-5 text-base",
                 )}
                 placeholder="Grade 10 Biology - Section A"
                 aria-invalid={Boolean(nameError)}
@@ -423,7 +427,7 @@ export function TeacherClassesListEmptyState() {
   return (
     <EmptyStateBlock
       title="No classes yet"
-      description="Create your first class to start organizing students, class codes, and future quiz assignments in one place."
+      description="Create your first class to start organizing students, class invites, and future assigned quizzes in one place."
       icon={Users}
       className="border-dashed"
     />
@@ -538,7 +542,7 @@ export function TeacherClassStudentActionsMenu({
         {student.status !== "joined" ? (
           <DropdownMenuItem onClick={onResendInvite}>
             <Mail className="h-4 w-4" />
-            Resend invite
+            Resend class invite
           </DropdownMenuItem>
         ) : null}
         {student.status !== "joined" ? <DropdownMenuSeparator /> : null}
@@ -656,7 +660,7 @@ export function AddStudentsDialog({
             title="Add students"
             description={
               <>
-                Invite one or more students to {teacherClass?.name ?? "this class"}.
+                Create one or more class invites for {teacherClass?.name ?? "this class"}.
                 {" "}Paste emails separated by commas, spaces, or new lines.
               </>
             }
@@ -699,7 +703,7 @@ export function AddStudentsDialog({
                 }}
                 className={cn(
                   dashboardTextareaVariants({ size: "md" }),
-                  "min-h-[198px] rounded-[22px] border-[var(--dashboard-border)] bg-white px-5 py-5 text-base leading-8",
+                  "min-h-[198px] rounded-[22px] border-[var(--dashboard-border)] bg-[var(--dashboard-surface-elevated)] px-5 py-5 text-base leading-8",
                 )}
                 placeholder={"student.one@example.com\nstudent.two@example.com"}
               />
@@ -1013,7 +1017,7 @@ export function TeacherClassDetailsPanel({
               onClick={onOpenAssignQuiz}
             >
               <Rocket className="h-4 w-4" />
-              Assign Quiz
+              Assign quiz
             </DashboardButton>
           ) : null}
         </div>
@@ -1041,8 +1045,18 @@ export function TeacherClassDetailsPanel({
                       expired={getAssignmentLevelStatus(quiz) === "expired"}
                     />
                     <AttemptsBadge maxAttempts={quiz.maxAttempts} />
+                    <DashboardBadge tone="brand">
+                      Join code{" "}
+                      {formatQuizJoinCode(
+                        buildQuizJoinCode({
+                          assignmentId: quiz.assignmentId,
+                          classId: teacherClass.id,
+                          quizId: quiz.quizId,
+                        }),
+                      )}
+                    </DashboardBadge>
                     <DashboardBadge tone="neutral">
-                      {assignmentInsights[quiz.assignmentId]?.attemptedStudentsCount ?? 0} students attempted
+                      {assignmentInsights[quiz.assignmentId]?.attemptedStudentsCount ?? 0} students opened the assigned quiz
                     </DashboardBadge>
                   </div>
                   <p className="mt-3 font-semibold text-[var(--dashboard-text-strong)]">
@@ -1055,7 +1069,7 @@ export function TeacherClassDetailsPanel({
                 </div>
                 <div className="flex items-center gap-3">
                   <p className="text-sm text-[var(--dashboard-text-soft)]">
-                    Assigned {formatTeacherClassDate(quiz.assignedAt)}
+                    Assigned quiz added {formatTeacherClassDate(quiz.assignedAt)}
                   </p>
                   <DashboardButton asChild type="button" size="sm" variant="secondary">
                     <Link
@@ -1082,7 +1096,7 @@ export function TeacherClassDetailsPanel({
                     {assignmentInsights[quiz.assignmentId]?.missedDeadlineCount ?? 0} missed deadline
                   </DashboardBadge>
                   <DashboardBadge tone="warning">
-                    {assignmentInsights[quiz.assignmentId]?.exhaustedStudentsCount ?? 0} exhausted attempts
+                    {assignmentInsights[quiz.assignmentId]?.exhaustedStudentsCount ?? 0} used all attempts
                   </DashboardBadge>
                 </div>
               </div>
@@ -1090,7 +1104,7 @@ export function TeacherClassDetailsPanel({
           </div>
         ) : (
           <EmptyStateBlock
-            title="No quizzes assigned yet"
+            title="No assigned quizzes yet"
             icon={BookOpen}
             className="border-dashed"
           />
@@ -1192,7 +1206,7 @@ export function AssignQuizDialog({
           title="Assign quiz"
           description={
             teacherClass
-              ? `Choose a quiz for ${teacherClass.name}.`
+              ? `Choose a quiz to make visible to class members in ${teacherClass.name}.`
               : "Choose a quiz for this class."
           }
         />
@@ -1202,7 +1216,7 @@ export function AssignQuizDialog({
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder="Search quizzes by title, topic, or description..."
-            inputClassName="h-12 rounded-[16px] border-[var(--dashboard-border)] bg-white"
+            inputClassName="h-12 rounded-[16px] border-[var(--dashboard-border)] bg-[var(--dashboard-surface-elevated)]"
           />
 
           {isArchivedClass ? (
@@ -1223,7 +1237,7 @@ export function AssignQuizDialog({
                   <div
                     key={quiz.id}
                     className={cn(
-                      "flex items-center justify-between gap-4 rounded-[18px] border bg-white px-5 py-4 transition hover:shadow-[0_10px_30px_rgba(18,32,58,0.06)]",
+                      "flex items-center justify-between gap-4 rounded-[18px] border bg-[var(--dashboard-surface-elevated)] px-5 py-4 transition hover:shadow-[var(--dashboard-shadow-card)]",
                       isSelected
                         ? "border-[var(--dashboard-brand)]"
                         : "border-[var(--dashboard-border-soft)] hover:border-[var(--dashboard-border)]",
@@ -1267,7 +1281,7 @@ export function AssignQuizDialog({
                         }
                       }}
                     >
-                      {isAlreadyAssigned ? "Assigned" : isSelected ? "Selected" : "Choose"}
+                      {isAlreadyAssigned ? "Already visible" : isSelected ? "Selected" : "Choose"}
                     </DashboardButton>
                   </div>
                 );
@@ -1275,10 +1289,10 @@ export function AssignQuizDialog({
               </div>
 
               {selectedQuiz ? (
-                <div className="space-y-4 rounded-[20px] border border-[var(--dashboard-border-soft)] bg-white px-4 py-4">
+                <div className="space-y-4 rounded-[20px] border border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-elevated)] px-4 py-4">
                   <div>
                     <p className="font-semibold text-[var(--dashboard-text-strong)]">
-                      Assignment settings
+                      Assigned quiz settings
                     </p>
                     <p className="mt-1 text-sm leading-6 text-[var(--dashboard-text-soft)]">
                       {selectedQuiz.title}

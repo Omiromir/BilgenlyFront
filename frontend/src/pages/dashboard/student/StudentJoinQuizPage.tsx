@@ -1,23 +1,44 @@
+import { useMemo, useState, type FormEvent } from "react";
+import { Link } from "react-router";
 import { BookOpen, Hash, Timer } from "../../../components/icons/AppIcons";
 import { useAuth } from "../../../app/providers/AuthProvider";
 import { useTeacherClasses } from "../../../app/providers/TeacherClassesProvider";
 import { useQuizLibrary } from "../../../app/providers/QuizLibraryProvider";
 import { useQuizSessions } from "../../../app/providers/QuizSessionProvider";
+import { InputOTP, InputOTPGroup, InputOTPSlot } from "../../../components/ui/input-otp";
 import { cn } from "../../../components/ui/utils";
 import { DashboardPageHeader } from "../../../features/dashboard/components/DashboardPageHeader";
+import {
+  getAssignmentStatusLabel,
+  getAssignmentStatusTone,
+} from "../../../features/assignments/assignmentConstraints";
+import { formatTeacherClassDate } from "../../../features/dashboard/components/classes/teacherClassesUtils";
 import {
   DashboardBadge,
   DashboardButton,
   DashboardSurface,
   dashboardIconChipVariants,
   dashboardIconTextRowClassName,
-  dashboardInputVariants,
   dashboardPageNarrowClassName,
 } from "../../../features/dashboard/components/DashboardPrimitives";
 import { EmptyAssignedQuizzesState } from "../../../features/dashboard/components/quiz-library/QuizLibraryComponents";
-import { buildStudentQuizLibrarySources } from "../../../features/dashboard/components/quiz-library/studentQuizLibrarySources";
-import { useQuizLauncher } from "../../../features/quiz-session/useQuizLauncher";
+import {
+  buildStudentQuizLibrarySources,
+  type StudentAssignedQuizLibraryItem,
+} from "../../../features/dashboard/components/quiz-library/studentQuizLibrarySources";
 import { useDashboardPageMeta } from "../../../features/dashboard/hooks/useDashboardPageMeta";
+import {
+  QUIZ_JOIN_CODE_LENGTH,
+  buildQuizJoinCode,
+  formatQuizJoinCode,
+  normalizeQuizJoinCode,
+} from "../../../features/quiz-session/quizJoinCode";
+import { useQuizLauncher } from "../../../features/quiz-session/useQuizLauncher";
+
+type JoinableAssignment = {
+  assignment: StudentAssignedQuizLibraryItem;
+  joinCode: string;
+};
 
 function getAssignedActionLabel(status: string) {
   if (status === "completed") {
@@ -29,10 +50,30 @@ function getAssignedActionLabel(status: string) {
   }
 
   if (status === "expired" || status === "attempts_exhausted") {
-    return "Open Assignment";
+    return "Open Assigned Quiz";
   }
 
-  return "Start Quiz";
+  return "Start Assigned Quiz";
+}
+
+function getAssignedPriority(status: string) {
+  if (status === "in_progress") {
+    return 0;
+  }
+
+  if (status === "active") {
+    return 1;
+  }
+
+  if (status === "completed") {
+    return 2;
+  }
+
+  if (status === "expired") {
+    return 3;
+  }
+
+  return 4;
 }
 
 export function StudentJoinQuizPage() {
@@ -42,24 +83,108 @@ export function StudentJoinQuizPage() {
   const { quizzes } = useQuizLibrary();
   const { sessions } = useQuizSessions();
   const { openQuiz } = useQuizLauncher();
+  const [joinCode, setJoinCode] = useState("");
+  const [joinError, setJoinError] = useState("");
   const studentViewer = currentUser?.role === "student" ? currentUser : null;
-  const studentIdentity = {
-    userId: studentViewer?.id,
-    email: studentViewer?.email,
-  };
-  const studentSources = buildStudentQuizLibrarySources(
-    classes,
-    quizzes,
-    studentIdentity,
-    sessions,
+  const studentIdentity = useMemo(
+    () => ({
+      userId: studentViewer?.id,
+      email: studentViewer?.email,
+    }),
+    [studentViewer?.email, studentViewer?.id],
   );
+  const studentSources = useMemo(
+    () => buildStudentQuizLibrarySources(classes, quizzes, studentIdentity, sessions),
+    [classes, quizzes, sessions, studentIdentity],
+  );
+  const joinableAssignments = useMemo(
+    () =>
+      studentSources.assigned
+        .map((assignment) => ({
+          assignment,
+          joinCode: buildQuizJoinCode({
+            assignmentId: assignment.assignmentContext.assignmentId,
+            classId: assignment.assignmentContext.classId,
+            quizId: assignment.id,
+          }),
+        }))
+        .sort((left, right) => {
+          const statusDifference =
+            getAssignedPriority(left.assignment.assignmentState.status) -
+            getAssignedPriority(right.assignment.assignmentState.status);
+
+          if (statusDifference !== 0) {
+            return statusDifference;
+          }
+
+          return (
+            new Date(right.assignment.updatedAt).getTime() -
+            new Date(left.assignment.updatedAt).getTime()
+          );
+        }),
+    [studentSources.assigned],
+  );
+  const normalizedJoinCode = normalizeQuizJoinCode(joinCode);
+  const matchedJoinTarget = useMemo(
+    () =>
+      normalizedJoinCode.length === QUIZ_JOIN_CODE_LENGTH
+        ? joinableAssignments.find((item) => item.joinCode === normalizedJoinCode) ?? null
+        : null,
+    [joinableAssignments, normalizedJoinCode],
+  );
+
+  const launchAssignment = (target: JoinableAssignment, launchSourceLabel?: string) => {
+    openQuiz({
+      quizId: target.assignment.id,
+      viewerRole: "student",
+      assignmentId: target.assignment.assignmentContext.assignmentId,
+      preferredSession:
+        target.assignment.assignmentState.status === "completed"
+          ? "completed"
+          : target.assignment.assignmentState.status === "in_progress"
+            ? "in-progress"
+            : undefined,
+      navigationState: {
+        launchSourceType: "join-quiz",
+        launchSourceLabel:
+          launchSourceLabel ?? `Join code ${formatQuizJoinCode(target.joinCode)}`,
+        returnToPath: "/dashboard/student/classes",
+        returnToLabel: "Back to class thread",
+        returnToState: {
+          selectedClassId: target.assignment.assignmentContext.classId,
+        },
+      },
+    });
+  };
+
+  const handleJoinSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!joinableAssignments.length) {
+      setJoinError("Join a class first to unlock quiz codes.");
+      return;
+    }
+
+    if (normalizedJoinCode.length !== QUIZ_JOIN_CODE_LENGTH) {
+      setJoinError(`Enter the full ${QUIZ_JOIN_CODE_LENGTH}-character code.`);
+      return;
+    }
+
+    if (!matchedJoinTarget) {
+      setJoinError("That code does not match any quiz from your joined classes.");
+      return;
+    }
+
+    setJoinError("");
+    launchAssignment(matchedJoinTarget);
+  };
 
   const getAssignedEmptyState = () => {
     if (studentSources.pendingMemberships.length) {
       return {
-        title: "Accept your invitation to unlock quizzes",
+        title: "Accept your invitation to unlock quiz codes",
         description:
-          "You have a pending class invitation. Accept it in Notifications and the assigned quizzes for that class will appear here.",
+          "You have a pending class invite. Accept it in Notifications and the matching join codes for that class will become active here.",
       };
     }
 
@@ -67,148 +192,309 @@ export function StudentJoinQuizPage() {
       return {
         title: "No joined classes yet",
         description:
-          "Assigned quizzes only appear after you join a class through the invitation flow.",
+          "Quiz codes only resolve after you join a class and the teacher assigns work to it.",
       };
     }
 
     return {
-      title: "No class quizzes assigned yet",
+      title: "No class quizzes available yet",
       description:
-        "Your joined classes are connected, but no teacher has assigned a quiz to them yet.",
+        "Your joined classes are active, but there are no assigned quizzes with active join codes yet.",
     };
   };
+
   const assignedEmptyState = getAssignedEmptyState();
 
   return (
     <div className={dashboardPageNarrowClassName}>
       <DashboardPageHeader
         title={meta?.title ?? "Join a Quiz"}
-        subtitle="Enter the quiz code provided by your teacher or launch a quiz assigned through a class you have joined."
-        align="center"
+        subtitle={
+          meta?.subtitle ??
+          "Enter the quiz code your teacher shared or pick from one of your joined class assigned quizzes."
+        }
+        actions={
+          <DashboardButton asChild type="button" variant="secondary" size="lg">
+            <Link to="/dashboard/student/classes">Open My Classes</Link>
+          </DashboardButton>
+        }
       />
 
-      <DashboardSurface asChild radius="xl" padding="lg">
-        <section>
-          <div className="mx-auto max-w-[420px] text-center">
-            <div
+      <DashboardSurface radius="xl" padding="lg" className="mx-auto max-w-[720px]">
+        <div className="mx-auto max-w-[560px] text-center">
+          <div
+            className={cn(
+              dashboardIconChipVariants({ tone: "brand", size: "xl" }),
+              "mx-auto rounded-full",
+            )}
+          >
+            <Hash className="h-9 w-9" />
+          </div>
+
+          <h2 className="mt-5 text-[1.9rem] font-semibold tracking-[-0.04em] text-[var(--dashboard-text-strong)]">
+            Enter Quiz Code
+          </h2>
+          <p className="mt-2 text-[1rem] text-[var(--dashboard-text-soft)]">
+            Use the 6-character code from your teacher to open the right assigned quiz.
+          </p>
+
+          <form className="mt-7 space-y-4" onSubmit={handleJoinSubmit}>
+            <InputOTP
+              maxLength={QUIZ_JOIN_CODE_LENGTH}
+              value={normalizedJoinCode}
+              onChange={(value) => {
+                setJoinCode(normalizeQuizJoinCode(value));
+                setJoinError("");
+              }}
+              containerClassName="justify-center"
+            >
+              <InputOTPGroup className="justify-center gap-2 sm:gap-3">
+                {Array.from({ length: QUIZ_JOIN_CODE_LENGTH }).map((_, index) => (
+                  <InputOTPSlot
+                    key={index}
+                    index={index}
+                    className="h-[56px] w-[56px] rounded-[18px] border bg-[var(--dashboard-surface-elevated)] text-lg font-semibold text-[var(--dashboard-text-strong)] first:rounded-[18px] first:border last:rounded-[18px] last:border data-[active=true]:border-[var(--dashboard-brand)] data-[active=true]:ring-[var(--dashboard-brand)]/20"
+                  />
+                ))}
+              </InputOTPGroup>
+            </InputOTP>
+
+            <p
               className={cn(
-                dashboardIconChipVariants({ tone: "brand", size: "xl" }),
-                "mx-auto rounded-full",
+                "min-h-6 text-sm leading-6",
+                joinError
+                  ? "text-[var(--dashboard-danger)]"
+                  : matchedJoinTarget
+                    ? "text-[var(--dashboard-brand-strong)]"
+                    : "text-[var(--dashboard-text-soft)]",
               )}
             >
-              <Hash className="h-9 w-9" />
-            </div>
-            <h2 className="mt-5 text-[2rem] font-medium text-[var(--dashboard-text-strong)]">
-              Enter Quiz Code
-            </h2>
-            <p className="mt-2 text-[1rem] text-[var(--dashboard-text-soft)]">
-              Your teacher will provide you with a unique code
+              {joinError
+                ? joinError
+                : matchedJoinTarget
+                  ? `${formatQuizJoinCode(matchedJoinTarget.joinCode)} matches ${matchedJoinTarget.assignment.title}.`
+                  : "Codes work with assigned quizzes from classes you have already joined."}
             </p>
 
-            <div className="mt-7 flex justify-center gap-2.5">
-              {Array.from({ length: 6 }).map((_, index) => (
-                <input
-                  key={index}
-                  type="text"
-                  maxLength={1}
-                  className={dashboardInputVariants({ size: "otp" })}
-                />
-              ))}
-            </div>
+            <div className="flex flex-wrap justify-center gap-3">
+              <DashboardButton
+                type="submit"
+                size="lg"
+                disabled={!joinableAssignments.length}
+              >
+                {matchedJoinTarget
+                  ? getAssignedActionLabel(matchedJoinTarget.assignment.assignmentState.status)
+                  : "Open Assigned Quiz"}
+              </DashboardButton>
 
-            <DashboardButton type="button" size="lg" className="mt-6 w-full">
-              Join Quiz
-            </DashboardButton>
-          </div>
-        </section>
-      </DashboardSurface>
-
-      <div className="flex items-center gap-4 py-2 text-sm text-[var(--dashboard-text-soft)]">
-        <div className="h-px flex-1 bg-[var(--dashboard-border-soft)]" />
-        or select from your class assignments
-        <div className="h-px flex-1 bg-[var(--dashboard-border-soft)]" />
-      </div>
-
-      <div className="space-y-4">
-        {studentSources.assigned.length ? (
-          studentSources.assigned.map((assignment) => (
-            <DashboardSurface
-              asChild
-              key={assignment.assignmentContext.assignmentId}
-              radius="lg"
-              padding="md"
-            >
-              <article>
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <h3 className="text-[1.25rem] font-semibold text-[var(--dashboard-text-strong)]">
-                      {assignment.title}
-                    </h3>
-                    <p className="mt-2 text-[1rem] text-[var(--dashboard-text-soft)]">
-                      {assignment.assignmentContext.assignedByName} ·{" "}
-                      {assignment.assignmentContext.className}
-                    </p>
-                  </div>
-                  <DashboardBadge
-                    tone={
-                      assignment.assignmentState.status === "completed"
-                        ? "success"
-                        : assignment.assignmentState.status === "in_progress"
-                          ? "warning"
-                          : assignment.assignmentState.status === "expired"
-                            ? "danger"
-                            : assignment.assignmentState.status === "attempts_exhausted"
-                              ? "neutral"
-                              : "info"
-                    }
-                    size="md"
-                  >
-                    {assignment.assignmentState.status.replace("_", " ")}
-                  </DashboardBadge>
-                </div>
-
-                <div className="mt-5 flex flex-wrap gap-6 text-sm text-[var(--dashboard-text-soft)]">
-                  <span className={dashboardIconTextRowClassName}>
-                    <BookOpen className="h-4 w-4" />
-                    {assignment.questionCount}{" "}
-                    {assignment.questionCount === 1 ? "question" : "questions"}
-                  </span>
-                  <span className={dashboardIconTextRowClassName}>
-                    <Timer className="h-4 w-4" />
-                    {assignment.durationMinutes} min
-                  </span>
-                </div>
-
+              {normalizedJoinCode ? (
                 <DashboardButton
                   type="button"
                   size="lg"
-                  className="mt-5 w-full"
-                  onClick={() =>
-                    openQuiz({
-                      quizId: assignment.id,
-                      viewerRole: "student",
-                      assignmentId: assignment.assignmentContext.assignmentId,
-                      preferredSession:
-                        assignment.assignmentState.status === "completed"
-                          ? "completed"
-                          : assignment.assignmentState.status === "in_progress"
-                            ? "in-progress"
-                            : undefined,
-                      navigationState: {
-                        launchSourceType: "join-quiz",
-                        launchSourceLabel: "Assigned quiz launcher",
-                        returnToPath: "/dashboard/student/join-quiz",
-                        returnToLabel: "Back to join quiz",
-                      },
-                    })
-                  }
+                  variant="secondary"
+                  onClick={() => {
+                    setJoinCode("");
+                    setJoinError("");
+                  }}
                 >
-                  {getAssignedActionLabel(assignment.assignmentState.status)}
-                  <span className="text-base">{">"}</span>
+                  Clear
                 </DashboardButton>
-              </article>
-            </DashboardSurface>
-          ))
+              ) : null}
+            </div>
+          </form>
+        </div>
+
+        {matchedJoinTarget ? (
+          <div className="mx-auto mt-6 max-w-[560px] rounded-[22px] border border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-muted)] p-5 text-left">
+            <div className="flex flex-wrap items-center gap-2">
+              <DashboardBadge
+                tone={getAssignmentStatusTone(
+                  matchedJoinTarget.assignment.assignmentState.status,
+                )}
+              >
+                {getAssignmentStatusLabel(
+                  matchedJoinTarget.assignment.assignmentState.status,
+                )}
+              </DashboardBadge>
+              <DashboardBadge tone="brand">
+                Code {formatQuizJoinCode(matchedJoinTarget.joinCode)}
+              </DashboardBadge>
+            </div>
+
+            <h3 className="mt-3 text-[1.2rem] font-semibold text-[var(--dashboard-text-strong)]">
+              {matchedJoinTarget.assignment.title}
+            </h3>
+            <p className="mt-1 text-sm leading-6 text-[var(--dashboard-text-soft)]">
+              {matchedJoinTarget.assignment.assignmentContext.className} / Assigned quiz{" "}
+              {formatTeacherClassDate(
+                matchedJoinTarget.assignment.assignmentContext.assignedAt,
+              )}
+            </p>
+
+            <div className="mt-4 flex flex-wrap gap-5 text-sm text-[var(--dashboard-text-soft)]">
+              <span className={dashboardIconTextRowClassName}>
+                <BookOpen className="h-4 w-4" />
+                {matchedJoinTarget.assignment.questionCount}{" "}
+                {matchedJoinTarget.assignment.questionCount === 1
+                  ? "question"
+                  : "questions"}
+              </span>
+              <span className={dashboardIconTextRowClassName}>
+                <Timer className="h-4 w-4" />
+                {matchedJoinTarget.assignment.durationMinutes} min
+              </span>
+            </div>
+
+            <div className="mt-5 flex flex-wrap gap-3">
+              <DashboardButton
+                type="button"
+                size="lg"
+                onClick={() => launchAssignment(matchedJoinTarget)}
+              >
+                {getAssignedActionLabel(matchedJoinTarget.assignment.assignmentState.status)}
+              </DashboardButton>
+              <DashboardButton asChild type="button" size="lg" variant="ghost">
+                <Link
+                  to="/dashboard/student/classes"
+                  state={{
+                    selectedClassId:
+                      matchedJoinTarget.assignment.assignmentContext.classId,
+                  }}
+                >
+                  Open Class
+                </Link>
+              </DashboardButton>
+            </div>
+          </div>
+        ) : null}
+      </DashboardSurface>
+
+      {studentSources.pendingMemberships.length ? (
+        <DashboardSurface
+          variant="muted"
+          radius="lg"
+          padding="md"
+          className="mx-auto max-w-[720px]"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm leading-6 text-[var(--dashboard-text-soft)]">
+              Pending class invites can unlock more quiz codes.
+            </p>
+            <DashboardButton asChild type="button" size="sm" variant="secondary">
+              <Link to="/dashboard/student/notifications">Notifications</Link>
+            </DashboardButton>
+          </div>
+        </DashboardSurface>
+      ) : null}
+
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h2 className="text-[1.5rem] font-semibold tracking-[-0.04em] text-[var(--dashboard-text-strong)]">
+              Your Assigned Quizzes
+            </h2>
+            <p className="mt-1 text-sm text-[var(--dashboard-text-soft)]">
+              Pick an assigned quiz directly or fill its code into the field above.
+            </p>
+          </div>
+          <DashboardBadge tone="neutral" size="md">
+            {joinableAssignments.length}{" "}
+            {joinableAssignments.length === 1 ? "assignment" : "assignments"}
+          </DashboardBadge>
+        </div>
+
+        {joinableAssignments.length ? (
+          joinableAssignments.map((target) => {
+            const { assignment } = target;
+            const isMatched =
+              matchedJoinTarget?.assignment.assignmentContext.assignmentId ===
+              assignment.assignmentContext.assignmentId;
+
+            return (
+              <DashboardSurface
+                key={assignment.assignmentContext.assignmentId}
+                radius="lg"
+                padding="md"
+                className={cn(isMatched && "border-[var(--dashboard-brand)]")}
+              >
+                <article className="space-y-4">
+                  <div className="flex flex-wrap items-start justify-between gap-4">
+                    <div>
+                      <div className="flex flex-wrap gap-2">
+                        <DashboardBadge tone="brand">
+                          Code {formatQuizJoinCode(target.joinCode)}
+                        </DashboardBadge>
+                        <DashboardBadge
+                          tone={getAssignmentStatusTone(assignment.assignmentState.status)}
+                        >
+                          {getAssignmentStatusLabel(assignment.assignmentState.status)}
+                        </DashboardBadge>
+                      </div>
+
+                      <h3 className="mt-3 text-[1.15rem] font-semibold text-[var(--dashboard-text-strong)]">
+                        {assignment.title}
+                      </h3>
+                      <p className="mt-1 text-sm leading-6 text-[var(--dashboard-text-soft)]">
+                        {assignment.assignmentContext.assignedByName} /{" "}
+                        {assignment.assignmentContext.className} / Assigned quiz{" "}
+                        {formatTeacherClassDate(assignment.assignmentContext.assignedAt)}
+                      </p>
+                    </div>
+
+                    <DashboardButton
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => {
+                        setJoinCode(target.joinCode);
+                        setJoinError("");
+                      }}
+                    >
+                      Use Code
+                    </DashboardButton>
+                  </div>
+
+                  <div className="flex flex-wrap gap-6 text-sm text-[var(--dashboard-text-soft)]">
+                    <span className={dashboardIconTextRowClassName}>
+                      <BookOpen className="h-4 w-4" />
+                      {assignment.questionCount}{" "}
+                      {assignment.questionCount === 1 ? "question" : "questions"}
+                    </span>
+                    <span className={dashboardIconTextRowClassName}>
+                      <Timer className="h-4 w-4" />
+                      {assignment.durationMinutes} min
+                    </span>
+                  </div>
+
+                  <div className="flex flex-wrap gap-3">
+                    <DashboardButton
+                      type="button"
+                      size="md"
+                      onClick={() =>
+                        launchAssignment(
+                          target,
+                          `${assignment.assignmentContext.className} join launcher`,
+                        )
+                      }
+                    >
+                      {getAssignedActionLabel(assignment.assignmentState.status)}
+                    </DashboardButton>
+                    <DashboardButton
+                      type="button"
+                      size="md"
+                      variant="ghost"
+                      onClick={() => {
+                        setJoinCode(target.joinCode);
+                        setJoinError("");
+                      }}
+                    >
+                      Fill Code
+                    </DashboardButton>
+                  </div>
+                </article>
+              </DashboardSurface>
+            );
+          })
         ) : (
           <EmptyAssignedQuizzesState
             title={assignedEmptyState.title}

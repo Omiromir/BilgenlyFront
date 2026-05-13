@@ -59,8 +59,8 @@ export function DashboardProfilePage({
           <div className="px-5 pb-6 sm:px-6">
             <div className="flex flex-col gap-6 pt-5 lg:flex-row lg:items-start lg:justify-between">
               <div className="min-w-0 flex flex-col gap-5 md:flex-row md:items-start">
-                <div className="-mt-16 relative h-[108px] w-[108px] shrink-0 rounded-full bg-white p-1 shadow-sm shadow-slate-300/50">
-                  <div className="flex h-full w-full items-center justify-center rounded-full bg-white text-[40px] font-semibold text-[var(--dashboard-brand)]">
+                <div className="-mt-16 relative h-[108px] w-[108px] shrink-0 rounded-full bg-[var(--dashboard-surface-elevated)] p-1 shadow-[var(--dashboard-shadow-card)] ring-1 ring-[var(--dashboard-border-soft)]">
+                  <div className="flex h-full w-full items-center justify-center rounded-full bg-[var(--dashboard-surface)] text-[40px] font-semibold text-[var(--dashboard-brand)]">
                     {profile.initials}
                   </div>
                   <DashboardButton

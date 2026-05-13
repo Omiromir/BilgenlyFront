@@ -4,12 +4,7 @@ import type {
   TeacherClassRecord,
 } from "./teacherClassesTypes";
 import { normalizeEmail } from "../../../auth/validation";
-
-const teacherClassDateFormatter = new Intl.DateTimeFormat("en-US", {
-  month: "short",
-  day: "numeric",
-  year: "numeric",
-});
+import { formatCurrentDate } from "../../settings/settingsPreferences";
 
 export function createTeacherClassId() {
   return `class-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -46,13 +41,7 @@ export function normalizeTeacherClassFormValues(
 }
 
 export function formatTeacherClassDate(date: string | Date) {
-  const resolvedDate = typeof date === "string" ? new Date(date) : date;
-
-  if (Number.isNaN(resolvedDate.getTime())) {
-    return "Invalid date";
-  }
-
-  return teacherClassDateFormatter.format(resolvedDate);
+  return formatCurrentDate(date);
 }
 
 export function buildTeacherStudentNameFromEmail(email: string) {

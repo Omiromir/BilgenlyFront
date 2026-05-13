@@ -1,4 +1,5 @@
 import type { QuizRecord } from "../dashboard/components/quiz-library/quizLibraryTypes";
+import { formatCurrentDate } from "../dashboard/settings/settingsPreferences";
 import type {
   QuizPlaybackSummary,
   QuizSessionLaunchContext,
@@ -222,11 +223,7 @@ export function formatQuizScore(percentage: number) {
 }
 
 export function formatQuizAttemptDate(value: string) {
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  }).format(new Date(value));
+  return formatCurrentDate(value);
 }
 
 export function formatQuizAttemptDuration(session: QuizSessionRecord) {

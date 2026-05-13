@@ -6,10 +6,9 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using Bilgenly.Infrastructure.Services;
 
 var builder = WebApplication.CreateBuilder(args);
-
-builder.WebHost.UseUrls("http://+:8080");
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
@@ -68,13 +67,17 @@ builder.Services.AddScoped<QuizService>();
 builder.Services.AddScoped<IAttemptRepository, AttemptRepository>();
 builder.Services.AddScoped<AttemptService>();
 builder.Services.AddScoped<AnalyticsService>();
+builder.Services.AddScoped<IClassRepository, ClassRepository>();
+builder.Services.AddScoped<ClassService>();
+builder.Services.AddScoped<QuizGenerationService>();
+builder.Services.AddScoped<IAiService, AiServiceStub>(); // potom udalit
 builder.Services.AddControllers();
 
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
     {
-        policy.WithOrigins("http://localhost:5173", "https://your-frontend-domain.com")
+        policy.WithOrigins("http://localhost:5173", "https://bilgenly.vercel.app")
               .AllowAnyHeader()
               .AllowAnyMethod();
     });

@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import type {
@@ -46,7 +47,10 @@ interface QuizLibraryContextValue {
     updates: Partial<
       Pick<
         QuizRecord,
-        "practiceState" | "practiceProgressLabel" | "attemptCount" | "averageScore"
+        | "practiceState"
+        | "practiceProgressLabel"
+        | "attemptCount"
+        | "averageScore"
       >
     >,
   ) => void;
@@ -72,11 +76,7 @@ interface QuizLibraryProviderProps {
 }
 
 function formatQuizDate(date: Date) {
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  }).format(date);
+  return date.toISOString();
 }
 
 function getOwnerName(
@@ -158,10 +158,7 @@ function loadQuizLibraryFromStorage() {
   for (let index = 0; index < localStorage.length; index += 1) {
     const storageKey = localStorage.key(index);
 
-    if (
-      !storageKey ||
-      !storageKey.startsWith(`${QUIZ_LIBRARY_STORAGE_KEY}:`)
-    ) {
+    if (!storageKey || !storageKey.startsWith(`${QUIZ_LIBRARY_STORAGE_KEY}:`)) {
       continue;
     }
 
@@ -255,6 +252,12 @@ export function QuizLibraryProvider({ children }: QuizLibraryProviderProps) {
   const [quizzes, setQuizzes] = useState<QuizRecord[]>([]);
   const [isHydrated, setIsHydrated] = useState(false);
 
+  // Keep sync function up-to-date via ref to avoid infinite loops
+  const syncAssignedQuizDetailsRef = useRef(syncAssignedQuizDetails);
+  useEffect(() => {
+    syncAssignedQuizDetailsRef.current = syncAssignedQuizDetails;
+  }, [syncAssignedQuizDetails]);
+
   useEffect(() => {
     setQuizzes([]);
     setIsHydrated(false);
@@ -268,11 +271,7 @@ export function QuizLibraryProvider({ children }: QuizLibraryProviderProps) {
 
     try {
       const parsed = JSON.parse(savedValue) as QuizRecord[];
-      setQuizzes(
-        Array.isArray(parsed)
-          ? parsed.map(sanitizeQuizRecord)
-          : [],
-      );
+      setQuizzes(Array.isArray(parsed) ? parsed.map(sanitizeQuizRecord) : []);
     } catch {
       setQuizzes([]);
     } finally {
@@ -294,13 +293,13 @@ export function QuizLibraryProvider({ children }: QuizLibraryProviderProps) {
     }
 
     quizzes.forEach((quiz) => {
-      syncAssignedQuizDetails(quiz.id, {
+      syncAssignedQuizDetailsRef.current(quiz.id, {
         title: quiz.title,
         topic: quiz.topic,
         questionCount: quiz.questions.length || quiz.questionCount,
       });
     });
-  }, [isHydrated, quizzes, syncAssignedQuizDetails]);
+  }, [isHydrated, quizzes]);
 
   const value = useMemo<QuizLibraryContextValue>(
     () => ({

@@ -44,12 +44,12 @@ export function AnswerOption({
       className={cn(
         "flex w-full items-start gap-4 rounded-[18px] border px-4 py-3.5 text-left transition",
         isSubmitted && isCorrectAnswer
-          ? "border-[#1bb7a3] bg-[#e9fbf7]"
+          ? "border-[var(--dashboard-success)] bg-[var(--dashboard-success-soft)]"
           : isSubmitted && isIncorrectSelection
             ? "border-[var(--dashboard-danger)] bg-[var(--dashboard-danger-soft)]/35"
             : isSelected
-              ? "border-[#18af97] bg-[#eefbf8]"
-              : "border-[var(--dashboard-border-soft)] bg-white hover:border-[var(--dashboard-brand-soft)]",
+              ? "border-[var(--dashboard-success)] bg-[var(--dashboard-success-soft)]/65"
+              : "border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-elevated)] hover:border-[var(--dashboard-brand-soft)]",
       )}
       aria-pressed={isSelected}
     >
@@ -57,12 +57,12 @@ export function AnswerOption({
         className={cn(
           "mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-semibold",
           isSubmitted && isCorrectAnswer
-            ? "border-[#1bb7a3] bg-[#1bb7a3] text-white"
+            ? "border-[var(--dashboard-success)] bg-[var(--dashboard-success)] text-white"
             : isSubmitted && isIncorrectSelection
               ? "border-[var(--dashboard-danger)] bg-[var(--dashboard-danger)] text-white"
               : isSelected
-                ? "border-[#18af97] bg-[#18af97] text-white"
-                : "border-[var(--dashboard-border-soft)] bg-white text-[var(--dashboard-text-soft)]",
+                ? "border-[var(--dashboard-success)] bg-[var(--dashboard-success)] text-white"
+                : "border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface)] text-[var(--dashboard-text-soft)]",
         )}
       >
         {isSubmitted && isCorrectAnswer ? (
@@ -96,11 +96,11 @@ export function AnswerOption({
         className={cn(
           "mt-1 h-4.5 w-4.5 shrink-0",
           isSubmitted && isCorrectAnswer
-            ? "text-[#1bb7a3]"
+            ? "text-[var(--dashboard-success)]"
             : isSubmitted && isIncorrectSelection
               ? "text-[var(--dashboard-danger)]"
               : isSelected
-                ? "text-[#18af97]"
+                ? "text-[var(--dashboard-success)]"
                 : "text-[var(--dashboard-text-faint)]",
         )}
       />

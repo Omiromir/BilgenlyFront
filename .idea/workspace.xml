@@ -4,7 +4,20 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="37e77280-3310-410b-8349-e976186d2718" name="Changes" comment="Profile page" />
+    <list default="true" id="37e77280-3310-410b-8349-e976186d2718" name="Changes" comment="Profile page">
+      <change afterPath="$PROJECT_DIR$/backend/Bilgenly.Application/DTOs/UpdateRoleDto.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/Bilgenly.API/Controllers/AuthController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/backend/Bilgenly.API/Controllers/AuthController.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/Bilgenly.Application/Interfaces/IUserRepository.cs" beforeDir="false" afterPath="$PROJECT_DIR$/backend/Bilgenly.Application/Interfaces/IUserRepository.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/Bilgenly.Application/Services/AuthService.cs" beforeDir="false" afterPath="$PROJECT_DIR$/backend/Bilgenly.Application/Services/AuthService.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/Bilgenly.Infrastructure/Repositories/UserRepository.cs" beforeDir="false" afterPath="$PROJECT_DIR$/backend/Bilgenly.Infrastructure/Repositories/UserRepository.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/features/auth/api.ts" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/features/auth/api.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/features/auth/components/SignUpForm.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/features/auth/components/SignUpForm.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/features/auth/types.ts" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/features/auth/types.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/features/onboarding/components/BilgenlyOnboarding.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/features/onboarding/components/BilgenlyOnboarding.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/features/onboarding/components/Steps.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/features/onboarding/components/Steps.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/pages/auth/OnboardingPage.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/pages/auth/OnboardingPage.tsx" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -30,6 +43,9 @@
     &quot;accountId&quot;: &quot;f2058434-1988-4613-8037-8255580c05d1&quot;
   }
 }</component>
+  <component name="ProblemsViewState">
+    <option name="selectedTabId" value="ProjectErrors" />
+  </component>
   <component name="ProjectColorInfo">{
   &quot;associatedIndex&quot;: 2
 }</component>
@@ -41,11 +57,12 @@
   <component name="PropertiesComponent">{
   &quot;keyToString&quot;: {
     &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;Node.js.assignmentConstraints.ts.executor&quot;: &quot;Run&quot;,
     &quot;Node.js.types.ts.executor&quot;: &quot;Run&quot;,
     &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
     &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
     &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;Integration&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;frontend/features&quot;,
     &quot;ignore.virus.scanning.warn.message&quot;: &quot;true&quot;,
     &quot;last_opened_file_path&quot;: &quot;C:/BilgenlyMerged/Bilgenly&quot;,
     &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
@@ -74,6 +91,13 @@
       <workItem from="1774526963039" duration="2813000" />
       <workItem from="1774582929342" duration="17535000" />
       <workItem from="1774845680066" duration="128000" />
+      <workItem from="1775633356486" duration="4568000" />
+      <workItem from="1776754572043" duration="2133000" />
+      <workItem from="1777312750654" duration="1886000" />
+      <workItem from="1777478294991" duration="2688000" />
+      <workItem from="1777822198325" duration="2089000" />
+      <workItem from="1778580682152" duration="270000" />
+      <workItem from="1778676256791" duration="3880000" />
     </task>
     <task id="LOCAL-00001" summary="Integration with back">
       <option name="closed" value="true" />
@@ -120,5 +144,16 @@
     <MESSAGE value="Integration with back" />
     <MESSAGE value="Global token" />
     <option name="LAST_COMMIT_MESSAGE" value="Global token" />
+  </component>
+  <component name="XDebuggerManager">
+    <breakpoint-manager>
+      <breakpoints>
+        <line-breakpoint enabled="true" type="javascript">
+          <url>file://$PROJECT_DIR$/frontend/src/app/providers/NotificationsProvider.tsx</url>
+          <line>38</line>
+          <option name="timeStamp" value="1" />
+        </line-breakpoint>
+      </breakpoints>
+    </breakpoint-manager>
   </component>
 </project>

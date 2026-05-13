@@ -102,7 +102,7 @@ export function TeacherOverviewPage() {
     setAssignmentDeadlineError("");
   };
 
-  const handleAssignQuizToClasses = () => {
+  const handleAssignQuizToClasses = async () => {
     if (!quizPendingAssignment) {
       return;
     }
@@ -119,36 +119,44 @@ export function TeacherOverviewPage() {
       return;
     }
 
-    const assignedClassIds = assignQuizToClasses(
-      {
-        quizId: quizPendingAssignment.quizId,
-        title: quizPendingAssignment.title,
-        topic: quizPendingAssignment.subjectLabel,
-        questionCount: quizPendingAssignment.questionCount,
-      },
-      selectedClassIds,
-      {
-        deadline: validation.deadline,
-        maxAttempts: validation.maxAttempts,
-        allowLateSubmissions: false,
-      },
-    );
+    try {
+      const assignedClassIds = await assignQuizToClasses(
+        {
+          quizId: quizPendingAssignment.quizId,
+          title: quizPendingAssignment.title,
+          topic: quizPendingAssignment.subjectLabel,
+          questionCount: quizPendingAssignment.questionCount,
+        },
+        selectedClassIds,
+        {
+          deadline: validation.deadline,
+          maxAttempts: validation.maxAttempts,
+          allowLateSubmissions: false,
+        },
+      );
 
-    if (!assignedClassIds.length) {
-      setAssignmentError("That quiz is already assigned to the selected classes.");
-      return;
+      if (!assignedClassIds.length) {
+        setAssignmentError(
+          "That assigned quiz is already visible to the selected classes.",
+        );
+        return;
+      }
+
+      toast.success(
+        `"${quizPendingAssignment.title}" is now visible to class members in ${assignedClassIds.length} ${
+          assignedClassIds.length === 1 ? "class" : "classes"
+        }.`,
+      );
+      setQuizPendingAssignment(null);
+      setSelectedClassIds([]);
+      setAssignmentSettings(DEFAULT_ASSIGNMENT_SETTINGS_VALUES);
+      setAssignmentError("");
+      setAssignmentDeadlineError("");
+    } catch (error) {
+      setAssignmentError(
+        error instanceof Error ? error.message : "Unable to assign that quiz.",
+      );
     }
-
-    toast.success(
-      `"${quizPendingAssignment.title}" assigned to ${assignedClassIds.length} ${
-        assignedClassIds.length === 1 ? "class" : "classes"
-      }.`,
-    );
-    setQuizPendingAssignment(null);
-    setSelectedClassIds([]);
-    setAssignmentSettings(DEFAULT_ASSIGNMENT_SETTINGS_VALUES);
-    setAssignmentError("");
-    setAssignmentDeadlineError("");
   };
 
   const handleViewTopicAnalytics = (topic: StrugglingTopicOverviewItem) => {
@@ -210,7 +218,7 @@ export function TeacherOverviewPage() {
       <div className={dashboardSplitGridClassName}>
         <SectionCard
           title="Recent Quizzes"
-          description="The latest quizzes you've created or assigned, with live completion and intervention signals from real class activity."
+          description="The latest quizzes you've created or turned into assigned quizzes, with live completion and intervention signals from real class activity."
         >
           <RecentQuizzesList
             quizzes={overview.recentQuizzes}
@@ -246,17 +254,17 @@ export function TeacherOverviewPage() {
       >
         <DashboardModalContent className="max-w-[720px]">
           <DashboardModalHeader
-            title="Assign quiz to classes"
+            title="Assign quiz to class"
             description={
               quizPendingAssignment
-                ? `Choose which classes should receive "${quizPendingAssignment.title}".`
-                : "Choose classes for this quiz."
+                ? `Choose which classes should make "${quizPendingAssignment.title}" visible to class members.`
+                : "Choose classes for this assigned quiz."
             }
           />
 
           <DashboardModalBody className="space-y-5">
             {quizPendingAssignment ? (
-              <div className="rounded-[22px] border border-[var(--dashboard-border-soft)] bg-white px-5 py-4 shadow-[0_10px_30px_rgba(18,32,58,0.04)]">
+              <div className="rounded-[22px] border border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-elevated)] px-5 py-4 shadow-[var(--dashboard-shadow-card)]">
                 <p className="text-[1.125rem] font-semibold tracking-[-0.02em] text-[var(--dashboard-text-strong)]">
                   {quizPendingAssignment.title}
                 </p>
@@ -279,7 +287,7 @@ export function TeacherOverviewPage() {
                   return (
                     <label
                       key={teacherClass.id}
-                      className="flex items-start justify-between gap-4 rounded-[22px] border border-[var(--dashboard-border-soft)] bg-white px-5 py-4 shadow-[0_10px_30px_rgba(18,32,58,0.04)] transition-colors hover:border-[var(--dashboard-brand-soft)]"
+                      className="flex items-start justify-between gap-4 rounded-[22px] border border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-elevated)] px-5 py-4 shadow-[var(--dashboard-shadow-card)] transition-colors hover:border-[var(--dashboard-brand-soft)]"
                     >
                       <div className="flex items-start gap-4">
                         <input
@@ -315,14 +323,14 @@ export function TeacherOverviewPage() {
 
                       <div className="flex flex-wrap justify-end gap-2 pt-0.5">
                         {alreadyAssigned ? (
-                          <DashboardBadge tone="info">Already assigned</DashboardBadge>
+                          <DashboardBadge tone="info">Already an assigned quiz</DashboardBadge>
                         ) : null}
                       </div>
                     </label>
                   );
                 })
               ) : (
-                <div className="rounded-[22px] border border-dashed border-[var(--dashboard-border-soft)] bg-white px-5 py-5">
+                <div className="rounded-[22px] border border-dashed border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-elevated)] px-5 py-5">
                   <p className="font-semibold text-[var(--dashboard-text-strong)]">
                     No active classes available
                   </p>
@@ -369,7 +377,7 @@ export function TeacherOverviewPage() {
               Cancel
             </DashboardButton>
             <DashboardButton type="button" size="lg" onClick={handleAssignQuizToClasses}>
-              Assign to classes
+              Assign quiz
             </DashboardButton>
           </DashboardModalFooter>
         </DashboardModalContent>

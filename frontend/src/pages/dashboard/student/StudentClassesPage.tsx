@@ -1,9 +1,17 @@
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { BookOpen, Play } from "../../../components/icons/AppIcons";
 import { useLocation, useNavigate } from "react-router";
+import { toast } from "sonner";
 import { useAuth } from "../../../app/providers/AuthProvider";
 import { useTeacherClasses } from "../../../app/providers/TeacherClassesProvider";
+import { Dialog } from "../../../components/ui/dialog";
 import { DashboardPageHeader } from "../../../features/dashboard/components/DashboardPageHeader";
+import {
+  DashboardModalBody,
+  DashboardModalContent,
+  DashboardModalFooter,
+  DashboardModalHeader,
+} from "../../../features/dashboard/components/DashboardModal";
 import {
   DashboardBadge,
   DashboardButton,
@@ -11,6 +19,8 @@ import {
   DashboardSurface,
   dashboardPageClassName,
 } from "../../../features/dashboard/components/DashboardPrimitives";
+import { EmptyStateBlock } from "../../../features/dashboard/components/EmptyStateBlock";
+import { LoadingCard } from "../../../features/dashboard/components/LoadingCard";
 import { SectionCard } from "../../../features/dashboard/components/SectionCard";
 import {
   StudentClassCard,
@@ -41,10 +51,10 @@ function getAssignedQuizActionLabel(item: StudentAssignedQuizLibraryItem) {
     item.assignmentState.status === "expired" ||
     item.assignmentState.status === "attempts_exhausted"
   ) {
-    return "Open Assignment";
+    return "Open Assigned Quiz";
   }
 
-  return "Start Quiz";
+  return "Start Assigned Quiz";
 }
 
 export function StudentClassesPage() {
@@ -52,7 +62,13 @@ export function StudentClassesPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const { currentUser } = useAuth();
-  const { classes, getStudentMemberships } = useTeacherClasses();
+  const {
+    classes,
+    error,
+    getStudentMemberships,
+    isLoading,
+    joinClassByInviteCode,
+  } = useTeacherClasses();
   const { quizzes } = useQuizLibrary();
   const { sessions } = useQuizSessions();
   const { openQuiz } = useQuizLauncher();
@@ -66,6 +82,10 @@ export function StudentClassesPage() {
   );
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [inviteCode, setInviteCode] = useState("");
+  const [inviteCodeError, setInviteCodeError] = useState("");
+  const [isJoinDialogOpen, setIsJoinDialogOpen] = useState(false);
+  const [isJoiningClass, setIsJoiningClass] = useState(false);
   const deferredSearch = useDeferredValue(search);
   const studentSources = useMemo(
     () => buildStudentQuizLibrarySources(classes, quizzes, studentIdentity, sessions),
@@ -132,6 +152,31 @@ export function StudentClassesPage() {
     0,
   );
 
+  const handleJoinClass = async () => {
+    const normalizedInviteCode = inviteCode.trim().toUpperCase();
+
+    if (!normalizedInviteCode) {
+      setInviteCodeError("Invite code is required.");
+      return;
+    }
+
+    try {
+      setIsJoiningClass(true);
+      const joinedClass = await joinClassByInviteCode(normalizedInviteCode);
+      setSelectedClassId(joinedClass.id);
+      setInviteCode("");
+      setInviteCodeError("");
+      setIsJoinDialogOpen(false);
+      toast.success(`You joined ${joinedClass.name}.`);
+    } catch (nextError) {
+      setInviteCodeError(
+        nextError instanceof Error ? nextError.message : "Unable to join class.",
+      );
+    } finally {
+      setIsJoiningClass(false);
+    }
+  };
+
   const getAssignedActions = (
     item: StudentAssignedQuizLibraryItem,
   ): QuizCardAction[] => [
@@ -176,17 +221,27 @@ export function StudentClassesPage() {
         title={meta?.title ?? "My Classes"}
         subtitle={
           meta?.subtitle ??
-          "See every class you have joined, along with the quizzes unlocked through that membership."
+          "See every class you have joined, along with the assigned quizzes unlocked through that membership."
         }
         actions={
-          <DashboardButton
-            type="button"
-            variant="secondary"
-            size="lg"
-            onClick={() => navigate("/dashboard/student/notifications")}
-          >
-            Review Invitations
-          </DashboardButton>
+          <>
+            <DashboardButton
+              type="button"
+              variant="secondary"
+              size="lg"
+              onClick={() => setIsJoinDialogOpen(true)}
+            >
+              Join with Code
+            </DashboardButton>
+            <DashboardButton
+              type="button"
+              variant="secondary"
+              size="lg"
+              onClick={() => navigate("/dashboard/student/notifications")}
+            >
+              Review Class Invites
+            </DashboardButton>
+          </>
         }
       />
 
@@ -204,19 +259,28 @@ export function StudentClassesPage() {
           </p>
         </DashboardSurface>
         <DashboardSurface variant="muted" radius="lg" padding="sm" className="space-y-2">
-          <p className="text-sm font-medium text-[var(--dashboard-text-soft)]">Pending invitations</p>
+          <p className="text-sm font-medium text-[var(--dashboard-text-soft)]">Pending class invites</p>
           <p className="text-[2rem] font-semibold tracking-[-0.04em] text-[var(--dashboard-text-strong)]">
             {studentSources.pendingMemberships.length}
           </p>
         </DashboardSurface>
       </div>
 
+      {error ? (
+        <EmptyStateBlock
+          title="Unable to load your classes"
+          description={error}
+          icon={BookOpen}
+          className="border-dashed"
+        />
+      ) : null}
+
       {studentSources.pendingMemberships.length ? (
         <div className="rounded-[22px] border border-[var(--dashboard-warning-soft)] bg-[var(--dashboard-warning-soft)]/45 px-5 py-4">
           <p className="text-sm leading-6 text-[var(--dashboard-warning)]">
             {studentSources.pendingMemberships.length}{" "}
-            {studentSources.pendingMemberships.length === 1 ? "class invitation is" : "class invitations are"}{" "}
-            still waiting in Notifications. Accept them there to add more classes to this workspace automatically.
+            {studentSources.pendingMemberships.length === 1 ? "class invite is" : "class invites are"}{" "}
+            still waiting in Notifications. Accept those class invites there to add more classes to this workspace automatically.
           </p>
         </div>
       ) : null}
@@ -235,7 +299,12 @@ export function StudentClassesPage() {
             </DashboardBadge>
           </div>
 
-          {!joinedMemberships.length ? (
+          {isLoading && joinedMemberships.length === 0 ? (
+            <div className="space-y-3">
+              <LoadingCard />
+              <LoadingCard />
+            </div>
+          ) : !joinedMemberships.length ? (
             <StudentClassesEmptyState />
           ) : !filteredMemberships.length ? (
             <StudentClassesSearchEmptyState
@@ -267,6 +336,65 @@ export function StudentClassesPage() {
           }
         />
       </div>
+
+      <Dialog
+        open={isJoinDialogOpen}
+        onOpenChange={(open) => {
+          setIsJoinDialogOpen(open);
+          if (!open) {
+            setInviteCode("");
+            setInviteCodeError("");
+          }
+        }}
+      >
+        <DashboardModalContent className="max-w-[560px]">
+          <DashboardModalHeader
+            title="Join a class"
+            description="Enter your teacher's class invite code to add that class to this workspace."
+          />
+
+          <DashboardModalBody className="space-y-4">
+            <label className="block space-y-2">
+              <span className="text-sm font-medium text-[var(--dashboard-text-strong)]">
+                Invite code
+              </span>
+              <input
+                value={inviteCode}
+                onChange={(event) => {
+                  setInviteCode(event.target.value.toUpperCase());
+                  if (inviteCodeError) {
+                    setInviteCodeError("");
+                  }
+                }}
+                placeholder="ABC123"
+                className="h-14 w-full rounded-[18px] border border-[var(--dashboard-border)] bg-[var(--dashboard-surface-elevated)] px-5 text-base tracking-[0.22em] text-[var(--dashboard-text-strong)]"
+              />
+              {inviteCodeError ? (
+                <p className="text-sm text-[var(--dashboard-danger)]">{inviteCodeError}</p>
+              ) : null}
+            </label>
+          </DashboardModalBody>
+
+          <DashboardModalFooter>
+            <DashboardButton
+              type="button"
+              size="lg"
+              variant="ghost"
+              onClick={() => setIsJoinDialogOpen(false)}
+            >
+              Cancel
+            </DashboardButton>
+            <DashboardButton
+              type="button"
+              size="lg"
+              onClick={handleJoinClass}
+              disabled={isJoiningClass}
+            >
+              {isJoiningClass ? "Joining..." : "Join class"}
+            </DashboardButton>
+          </DashboardModalFooter>
+        </DashboardModalContent>
+      </Dialog>
     </div>
   );
 }

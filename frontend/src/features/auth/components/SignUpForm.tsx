@@ -2,6 +2,7 @@ import { type ChangeEvent, type FormEvent, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { toast } from "sonner";
 import { signUp } from "../api";
+import { logout } from "../api";
 import { usePasswordVisibility } from "../hooks";
 import type { UserRole } from "../../../lib/auth";
 import type { SignUpFormErrors, SignUpFormValues } from "../types";
@@ -24,14 +25,12 @@ export function SignUpForm() {
         email: "",
         fullName: "",
         password: "",
-        role: "Student",
     });
     const [errors, setErrors] = useState<SignUpFormErrors>({});
     const [touched, setTouched] = useState<Record<keyof SignUpFormValues, boolean>>({
         email: false,
         fullName: false,
         password: false,
-        role: false,
     });
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [serverError, setServerError] = useState<string | null>(null);
@@ -80,7 +79,6 @@ export function SignUpForm() {
             email: normalizeEmail(values.email),
             fullName: values.fullName.trim(),
             password: values.password,
-            role: values.role,
         };
 
         const nextErrors = validateSignUpForm(normalizedValues);
@@ -92,14 +90,13 @@ export function SignUpForm() {
         try {
             setIsSubmitting(true);
             const result = await signUp(normalizedValues);
-            signInAsRole(result.role.toLowerCase() as UserRole, result.token, {
+            signInAsRole("student", result.token, {
                 userId: result.userId ?? "",
                 username: result.username,
                 email: result.email,
                 role: result.role,
             });
-            const dashboardPath = getDashboardPathByRole(result.role.toLowerCase());
-            navigate(dashboardPath);
+            navigate("/onboarding"); // ← вместо дашборда
         } catch (error) {
             const message = error instanceof Error ? error.message : "Registration failed";
             setServerError(message);
@@ -208,18 +205,6 @@ export function SignUpForm() {
                 </div>
             </div>
 
-            <div className="auth-field">
-                <label className="auth-label" htmlFor="role">I am a...</label>
-                <select
-                    id="role"
-                    className="auth-input"
-                    value={values.role}
-                    onChange={handleChange("role")}
-                >
-                    <option value="Student">Student</option>
-                    <option value="Teacher">Teacher</option>
-                </select>
-            </div>
 
             <button className="auth-primary" type="submit" disabled={!canSubmit}>
                 {isSubmitting ? "Creating account..." : "Sign Up"}

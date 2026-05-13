@@ -9,6 +9,8 @@ import {
 import type { UserRole } from "../../lib/auth";
 import { getMe } from "../../features/auth/api";
 import {
+  defaultMockStudentId,
+  getMockStudentById,
   mockTeacherUser,
   type MockDashboardUser,
 } from "../../features/dashboard/mock/mockUsers";
@@ -22,7 +24,7 @@ interface AuthContextValue {
   setRole: (role: UserRole | null) => void;
   signInAsRole: (
     role: UserRole,
-    token: string,
+    token?: string,
     user?: AuthUserProfile,
   ) => void;
   signOut: () => void;
@@ -59,7 +61,12 @@ function mapAuthUserToDashboardUser(
     return null;
   }
 
-  const fallbackUser = role === "teacher" ? mockTeacherUser : null;
+  const fallbackUser =
+    role === "teacher"
+      ? mockTeacherUser
+      : role === "student"
+        ? getMockStudentById(defaultMockStudentId)
+        : null;
 
   return {
     id: authUser.userId || `email:${authUser.email.trim().toLowerCase()}`,
@@ -118,27 +125,37 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
 
     let isMounted = true;
+    let timeoutId: NodeJS.Timeout | null = null;
 
-    getMe()
-      .then((user) => {
-        if (!isMounted) {
-          return;
+    const fetchUser = async () => {
+      try {
+        const user = await getMe();
+        if (isMounted) {
+          setAuthUser(user);
+          localStorage.setItem(AUTH_USER_KEY, JSON.stringify(user));
         }
-
-        setAuthUser(user);
-        localStorage.setItem(AUTH_USER_KEY, JSON.stringify(user));
-      })
-      .catch(() => {
-        if (!isMounted) {
-          return;
+      } catch (error) {
+        // Silently fail - user is authenticated but we couldn't fetch full details
+        // This is acceptable, we have the token and basic role
+        if (isMounted) {
+          setAuthUser(null);
+          localStorage.removeItem(AUTH_USER_KEY);
         }
+      }
+    };
 
-        setAuthUser(null);
-        localStorage.removeItem(AUTH_USER_KEY);
-      });
+    // Delay the fetch slightly to avoid cascading renders
+    timeoutId = setTimeout(() => {
+      if (isMounted) {
+        void fetchUser();
+      }
+    }, 0);
 
     return () => {
       isMounted = false;
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
     };
   }, [token]);
 
@@ -154,7 +171,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const signInAsRole = (
     nextRole: UserRole,
-    nextToken: string,
+    nextToken = `bilgenly-session-${nextRole}`,
     nextUser?: AuthUserProfile,
   ) => {
     setRoleState(nextRole);
@@ -162,6 +179,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     if (nextUser) {
       setAuthUser(nextUser);
       localStorage.setItem(AUTH_USER_KEY, JSON.stringify(nextUser));
+    } else {
+      setAuthUser(null);
+      localStorage.removeItem(AUTH_USER_KEY);
     }
     localStorage.setItem(AUTH_ROLE_KEY, nextRole);
     localStorage.setItem(AUTH_TOKEN_KEY, nextToken);
@@ -175,11 +195,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
     localStorage.removeItem(AUTH_TOKEN_KEY);
     localStorage.removeItem(AUTH_USER_KEY);
   };
+  const fallbackUser =
+    role === "teacher"
+      ? mockTeacherUser
+      : role === "student"
+        ? getMockStudentById(defaultMockStudentId)
+        : null;
   const currentUser = authUser
     ? mapAuthUserToDashboardUser(authUser, role)
-    : role === "teacher"
-      ? mockTeacherUser
-      : null;
+    : fallbackUser;
 
   const value = useMemo(
     () => ({

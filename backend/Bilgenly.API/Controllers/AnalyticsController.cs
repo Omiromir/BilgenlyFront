@@ -52,4 +52,13 @@ public class AnalyticsController : ControllerBase
         
         return Ok(result);
     } 
+    [HttpGet("assignment/{assignmentId}")]
+    [Authorize(Roles = "Teacher")]
+    public async Task<IActionResult> GetClassAnalytics(Guid assignmentId)
+    {
+        var teacherId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+        var (result, error) = await _analyticsService.GetClassAnalyticsAsync(assignmentId, teacherId);
+        if (result is null) return BadRequest(new { message = error });
+        return Ok(result);
+    }
 }

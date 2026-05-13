@@ -1,6 +1,6 @@
 import { DashboardSettingsPage } from "../../../features/dashboard/components/DashboardSettingsPage";
 import { useDashboardPageMeta } from "../../../features/dashboard/hooks/useDashboardPageMeta";
-import { studentSettingsData } from "../../../features/dashboard/mock/sharedUi";
+import { dashboardSettingsMetadata } from "../../../features/dashboard/settings/settingsMetadata";
 
 export function StudentSettingsPage() {
   const meta = useDashboardPageMeta();
@@ -9,7 +9,7 @@ export function StudentSettingsPage() {
     <DashboardSettingsPage
       title={meta?.title ?? "Settings"}
       subtitle={meta?.subtitle ?? ""}
-      data={studentSettingsData}
+      metadata={dashboardSettingsMetadata}
     />
   );
 }

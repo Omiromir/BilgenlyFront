@@ -3,6 +3,7 @@ import { useAuth } from "../../../app/providers/AuthProvider";
 import { BilgenlyLogo } from "../../../components/shared/BilgenlyLogo";
 import { progressMap, totalSteps } from "../content";
 import { onboardingStyles } from "../styles";
+import { updateRole } from "../../../features/auth/api";
 import {
   ExperienceStep,
   GoalStep,
@@ -54,13 +55,30 @@ export function BilgenlyOnboarding() {
     return () => clearInterval(interval);
   }, [step]);
 
-  const handleFinishOnboarding = () => {
-    if (!selected.role) {
-      return;
-    }
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [submitError, setSubmitError] = useState<string | null>(null);
 
-    signInAsRole(selected.role);
-  };
+    const handleFinishOnboarding = async () => {
+        if (!selected.role) return;
+
+        setIsSubmitting(true);
+        setSubmitError(null);
+
+        try {
+            const result = await updateRole(
+                selected.role.charAt(0).toUpperCase() + selected.role.slice(1)
+            );
+            signInAsRole(selected.role, result.token, {
+                userId: result.userId,
+                username: result.username,
+                email: result.email,
+                role: result.role,
+            });
+        } catch (err) {
+            setSubmitError(err instanceof Error ? err.message : "Something went wrong");
+            setIsSubmitting(false);
+        }
+    };
 
   const progress = progressMap[step] || 0;
   const isWelcomeStep = step === "welcome";
@@ -199,9 +217,13 @@ export function BilgenlyOnboarding() {
                 />
               )}
               {step === "loading" && <LoadingStep loadingPct={loadingPct} />}
-              {step === "recommendations" && (
-                <RecommendationsStep onContinue={handleFinishOnboarding} />
-              )}
+                {step === "recommendations" && (
+                    <RecommendationsStep
+                        onContinue={handleFinishOnboarding}
+                        isLoading={isSubmitting}
+                        error={submitError}
+                    />
+                )}
             </div>
           </div>
         </>

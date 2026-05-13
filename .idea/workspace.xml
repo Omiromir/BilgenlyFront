@@ -5,7 +5,18 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="37e77280-3310-410b-8349-e976186d2718" name="Changes" comment="Profile page">
+      <change afterPath="$PROJECT_DIR$/backend/Bilgenly.Application/DTOs/UpdateRoleDto.cs" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/Bilgenly.API/Controllers/AuthController.cs" beforeDir="false" afterPath="$PROJECT_DIR$/backend/Bilgenly.API/Controllers/AuthController.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/Bilgenly.Application/Interfaces/IUserRepository.cs" beforeDir="false" afterPath="$PROJECT_DIR$/backend/Bilgenly.Application/Interfaces/IUserRepository.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/Bilgenly.Application/Services/AuthService.cs" beforeDir="false" afterPath="$PROJECT_DIR$/backend/Bilgenly.Application/Services/AuthService.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/Bilgenly.Infrastructure/Repositories/UserRepository.cs" beforeDir="false" afterPath="$PROJECT_DIR$/backend/Bilgenly.Infrastructure/Repositories/UserRepository.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/features/auth/api.ts" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/features/auth/api.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/features/auth/components/SignUpForm.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/features/auth/components/SignUpForm.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/features/auth/types.ts" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/features/auth/types.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/features/onboarding/components/BilgenlyOnboarding.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/features/onboarding/components/BilgenlyOnboarding.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/features/onboarding/components/Steps.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/features/onboarding/components/Steps.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/src/pages/auth/OnboardingPage.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/src/pages/auth/OnboardingPage.tsx" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -85,6 +96,8 @@
       <workItem from="1777312750654" duration="1886000" />
       <workItem from="1777478294991" duration="2688000" />
       <workItem from="1777822198325" duration="2089000" />
+      <workItem from="1778580682152" duration="270000" />
+      <workItem from="1778676256791" duration="3880000" />
     </task>
     <task id="LOCAL-00001" summary="Integration with back">
       <option name="closed" value="true" />

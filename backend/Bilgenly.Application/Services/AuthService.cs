@@ -89,5 +89,29 @@ public class AuthService
             );
             return new JwtSecurityTokenHandler().WriteToken(token);
         }
+    public async Task<(AuthResponseDto? Response, string? Error)> UpdateRoleAsync(
+        Guid userId, UpdateRoleDto dto)
+    {
+        if (!Enum.TryParse<UserRole>(dto.Role, out var role))
+            return (null, $"Role '{dto.Role}' does not exist");
+
+        if (role == UserRole.Moderator)
+            return (null, "Cannot set moderator role");
+
+        var user = await _userRepository.GetByIdAsync(userId);
+        if (user is null) return (null, "User not found");
+
+        user.Role = role;
+        await _userRepository.SaveChangesAsync();
+
+        return (new AuthResponseDto
+        {
+            UserId = user.Id.ToString(),
+            Token = GenerateToken(user),
+            Username = user.Username,
+            Email = user.Email,
+            Role = user.Role.ToString()
+        }, null);
+    }
     
     }

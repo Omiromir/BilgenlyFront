@@ -6,10 +6,14 @@ import type {
 
 const API_URL = (
     import.meta.env.VITE_API_URL?.trim() ||
-    (window.location.hostname === "localhost" ? "http://localhost:5241" : "https://bilgenly-1.onrender.com")
+    (window.location.hostname === "localhost"
+        ? "http://localhost:5241"
+        : "https://bilgenly-1.onrender.com")
 ).replace(/\/+$/, "");
+
 const AUTH_TOKEN_KEY = "bilgenly_token";
 const AUTH_ROLE_KEY = "bilgenly_role";
+const ONBOARDING_KEY = "bilgenly_onboarding_done";
 
 async function readErrorMessage(response: Response, fallbackMessage: string) {
     try {
@@ -18,9 +22,8 @@ async function readErrorMessage(response: Response, fallbackMessage: string) {
             return error.message;
         }
     } catch {
-        //  Just ignore JSON parsing errors and return the fallback message
+        // ignore
     }
-
     return fallbackMessage;
 }
 
@@ -29,13 +32,10 @@ function getRequestErrorMessage(error: unknown, fallbackMessage: string) {
         if (error.message === "Failed to fetch") {
             return "Unable to reach the server. Please try again.";
         }
-
         return error.message;
     }
-
     return fallbackMessage;
 }
-
 
 function saveAuth(token: string, role: string) {
     localStorage.setItem(AUTH_TOKEN_KEY, token);
@@ -50,9 +50,18 @@ export function getRole() {
     return localStorage.getItem(AUTH_ROLE_KEY);
 }
 
+export function isOnboardingDone() {
+    return localStorage.getItem(ONBOARDING_KEY) === "true";
+}
+
+export function markOnboardingDone() {
+    localStorage.setItem(ONBOARDING_KEY, "true");
+}
+
 export function logout() {
     localStorage.removeItem(AUTH_TOKEN_KEY);
     localStorage.removeItem(AUTH_ROLE_KEY);
+    localStorage.removeItem(ONBOARDING_KEY);
 }
 
 export async function signIn(data: SignInFormValues & { rememberMe: boolean }) {
@@ -72,6 +81,7 @@ export async function signIn(data: SignInFormValues & { rememberMe: boolean }) {
 
         const result = await response.json();
         saveAuth(result.token, result.role);
+        markOnboardingDone(); // ← при логине онбординг уже пройден
         return result;
     } catch (error) {
         throw new Error(getRequestErrorMessage(error, "Login failed"));
@@ -87,7 +97,7 @@ export async function signUp(data: SignUpFormValues) {
                 username: data.fullName,
                 email: data.email,
                 password: data.password,
-                role: data.role ?? "Student",
+                role: "Student",
             }),
         });
 
@@ -97,15 +107,41 @@ export async function signUp(data: SignUpFormValues) {
 
         const result = await response.json();
         saveAuth(result.token, result.role);
+        localStorage.removeItem(ONBOARDING_KEY);
         return result;
     } catch (error) {
         throw new Error(getRequestErrorMessage(error, "Registration failed"));
     }
 }
 
+export async function updateRole(role: string) {
+    try {
+        const response = await fetch(`${API_URL}/api/auth/role`, {
+            method: "PATCH",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${getToken()}`
+            },
+            body: JSON.stringify({ role }),
+        });
+
+        if (!response.ok) {
+            throw new Error(await readErrorMessage(response, "Failed to update role"));
+        }
+
+        const result = await response.json();
+        saveAuth(result.token, result.role);
+        markOnboardingDone();
+        return result;
+    } catch (error) {
+        throw new Error(getRequestErrorMessage(error, "Failed to update role"));
+    }
+}
+
 export async function requestPasswordReset(_: ResetPasswordFormValues) {
     return new Promise((resolve) => window.setTimeout(resolve, 400));
 }
+
 export async function getMe() {
     const response = await fetch(`${API_URL}/api/auth/me`, {
         headers: {

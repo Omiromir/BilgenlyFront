@@ -67,7 +67,10 @@ interface TeacherClassesContextValue {
     classId: string,
     values: TeacherClassFormValues,
   ) => Promise<TeacherClassRecord | null>;
-  setClassStatus: (classId: string, status: TeacherClassStatus) => Promise<void>;
+  setClassStatus: (
+    classId: string,
+    status: TeacherClassStatus,
+  ) => Promise<void>;
   addStudentsToClass: (
     classId: string,
     emails: string[],
@@ -81,7 +84,10 @@ interface TeacherClassesContextValue {
     studentIdentity?: StudentIdentity,
   ) => void;
   assignQuizToClasses: (
-    quiz: Pick<TeacherClassAssignedQuiz, "quizId" | "title" | "topic" | "questionCount">,
+    quiz: Pick<
+      TeacherClassAssignedQuiz,
+      "quizId" | "title" | "topic" | "questionCount"
+    >,
     classIds: string[],
     settings?: Pick<
       TeacherClassAssignedQuiz,
@@ -95,7 +101,9 @@ interface TeacherClassesContextValue {
   removeQuizFromClass: (classId: string, quizId: string) => void;
   deleteClass: (classId: string) => Promise<void>;
   getClassById: (classId: string) => TeacherClassRecord | undefined;
-  getStudentMemberships: (studentIdentity: StudentIdentity) => StudentClassMembershipRecord[];
+  getStudentMemberships: (
+    studentIdentity: StudentIdentity,
+  ) => StudentClassMembershipRecord[];
   joinClassByInviteCode: (inviteCode: string) => Promise<TeacherClassRecord>;
 }
 
@@ -175,7 +183,9 @@ function sanitizeTeacherClassStudent(
     status: nextStatus,
     invitationStatus,
     invitedAt:
-      typeof student.invitedAt === "string" ? student.invitedAt : fallbackTimestamp,
+      typeof student.invitedAt === "string"
+        ? student.invitedAt
+        : fallbackTimestamp,
     joinedAt:
       typeof student.joinedAt === "string" && student.joinedAt
         ? student.joinedAt
@@ -214,7 +224,9 @@ function sanitizeTeacherClassRecord(
     ? sortTeacherClassStudents(
         teacherClass.students
           .map((student) => sanitizeTeacherClassStudent(student))
-          .filter((student): student is TeacherClassStudent => student !== null),
+          .filter(
+            (student): student is TeacherClassStudent => student !== null,
+          ),
       )
     : [];
   const assignedQuizzes = Array.isArray(teacherClass.assignedQuizzes)
@@ -228,10 +240,20 @@ function sanitizeTeacherClassRecord(
 
   return {
     id: teacherClass.id,
-    name: typeof teacherClass.name === "string" ? teacherClass.name : "Untitled class",
-    description: typeof teacherClass.description === "string" ? teacherClass.description : "",
-    subject: typeof teacherClass.subject === "string" ? teacherClass.subject : "",
-    inviteCode: typeof teacherClass.inviteCode === "string" ? teacherClass.inviteCode : "",
+    name:
+      typeof teacherClass.name === "string"
+        ? teacherClass.name
+        : "Untitled class",
+    description:
+      typeof teacherClass.description === "string"
+        ? teacherClass.description
+        : "",
+    subject:
+      typeof teacherClass.subject === "string" ? teacherClass.subject : "",
+    inviteCode:
+      typeof teacherClass.inviteCode === "string"
+        ? teacherClass.inviteCode
+        : "",
     createdAt:
       typeof teacherClass.createdAt === "string"
         ? teacherClass.createdAt
@@ -273,7 +295,10 @@ function loadStoredClasses() {
     return sortTeacherClasses(
       parsed
         .map((teacherClass) => sanitizeTeacherClassRecord(teacherClass))
-        .filter((teacherClass): teacherClass is TeacherClassRecord => teacherClass !== null),
+        .filter(
+          (teacherClass): teacherClass is TeacherClassRecord =>
+            teacherClass !== null,
+        ),
     );
   } catch {
     return [];
@@ -309,7 +334,8 @@ function updateTeacherClassStudents(
   return {
     ...teacherClass,
     students,
-    studentCount: students.filter((student) => student.status !== "removed").length,
+    studentCount: students.filter((student) => student.status !== "removed")
+      .length,
     updatedAt: new Date().toISOString(),
   };
 }
@@ -320,10 +346,10 @@ async function loadTeacherClassesFromApi(
 ) {
   const teacherClasses = await getTeacherClasses();
   const assignmentsByClass = await Promise.all(
-    teacherClasses.map(async (teacherClass) => [
-      teacherClass.id,
-      await getClassAssignments(teacherClass.id),
-    ] as const),
+    teacherClasses.map(
+      async (teacherClass) =>
+        [teacherClass.id, await getClassAssignments(teacherClass.id)] as const,
+    ),
   );
   const assignmentMap = new Map(assignmentsByClass);
 
@@ -331,7 +357,8 @@ async function loadTeacherClassesFromApi(
     mapClassDtoToTeacherClassRecord(
       teacherClass,
       assignmentMap.get(teacherClass.id) ?? [],
-      localClasses.find((candidate) => candidate.id === teacherClass.id) ?? null,
+      localClasses.find((candidate) => candidate.id === teacherClass.id) ??
+        null,
       new Set(hiddenAssignmentIdsByClass[teacherClass.id] ?? []),
     ),
   );
@@ -347,7 +374,8 @@ async function loadStudentClassesFromApi(
     mapClassDtoToTeacherClassRecord(
       teacherClass,
       null,
-      localClasses.find((candidate) => candidate.id === teacherClass.id) ?? null,
+      localClasses.find((candidate) => candidate.id === teacherClass.id) ??
+        null,
       new Set(hiddenAssignmentIdsByClass[teacherClass.id] ?? []),
     ),
   );
@@ -357,7 +385,9 @@ export function TeacherClassesProvider({
   children,
 }: TeacherClassesProviderProps) {
   const { currentUser, role, token } = useAuth();
-  const [classes, setClasses] = useState<TeacherClassRecord[]>(() => loadStoredClasses());
+  const [classes, setClasses] = useState<TeacherClassRecord[]>(() =>
+    loadStoredClasses(),
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hiddenAssignmentIdsByClass, setHiddenAssignmentIdsByClass] = useState<
@@ -370,10 +400,12 @@ export function TeacherClassesProvider({
     updateClassInvitationStatusByStudent,
     upsertClassInvitationNotification,
   } = useNotifications();
-  const teacherActor = role === "teacher" && currentUser ? currentUser : mockTeacherUser;
+  const teacherActor =
+    role === "teacher" && currentUser ? currentUser : mockTeacherUser;
   const studentUserId = currentUser?.role === "student" ? currentUser.id : null;
-  const studentEmail = currentUser?.role === "student" ? currentUser.email : null;
-  
+  const studentEmail =
+    currentUser?.role === "student" ? currentUser.email : null;
+
   // Keep teacherActor values up-to-date via ref
   const teacherActorRef = useRef(teacherActor);
   useEffect(() => {
@@ -410,8 +442,14 @@ export function TeacherClassesProvider({
       };
       const remoteClasses =
         role === "teacher"
-          ? await loadTeacherClassesFromApi(localClasses, hiddenAssignmentIdsByClass)
-          : await loadStudentClassesFromApi(localClasses, hiddenAssignmentIdsByClass);
+          ? await loadTeacherClassesFromApi(
+              localClasses,
+              hiddenAssignmentIdsByClass,
+            )
+          : await loadStudentClassesFromApi(
+              localClasses,
+              hiddenAssignmentIdsByClass,
+            );
       const mergedClasses = mergeRemoteClassesWithLocalCache(
         remoteClasses,
         localClasses,
@@ -445,7 +483,9 @@ export function TeacherClassesProvider({
       error,
       refreshClasses,
       createClass: async (values) => {
-        const createdClass = await createClassRequest(toCreateClassRequest(values));
+        const createdClass = await createClassRequest(
+          toCreateClassRequest(values),
+        );
         const mappedClass = mapClassDtoToTeacherClassRecord(
           createdClass,
           [],
@@ -567,16 +607,18 @@ export function TeacherClassesProvider({
               }
 
               const existingByEmail = new Map(
-                item.students.map((student) => [normalizeEmail(student.email), student]),
+                item.students.map((student) => [
+                  normalizeEmail(student.email),
+                  student,
+                ]),
               );
 
               newStudents.forEach((student) => {
                 existingByEmail.set(normalizeEmail(student.email), student);
               });
 
-              return updateTeacherClassStudents(
-                item,
-                () => Array.from(existingByEmail.values()),
+              return updateTeacherClassStudents(item, () =>
+                Array.from(existingByEmail.values()),
               );
             }),
           ),
@@ -585,7 +627,8 @@ export function TeacherClassesProvider({
         newStudents.forEach((student) => {
           upsertClassInvitationNotification({
             recipientUserId:
-              student.linkedUserId ?? getNotificationRecipientUserIdByEmail(student.email),
+              student.linkedUserId ??
+              getNotificationRecipientUserIdByEmail(student.email),
             recipientEmail: student.email,
             relatedClassId: targetClass.id,
             relatedClassName: targetClass.name,
@@ -607,7 +650,8 @@ export function TeacherClassesProvider({
         }
 
         const targetStudent =
-          targetClass.students.find((student) => student.id === studentId) ?? null;
+          targetClass.students.find((student) => student.id === studentId) ??
+          null;
 
         if (!targetStudent) {
           return;
@@ -632,7 +676,8 @@ export function TeacherClassesProvider({
       resendStudentInvite: (classId, studentId) => {
         const targetClass = classes.find((item) => item.id === classId);
         const targetStudent =
-          targetClass?.students.find((student) => student.id === studentId) ?? null;
+          targetClass?.students.find((student) => student.id === studentId) ??
+          null;
 
         if (
           !targetClass ||
@@ -711,11 +756,11 @@ export function TeacherClassesProvider({
                         invitationStatus: response,
                         linkedUserId:
                           response === "accepted"
-                            ? identity?.userId ?? student.linkedUserId
+                            ? (identity?.userId ?? student.linkedUserId)
                             : student.linkedUserId,
                         joinedAt:
                           response === "accepted"
-                            ? student.joinedAt ?? responseTimestamp
+                            ? (student.joinedAt ?? responseTimestamp)
                             : undefined,
                         respondedAt: responseTimestamp,
                         removedAt: undefined,
@@ -733,7 +778,8 @@ export function TeacherClassesProvider({
             classIds.filter((classId) =>
               classes.some(
                 (teacherClass) =>
-                  teacherClass.id === classId && teacherClass.status === "active",
+                  teacherClass.id === classId &&
+                  teacherClass.status === "active",
               ),
             ),
           ),
@@ -764,7 +810,8 @@ export function TeacherClassesProvider({
                       : 1,
                 allowLateSubmissions: Boolean(settings?.allowLateSubmissions),
               });
-              const mappedAssignment = mapAssignmentDtoToTeacherAssignedQuiz(assignment);
+              const mappedAssignment =
+                mapAssignmentDtoToTeacherAssignedQuiz(assignment);
 
               setHiddenAssignmentIdsByClass((current) => {
                 if (!current[classId]?.length) {
@@ -774,7 +821,8 @@ export function TeacherClassesProvider({
                 return {
                   ...current,
                   [classId]: current[classId].filter(
-                    (assignmentId) => assignmentId !== mappedAssignment.assignmentId,
+                    (assignmentId) =>
+                      assignmentId !== mappedAssignment.assignmentId,
                   ),
                 };
               });
@@ -797,7 +845,10 @@ export function TeacherClassesProvider({
                     return {
                       ...teacherClass,
                       assignedQuizzes,
-                      quizCount: Math.max(teacherClass.quizCount, assignedQuizzes.length),
+                      quizCount: Math.max(
+                        teacherClass.quizCount,
+                        assignedQuizzes.length,
+                      ),
                       updatedAt: new Date().toISOString(),
                     };
                   }),
@@ -882,7 +933,9 @@ export function TeacherClassesProvider({
         const removedAssignmentIds =
           classes
             .find((teacherClass) => teacherClass.id === classId)
-            ?.assignedQuizzes.filter((assignment) => assignment.quizId === quizId)
+            ?.assignedQuizzes.filter(
+              (assignment) => assignment.quizId === quizId,
+            )
             .map((assignment) => assignment.assignmentId) ?? [];
 
         if (removedAssignmentIds.length) {
@@ -967,7 +1020,8 @@ export function TeacherClassesProvider({
       joinClassByInviteCode: async (inviteCode) => {
         const joinedClass = await joinClassByInviteCodeRequest(inviteCode);
         const existingClass =
-          classes.find((teacherClass) => teacherClass.id === joinedClass.id) ?? null;
+          classes.find((teacherClass) => teacherClass.id === joinedClass.id) ??
+          null;
         const mappedClass = mapClassDtoToTeacherClassRecord(
           joinedClass,
           null,

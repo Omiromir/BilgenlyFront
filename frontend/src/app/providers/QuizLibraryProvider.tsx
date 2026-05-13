@@ -47,7 +47,10 @@ interface QuizLibraryContextValue {
     updates: Partial<
       Pick<
         QuizRecord,
-        "practiceState" | "practiceProgressLabel" | "attemptCount" | "averageScore"
+        | "practiceState"
+        | "practiceProgressLabel"
+        | "attemptCount"
+        | "averageScore"
       >
     >,
   ) => void;
@@ -155,10 +158,7 @@ function loadQuizLibraryFromStorage() {
   for (let index = 0; index < localStorage.length; index += 1) {
     const storageKey = localStorage.key(index);
 
-    if (
-      !storageKey ||
-      !storageKey.startsWith(`${QUIZ_LIBRARY_STORAGE_KEY}:`)
-    ) {
+    if (!storageKey || !storageKey.startsWith(`${QUIZ_LIBRARY_STORAGE_KEY}:`)) {
       continue;
     }
 
@@ -251,7 +251,7 @@ export function QuizLibraryProvider({ children }: QuizLibraryProviderProps) {
   const { syncAssignedQuizDetails } = useTeacherClasses();
   const [quizzes, setQuizzes] = useState<QuizRecord[]>([]);
   const [isHydrated, setIsHydrated] = useState(false);
-  
+
   // Keep sync function up-to-date via ref to avoid infinite loops
   const syncAssignedQuizDetailsRef = useRef(syncAssignedQuizDetails);
   useEffect(() => {
@@ -271,11 +271,7 @@ export function QuizLibraryProvider({ children }: QuizLibraryProviderProps) {
 
     try {
       const parsed = JSON.parse(savedValue) as QuizRecord[];
-      setQuizzes(
-        Array.isArray(parsed)
-          ? parsed.map(sanitizeQuizRecord)
-          : [],
-      );
+      setQuizzes(Array.isArray(parsed) ? parsed.map(sanitizeQuizRecord) : []);
     } catch {
       setQuizzes([]);
     } finally {

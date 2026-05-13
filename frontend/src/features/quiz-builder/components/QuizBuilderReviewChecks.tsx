@@ -126,7 +126,7 @@ export function QuizBuilderReviewChecks({
                 }
                 className={cn(
                   dashboardSelectVariants({ size: "md" }),
-                  "w-full border-[var(--dashboard-border-soft)] bg-white",
+                  "w-full border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-elevated)]",
                 )}
               >
                 <option value="private">Private</option>
@@ -152,7 +152,7 @@ export function QuizBuilderReviewChecks({
                     }
                     className={cn(
                       dashboardSelectVariants({ size: "md" }),
-                      "w-full border-[var(--dashboard-border-soft)] bg-white",
+                      "w-full border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-elevated)]",
                     )}
                     aria-label="Export quiz format"
                   >

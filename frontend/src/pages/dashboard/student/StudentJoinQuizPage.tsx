@@ -50,10 +50,10 @@ function getAssignedActionLabel(status: string) {
   }
 
   if (status === "expired" || status === "attempts_exhausted") {
-    return "Open Assignment";
+    return "Open Assigned Quiz";
   }
 
-  return "Start Quiz";
+  return "Start Assigned Quiz";
 }
 
 function getAssignedPriority(status: string) {
@@ -184,7 +184,7 @@ export function StudentJoinQuizPage() {
       return {
         title: "Accept your invitation to unlock quiz codes",
         description:
-          "You have a pending class invitation. Accept it in Notifications and the matching join codes for that class will become active here.",
+          "You have a pending class invite. Accept it in Notifications and the matching join codes for that class will become active here.",
       };
     }
 
@@ -197,9 +197,9 @@ export function StudentJoinQuizPage() {
     }
 
     return {
-      title: "No class quizzes assigned yet",
+      title: "No class quizzes available yet",
       description:
-        "Your joined classes are active, but there are no code-enabled quiz assignments to launch yet.",
+        "Your joined classes are active, but there are no assigned quizzes with active join codes yet.",
     };
   };
 
@@ -211,7 +211,7 @@ export function StudentJoinQuizPage() {
         title={meta?.title ?? "Join a Quiz"}
         subtitle={
           meta?.subtitle ??
-          "Enter the quiz code your teacher shared or pick from one of your joined class assignments."
+          "Enter the quiz code your teacher shared or pick from one of your joined class assigned quizzes."
         }
         actions={
           <DashboardButton asChild type="button" variant="secondary" size="lg">
@@ -235,7 +235,7 @@ export function StudentJoinQuizPage() {
             Enter Quiz Code
           </h2>
           <p className="mt-2 text-[1rem] text-[var(--dashboard-text-soft)]">
-            Use the 6-character code from your teacher to open the right assignment.
+            Use the 6-character code from your teacher to open the right assigned quiz.
           </p>
 
           <form className="mt-7 space-y-4" onSubmit={handleJoinSubmit}>
@@ -253,7 +253,7 @@ export function StudentJoinQuizPage() {
                   <InputOTPSlot
                     key={index}
                     index={index}
-                    className="h-[56px] w-[56px] rounded-[18px] border bg-white text-lg font-semibold text-[var(--dashboard-text-strong)] first:rounded-[18px] first:border last:rounded-[18px] last:border data-[active=true]:border-[var(--dashboard-brand)] data-[active=true]:ring-[var(--dashboard-brand)]/20"
+                    className="h-[56px] w-[56px] rounded-[18px] border bg-[var(--dashboard-surface-elevated)] text-lg font-semibold text-[var(--dashboard-text-strong)] first:rounded-[18px] first:border last:rounded-[18px] last:border data-[active=true]:border-[var(--dashboard-brand)] data-[active=true]:ring-[var(--dashboard-brand)]/20"
                   />
                 ))}
               </InputOTPGroup>
@@ -273,7 +273,7 @@ export function StudentJoinQuizPage() {
                 ? joinError
                 : matchedJoinTarget
                   ? `${formatQuizJoinCode(matchedJoinTarget.joinCode)} matches ${matchedJoinTarget.assignment.title}.`
-                  : "Codes work with assignments from classes you have already joined."}
+                  : "Codes work with assigned quizzes from classes you have already joined."}
             </p>
 
             <div className="flex flex-wrap justify-center gap-3">
@@ -284,7 +284,7 @@ export function StudentJoinQuizPage() {
               >
                 {matchedJoinTarget
                   ? getAssignedActionLabel(matchedJoinTarget.assignment.assignmentState.status)
-                  : "Join Quiz"}
+                  : "Open Assigned Quiz"}
               </DashboardButton>
 
               {normalizedJoinCode ? (
@@ -325,7 +325,7 @@ export function StudentJoinQuizPage() {
               {matchedJoinTarget.assignment.title}
             </h3>
             <p className="mt-1 text-sm leading-6 text-[var(--dashboard-text-soft)]">
-              {matchedJoinTarget.assignment.assignmentContext.className} / Assigned{" "}
+              {matchedJoinTarget.assignment.assignmentContext.className} / Assigned quiz{" "}
               {formatTeacherClassDate(
                 matchedJoinTarget.assignment.assignmentContext.assignedAt,
               )}
@@ -378,7 +378,7 @@ export function StudentJoinQuizPage() {
         >
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm leading-6 text-[var(--dashboard-text-soft)]">
-              Pending invitations can unlock more quiz codes.
+              Pending class invites can unlock more quiz codes.
             </p>
             <DashboardButton asChild type="button" size="sm" variant="secondary">
               <Link to="/dashboard/student/notifications">Notifications</Link>
@@ -391,10 +391,10 @@ export function StudentJoinQuizPage() {
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <h2 className="text-[1.5rem] font-semibold tracking-[-0.04em] text-[var(--dashboard-text-strong)]">
-              Your Class Assignments
+              Your Assigned Quizzes
             </h2>
             <p className="mt-1 text-sm text-[var(--dashboard-text-soft)]">
-              Pick an assignment directly or fill its code into the field above.
+              Pick an assigned quiz directly or fill its code into the field above.
             </p>
           </div>
           <DashboardBadge tone="neutral" size="md">
@@ -436,7 +436,7 @@ export function StudentJoinQuizPage() {
                       </h3>
                       <p className="mt-1 text-sm leading-6 text-[var(--dashboard-text-soft)]">
                         {assignment.assignmentContext.assignedByName} /{" "}
-                        {assignment.assignmentContext.className} / Assigned{" "}
+                        {assignment.assignmentContext.className} / Assigned quiz{" "}
                         {formatTeacherClassDate(assignment.assignmentContext.assignedAt)}
                       </p>
                     </div>

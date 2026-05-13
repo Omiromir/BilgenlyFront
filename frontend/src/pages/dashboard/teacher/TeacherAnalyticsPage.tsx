@@ -18,7 +18,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../../components/ui
 import { cn } from "../../../components/ui/utils";
 import { useAuth } from "../../../app/providers/AuthProvider";
 import { useNotifications } from "../../../app/providers/NotificationsProvider";
-import { useQuizSessions } from "../../../app/providers/QuizSessionProvider";
 import { useTeacherClasses } from "../../../app/providers/TeacherClassesProvider";
 import { DashboardPageHeader } from "../../../features/dashboard/components/DashboardPageHeader";
 import {
@@ -42,18 +41,14 @@ import {
   StudentQuizResultRow,
 } from "../../../features/dashboard/components/teacher-analytics/TeacherQuizAnalyticsComponents";
 import {
-  buildTeacherAssignedQuizAnalytics,
   DEFAULT_INTERVENTION_THRESHOLD,
   type TeacherStudentQuizResultRowData,
 } from "../../../features/dashboard/components/teacher-analytics/teacherQuizAnalyticsUtils";
+import { LoadingCard } from "../../../features/dashboard/components/LoadingCard";
+import { useAssignmentAnalytics } from "../../../features/dashboard/hooks/useDashboardAnalytics";
 import { getNotificationRecipientUserIdByEmail } from "../../../features/dashboard/mock/mockUsers";
 import { useDashboardPageMeta } from "../../../features/dashboard/hooks/useDashboardPageMeta";
-
-const shortDateFormatter = new Intl.DateTimeFormat("en-US", {
-  month: "short",
-  day: "numeric",
-  year: "numeric",
-});
+import { formatCurrentShortDate } from "../../../features/dashboard/settings/settingsPreferences";
 
 function escapeCsvValue(value: string | number) {
   return `"${String(value).replace(/"/g, '""')}"`;
@@ -86,12 +81,39 @@ function matchesScoreRange(
   return row.latestScore < 70;
 }
 
+function getFollowUpToastCopy(
+  followUpKind: "needs_review" | "reassign_quiz" | "follow_up_practice",
+  studentName: string,
+  wasCreated: boolean,
+) {
+  if (wasCreated) {
+    switch (followUpKind) {
+      case "reassign_quiz":
+        return `Another Attempt Requested added to ${studentName}'s in-app notifications.`;
+      case "follow_up_practice":
+        return `Practice Follow-up added to ${studentName}'s in-app notifications.`;
+      case "needs_review":
+      default:
+        return `Review Request added to ${studentName}'s in-app notifications.`;
+    }
+  }
+
+  switch (followUpKind) {
+    case "reassign_quiz":
+      return `No in-app notification was created because ${studentName}'s Another Attempt Requested preference is disabled.`;
+    case "follow_up_practice":
+      return `No in-app notification was created because ${studentName}'s Practice Follow-up preference is disabled.`;
+    case "needs_review":
+    default:
+      return `No in-app notification was created because ${studentName}'s Review Request preference is disabled.`;
+  }
+}
+
 export function TeacherAnalyticsPage() {
   const meta = useDashboardPageMeta();
   const [searchParams, setSearchParams] = useSearchParams();
   const { currentUser } = useAuth();
-  const { classes } = useTeacherClasses();
-  const { sharedAssignedSessions } = useQuizSessions();
+  const { classes, error: classesError, isLoading: isClassesLoading } = useTeacherClasses();
   const { sendQuizFollowUpNotification } = useNotifications();
   const [studentSearch, setStudentSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<
@@ -122,6 +144,11 @@ export function TeacherAnalyticsPage() {
     ) ??
     selectedClass?.assignedQuizzes[0] ??
     null;
+  const assignmentAnalyticsState = useAssignmentAnalytics(
+    selectedClass,
+    selectedAssignment,
+    DEFAULT_INTERVENTION_THRESHOLD,
+  );
 
   useEffect(() => {
     if (!selectedClass || !selectedAssignment) {
@@ -147,18 +174,7 @@ export function TeacherAnalyticsPage() {
     setSearchParams,
   ]);
 
-  const analytics = useMemo(() => {
-    if (!selectedClass || !selectedAssignment) {
-      return null;
-    }
-
-    return buildTeacherAssignedQuizAnalytics(
-      selectedClass,
-      selectedAssignment,
-      sharedAssignedSessions,
-      DEFAULT_INTERVENTION_THRESHOLD,
-    );
-  }, [selectedAssignment, selectedClass, sharedAssignedSessions]);
+  const analytics = assignmentAnalyticsState.data;
 
   const filteredRows = useMemo(() => {
     if (!analytics) {
@@ -226,7 +242,7 @@ export function TeacherAnalyticsPage() {
       return;
     }
 
-    sendQuizFollowUpNotification({
+    const notification = sendQuizFollowUpNotification({
       recipientUserId:
         row.student.linkedUserId ?? getNotificationRecipientUserIdByEmail(row.student.email),
       recipientEmail: row.student.email,
@@ -243,7 +259,18 @@ export function TeacherAnalyticsPage() {
       followUpKind,
     });
 
-    toast.success(`Follow-up sent to ${row.student.fullName}.`);
+    const toastMessage = getFollowUpToastCopy(
+      followUpKind,
+      row.student.fullName,
+      Boolean(notification),
+    );
+
+    if (notification) {
+      toast.success(toastMessage);
+      return;
+    }
+
+    toast(toastMessage);
   };
 
   const handleExportCsv = () => {
@@ -300,7 +327,41 @@ export function TeacherAnalyticsPage() {
     URL.revokeObjectURL(url);
   };
 
-  if (!classOptions.length || !selectedClass || !selectedAssignment || !analytics) {
+  if (isClassesLoading && !classes.length) {
+    return (
+      <div className={dashboardPageClassName}>
+        <DashboardPageHeader
+          title={meta?.title ?? "Analytics"}
+          subtitle="Track assigned-quiz results, class-level progress, and follow-up needs in one place."
+        />
+
+        <div className="space-y-4">
+          <LoadingCard />
+          <LoadingCard />
+        </div>
+      </div>
+    );
+  }
+
+  if (classesError) {
+    return (
+      <div className={dashboardPageClassName}>
+        <DashboardPageHeader
+          title={meta?.title ?? "Analytics"}
+          subtitle="Track assigned-quiz results, class-level progress, and follow-up needs in one place."
+        />
+
+        <EmptyStateBlock
+          title="Unable to load analytics workspace"
+          description={classesError}
+          icon={Users}
+          className="border-dashed"
+        />
+      </div>
+    );
+  }
+
+  if (!classOptions.length || !selectedClass || !selectedAssignment) {
     return (
       <div className={dashboardPageClassName}>
         <DashboardPageHeader
@@ -311,6 +372,43 @@ export function TeacherAnalyticsPage() {
         <EmptyStateBlock
           title="Assign a quiz before reviewing results"
           description="Once a class has at least one assigned quiz, this dashboard will switch from setup to post-quiz analytics automatically."
+          icon={Users}
+          className="border-dashed"
+        />
+      </div>
+    );
+  }
+
+  if (assignmentAnalyticsState.isLoading && !analytics) {
+    return (
+      <div className={dashboardPageClassName}>
+        <DashboardPageHeader
+          title={meta?.title ?? "Analytics"}
+          subtitle="Review assigned quiz outcomes, move from class trends into individual answers, and send follow-up actions without leaving the dashboard."
+        />
+
+        <div className="space-y-4">
+          <LoadingCard />
+          <LoadingCard />
+        </div>
+      </div>
+    );
+  }
+
+  if (assignmentAnalyticsState.error || !analytics) {
+    return (
+      <div className={dashboardPageClassName}>
+        <DashboardPageHeader
+          title={meta?.title ?? "Analytics"}
+          subtitle="Review assigned quiz outcomes, move from class trends into individual answers, and send follow-up actions without leaving the dashboard."
+        />
+
+        <EmptyStateBlock
+          title="Unable to load assignment analytics"
+          description={
+            assignmentAnalyticsState.error ??
+            "The selected assignment analytics are unavailable right now."
+          }
           icon={Users}
           className="border-dashed"
         />
@@ -352,7 +450,7 @@ export function TeacherAnalyticsPage() {
                 {selectedAssignment.title}
               </h2>
               <p className="max-w-2xl text-[15px] leading-7 text-white/80">
-                Move from class-wide outcomes into individual follow-up without losing the assignment context. Filters stay close to the quiz, and the roster stays anchored below.
+                Move from class-wide outcomes into individual follow-up without losing the assigned quiz context. Filters stay close to the quiz, and the roster stays anchored below.
               </p>
             </div>
 
@@ -364,11 +462,11 @@ export function TeacherAnalyticsPage() {
                 {selectedAssignment.questionCount} questions
               </DashboardBadge>
               <DashboardBadge tone="white">
-                Assigned {shortDateFormatter.format(new Date(selectedAssignment.assignedAt))}
+                Assigned {formatCurrentShortDate(selectedAssignment.assignedAt)}
               </DashboardBadge>
               <DashboardBadge tone="white">
                 {selectedAssignment.deadline
-                  ? `Due ${shortDateFormatter.format(new Date(selectedAssignment.deadline))}`
+                  ? `Due ${formatCurrentShortDate(selectedAssignment.deadline)}`
                   : "No deadline"}
               </DashboardBadge>
               <DashboardBadge tone="white">
@@ -377,7 +475,7 @@ export function TeacherAnalyticsPage() {
             </div>
           </div>
 
-          <div className="rounded-[28px] border border-white/12 bg-white/10 p-5 shadow-[0_24px_48px_rgba(11,15,38,0.16)] backdrop-blur-sm">
+          <div className="rounded-[28px] border border-white/12 bg-[rgba(15,23,42,0.12)] p-5 shadow-[0_24px_48px_rgba(11,15,38,0.16)] backdrop-blur-sm dark:bg-[rgba(8,14,28,0.36)]">
             <div className="space-y-1">
               <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/70">
                 Refine view
@@ -395,7 +493,7 @@ export function TeacherAnalyticsPage() {
                   onChange={(event) => handleClassChange(event.target.value)}
                   className={cn(
                     dashboardSelectVariants({ size: "md" }),
-                    "w-full border-white/20 bg-white/96 text-[var(--dashboard-text-strong)] shadow-[0_14px_28px_rgba(11,15,38,0.08)]",
+                    "w-full border-white/20 bg-[var(--dashboard-surface-elevated)] text-[var(--dashboard-text-strong)] shadow-[0_14px_28px_rgba(11,15,38,0.12)]",
                   )}
                 >
                   {classOptions.map((teacherClass) => (
@@ -413,7 +511,7 @@ export function TeacherAnalyticsPage() {
                   onChange={(event) => handleAssignmentChange(event.target.value)}
                   className={cn(
                     dashboardSelectVariants({ size: "md" }),
-                    "w-full border-white/20 bg-white/96 text-[var(--dashboard-text-strong)] shadow-[0_14px_28px_rgba(11,15,38,0.08)]",
+                    "w-full border-white/20 bg-[var(--dashboard-surface-elevated)] text-[var(--dashboard-text-strong)] shadow-[0_14px_28px_rgba(11,15,38,0.12)]",
                   )}
                 >
                   {selectedClass.assignedQuizzes.map((assignment) => (
@@ -441,7 +539,7 @@ export function TeacherAnalyticsPage() {
                   }
                   className={cn(
                     dashboardSelectVariants({ size: "md" }),
-                    "w-full border-white/20 bg-white/96 text-[var(--dashboard-text-strong)] shadow-[0_14px_28px_rgba(11,15,38,0.08)]",
+                    "w-full border-white/20 bg-[var(--dashboard-surface-elevated)] text-[var(--dashboard-text-strong)] shadow-[0_14px_28px_rgba(11,15,38,0.12)]",
                   )}
                 >
                   <option value="all">All statuses</option>
@@ -469,7 +567,7 @@ export function TeacherAnalyticsPage() {
                   }
                   className={cn(
                     dashboardSelectVariants({ size: "md" }),
-                    "w-full border-white/20 bg-white/96 text-[var(--dashboard-text-strong)] shadow-[0_14px_28px_rgba(11,15,38,0.08)]",
+                    "w-full border-white/20 bg-[var(--dashboard-surface-elevated)] text-[var(--dashboard-text-strong)] shadow-[0_14px_28px_rgba(11,15,38,0.12)]",
                   )}
                 >
                   <option value="all">All scores</option>
@@ -488,7 +586,7 @@ export function TeacherAnalyticsPage() {
         <ClassQuizAnalyticsCard
           title="Completion Rate"
           value={`${analytics.completionRate}%`}
-          helper={`${analytics.completedStudentsCount} of ${analytics.assignedStudentsCount} joined students finished the assignment.`}
+          helper={`${analytics.completedStudentsCount} of ${analytics.assignedStudentsCount} joined students finished the assigned quiz.`}
           icon={CheckCircle2}
           tone="success"
         />
@@ -542,7 +640,7 @@ export function TeacherAnalyticsPage() {
                     onChange={(event) => setStudentSearch(event.target.value)}
                     placeholder="Search student name or email..."
                     containerClassName="w-full max-w-xl"
-                    inputClassName="border-[var(--dashboard-border-soft)] bg-white"
+                    inputClassName="border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-elevated)]"
                   />
                   <div className="flex flex-wrap gap-2">
                     <DashboardBadge tone="neutral">
@@ -555,7 +653,7 @@ export function TeacherAnalyticsPage() {
                     ) : null}
                   </div>
                 </div>
-                <div className="overflow-hidden rounded-[18px] border border-[var(--dashboard-border-soft)] bg-white">
+                <div className="overflow-hidden rounded-[18px] border border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-elevated)]">
                   <div className="max-h-[430px] overflow-auto">
                     <Table className="min-w-[940px]">
                       <TableHeader className="sticky top-0 z-10 bg-[var(--dashboard-surface-muted)]">

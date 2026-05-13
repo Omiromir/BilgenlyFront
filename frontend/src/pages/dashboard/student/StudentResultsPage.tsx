@@ -33,6 +33,8 @@ import {
   getQuizSessionResultSummary,
 } from "../../../features/quiz-session/quizSessionUtils";
 import { useDashboardPageMeta } from "../../../features/dashboard/hooks/useDashboardPageMeta";
+import { LoadingCard } from "../../../features/dashboard/components/LoadingCard";
+import { useMyAnalytics } from "../../../features/dashboard/hooks/useDashboardAnalytics";
 
 const summaryIcons = [TrendingUp, CheckCircle2, Award, Clock3] as const;
 const summaryColors = [
@@ -57,13 +59,16 @@ function buildQuizLink(quizId: string, assignmentId?: string) {
 
 export function StudentResultsPage() {
   const meta = useDashboardPageMeta();
+  const analyticsState = useMyAnalytics();
   const { getCompletedSessionsForRole } = useQuizSessions();
   const completedSessions = getCompletedSessionsForRole("student");
   const [search, setSearch] = useState("");
   const deferredSearch = useDeferredValue(search);
+  const attemptSummaries = analyticsState.data?.attempts ?? [];
+  const usingLocalFallback = Boolean(analyticsState.error);
 
   const summary = useMemo(() => {
-    if (!completedSessions.length) {
+    if (!attemptSummaries.length && !completedSessions.length) {
       return [
         {
           label: "Average Score",
@@ -88,24 +93,29 @@ export function StudentResultsPage() {
       ];
     }
 
-    const percentages = completedSessions.map(
-      (session) => getQuizSessionResultSummary(session).percentage,
-    );
+    const percentages = attemptSummaries.length
+      ? attemptSummaries.map((attempt) => attempt.score)
+      : completedSessions.map(
+          (session) => getQuizSessionResultSummary(session).percentage,
+        );
     const latestScore = percentages[0];
-    const averageScore = Math.round(
-      percentages.reduce((total, value) => total + value, 0) / percentages.length,
-    );
+    const averageScore = attemptSummaries.length
+      ? Math.round(analyticsState.data?.averageScore ?? 0)
+      : Math.round(
+          percentages.reduce((total, value) => total + value, 0) / percentages.length,
+        );
     const bestScore = Math.max(...percentages);
+    const completedCount = attemptSummaries.length || completedSessions.length;
 
     return [
       {
         label: "Average Score",
         value: formatQuizScore(averageScore),
-        note: `${completedSessions.length} completed ${completedSessions.length === 1 ? "quiz" : "quizzes"}`,
+        note: `${completedCount} completed ${completedCount === 1 ? "quiz" : "quizzes"}`,
       },
       {
         label: "Quizzes Completed",
-        value: String(completedSessions.length),
+        value: String(completedCount),
         note: "Across class and self-study attempts.",
       },
       {
@@ -120,28 +130,43 @@ export function StudentResultsPage() {
         label: "Latest Score",
         value: formatQuizScore(latestScore),
         note: `Recorded ${formatQuizAttemptDate(
-          completedSessions[0].finishedAt ?? completedSessions[0].updatedAt,
+          attemptSummaries[0]?.dateTaken ??
+            completedSessions[0]?.finishedAt ??
+            completedSessions[0]?.updatedAt ??
+            new Date().toISOString(),
         )}`,
       },
     ];
-  }, [completedSessions]);
+  }, [analyticsState.data?.averageScore, attemptSummaries, completedSessions]);
 
   const progressData = useMemo(
     () =>
-      completedSessions
+      (attemptSummaries.length ? attemptSummaries : completedSessions)
         .slice(0, 6)
         .reverse()
-        .map((session, index) => ({
+        .map((attemptOrSession, index) => ({
           label: `Attempt ${index + 1}`,
-          value: getQuizSessionResultSummary(session).percentage,
+          value:
+            "score" in attemptOrSession
+              ? attemptOrSession.score
+              : getQuizSessionResultSummary(attemptOrSession).percentage,
         })),
-    [completedSessions],
+    [attemptSummaries, completedSessions],
   );
 
   const recentResults = useMemo(
     () =>
-      completedSessions
-        .filter((session) => {
+      (attemptSummaries.length
+        ? attemptSummaries
+        : completedSessions.map((session) => ({
+            attemptId: session.id,
+            quizId: session.quizId,
+            quizTitle: session.quiz.title,
+            score: getQuizSessionResultSummary(session).percentage,
+            dateTaken: session.finishedAt ?? session.updatedAt,
+            isCompleted: true,
+          })))
+        .filter((attempt) => {
           const query = deferredSearch.trim().toLowerCase();
 
           if (!query) {
@@ -149,34 +174,68 @@ export function StudentResultsPage() {
           }
 
           return [
-            session.quiz.title,
-            session.quiz.topic,
-            session.assignmentContext ? "assigned quiz" : session.sourceLabel,
+            attempt.quizTitle,
           ]
             .join(" ")
             .toLowerCase()
             .includes(query);
         })
         .slice(0, 5)
-        .map((session) => {
-          const result = getQuizSessionResultSummary(session);
+        .map((attempt) => {
+          const matchedSession =
+            completedSessions.find(
+              (session) =>
+                session.quizId === attempt.quizId &&
+                Math.abs(
+                  new Date(session.finishedAt ?? session.updatedAt).getTime() -
+                    new Date(attempt.dateTaken).getTime(),
+                ) <
+                  5 * 60 * 1000,
+            ) ?? null;
+          const result = matchedSession
+            ? getQuizSessionResultSummary(matchedSession)
+            : {
+                percentage: attempt.score,
+                correctCount: 0,
+                incorrectCount: 0,
+                totalQuestions: 0,
+              };
 
           return {
-            session,
+            attempt,
+            session: matchedSession,
             result,
-            reviewHref: buildSessionLink(
-              session.id,
-              session.quizId,
-              session.assignmentContext?.assignmentId,
-            ),
+            reviewHref: matchedSession
+              ? buildSessionLink(
+                  matchedSession.id,
+                  matchedSession.quizId,
+                  matchedSession.assignmentContext?.assignmentId,
+                )
+              : null,
             retakeHref: buildQuizLink(
-              session.quizId,
-              session.assignmentContext?.assignmentId,
+              attempt.quizId,
+              matchedSession?.assignmentContext?.assignmentId,
             ),
           };
         }),
-    [completedSessions, deferredSearch],
+    [attemptSummaries, completedSessions, deferredSearch],
   );
+
+  if (analyticsState.isLoading && !attemptSummaries.length && !completedSessions.length) {
+    return (
+      <div className={dashboardPageClassName}>
+        <DashboardPageHeader
+          title={meta?.title ?? "My Results"}
+          subtitle="Track real quiz attempts, review what you missed, and jump back into practice from one place."
+        />
+
+        <div className="space-y-4">
+          <LoadingCard />
+          <LoadingCard />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={dashboardPageClassName}>
@@ -184,6 +243,15 @@ export function StudentResultsPage() {
         title={meta?.title ?? "My Results"}
         subtitle="Track real quiz attempts, review what you missed, and jump back into practice from one place."
       />
+
+      {usingLocalFallback ? (
+        <EmptyStateBlock
+          title="Backend analytics are unavailable"
+          description={`${analyticsState.error} Showing local session history only where it is available.`}
+          icon={TrendingUp}
+          className="border-dashed"
+        />
+      ) : null}
 
       <div className={dashboardStatsGridClassName}>
         {summary.map((item, index) => {
@@ -253,32 +321,30 @@ export function StudentResultsPage() {
 
       <SectionCard
         title="Recent Quiz Results"
-        description="Search by quiz title, topic, or source to jump straight to the result you want."
+        description="Search by quiz title, topic, or source to jump straight to the result or assigned quiz review you want."
         contentClassName="space-y-5"
       >
         <DashboardSearchField
           value={search}
           onChange={(event) => setSearch(event.target.value)}
           placeholder="Search results by quiz title, topic, or source..."
-          inputClassName="border-[var(--dashboard-border-soft)] bg-white"
+          inputClassName="border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-elevated)]"
         />
 
         {recentResults.length ? (
           <div className="space-y-5">
-            {recentResults.map(({ session, result, reviewHref, retakeHref }) => (
+            {recentResults.map(({ attempt, session, result, reviewHref, retakeHref }) => (
               <article
-                key={session.id}
-                className="rounded-[22px] border border-[var(--dashboard-border-soft)] bg-white px-5 py-5"
+                key={attempt.attemptId}
+                className="rounded-[22px] border border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-elevated)] px-5 py-5"
               >
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <h3 className="text-[1.18rem] font-semibold text-[var(--dashboard-text-strong)]">
-                      {session.quiz.title}
+                      {attempt.quizTitle}
                     </h3>
                     <p className="mt-1 text-sm text-[var(--dashboard-text-soft)]">
-                      {formatQuizAttemptDate(
-                        session.finishedAt ?? session.updatedAt,
-                      )}
+                      {formatQuizAttemptDate(attempt.dateTaken)}
                     </p>
                   </div>
                   <div className="text-right">
@@ -286,7 +352,9 @@ export function StudentResultsPage() {
                       {formatQuizScore(result.percentage)}
                     </p>
                     <p className="text-sm text-[var(--dashboard-text-soft)]">
-                      {result.correctCount}/{result.totalQuestions} correct
+                      {result.totalQuestions
+                        ? `${result.correctCount}/${result.totalQuestions} correct`
+                        : "Summary only"}
                     </p>
                   </div>
                 </div>
@@ -294,32 +362,42 @@ export function StudentResultsPage() {
                 <div className="mt-5 grid gap-4 text-sm text-[var(--dashboard-text-soft)] md:grid-cols-2">
                   <div className={dashboardIconTextRowClassName}>
                     <CheckCircle2 className="h-4 w-4 text-[var(--dashboard-brand)]" />
-                    Correct: {result.correctCount}
+                    Correct: {result.totalQuestions ? result.correctCount : "--"}
                   </div>
                   <div className={dashboardIconTextRowClassName}>
                     <Award className="h-4 w-4 text-[var(--dashboard-brand-strong)]" />
-                    Incorrect: {result.incorrectCount}
+                    Incorrect: {result.totalQuestions ? result.incorrectCount : "--"}
                   </div>
                   <div className={dashboardIconTextRowClassName}>
                     <Clock3 className="h-4 w-4 text-[var(--dashboard-brand)]" />
-                    Time: {formatQuizAttemptDuration(session)}
+                    Time: {session ? formatQuizAttemptDuration(session) : "--"}
                   </div>
                   <div className={dashboardIconTextRowClassName}>
                     <TrendingUp className="h-4 w-4 text-[var(--dashboard-brand)]" />
-                    Source: {session.assignmentContext ? "Assigned quiz" : session.sourceLabel}
+                    Source: {session ? (session.assignmentContext ? "Assigned quiz" : session.sourceLabel) : "Analytics summary"}
                   </div>
                 </div>
 
                 <div className="mt-5 rounded-[12px] border border-[var(--dashboard-border)] bg-[var(--dashboard-brand-soft-alt)] px-4 py-3 text-sm text-[var(--dashboard-text-strong)]">
-                  Review feedback is saved with this attempt. Open the result to see each answer and explanation again.
+                  {reviewHref
+                    ? "Review feedback is saved with this attempt. Open the result to revisit each answer, explanation, and any Review Request context tied to this assigned quiz."
+                    : "Detailed per-question review is not available for this backend summary yet, but you can reopen the quiz from your library or class workspace."}
                 </div>
 
                 <div className="mt-5 flex gap-3">
-                  <DashboardButton asChild type="button" size="lg" className="flex-1">
-                    <Link to={reviewHref}>Review Answers</Link>
-                  </DashboardButton>
+                  {reviewHref ? (
+                    <DashboardButton asChild type="button" size="lg" className="flex-1">
+                      <Link to={reviewHref}>Review Answers</Link>
+                    </DashboardButton>
+                  ) : (
+                    <DashboardButton type="button" size="lg" className="flex-1" disabled>
+                      Review Answers
+                    </DashboardButton>
+                  )}
                   <DashboardButton asChild type="button" variant="secondary" size="lg">
-                    <Link to={retakeHref}>Retake Quiz</Link>
+                    <Link to={retakeHref}>
+                      {session?.assignmentContext ? "Open Assigned Quiz" : "Retake Quiz"}
+                    </Link>
                   </DashboardButton>
                 </div>
               </article>

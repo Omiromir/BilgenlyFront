@@ -1,0 +1,78 @@
+import { apiRequest } from "../../../lib/apiClient";
+import type {
+  AssignmentDto,
+  AssignQuizToClassRequest,
+  ClassDto,
+  CreateClassRequest,
+  JoinClassRequest,
+  UpdateClassRequest,
+} from "./dashboardApiTypes";
+
+export function getTeacherClasses() {
+  return apiRequest<ClassDto[]>("/api/classes/teacher", {
+    fallbackErrorMessage: "Unable to load teacher classes.",
+  });
+}
+
+export function createClass(payload: CreateClassRequest) {
+  return apiRequest<ClassDto>("/api/classes", {
+    method: "POST",
+    body: payload,
+    fallbackErrorMessage: "Unable to create class.",
+  });
+}
+
+export function updateClass(classId: string, payload: UpdateClassRequest) {
+  return apiRequest<ClassDto>(`/api/classes/${classId}`, {
+    method: "PUT",
+    body: payload,
+    fallbackErrorMessage: "Unable to update class.",
+  });
+}
+
+export function archiveClass(classId: string) {
+  return apiRequest<{ message: string }>(`/api/classes/${classId}/archive`, {
+    method: "PATCH",
+    fallbackErrorMessage: "Unable to update class archive status.",
+  });
+}
+
+export function deleteClass(classId: string) {
+  return apiRequest<{ message: string }>(`/api/classes/${classId}`, {
+    method: "DELETE",
+    fallbackErrorMessage: "Unable to delete class.",
+  });
+}
+
+export function assignQuizToClass(
+  classId: string,
+  payload: AssignQuizToClassRequest,
+) {
+  return apiRequest<AssignmentDto>(`/api/classes/${classId}/assignments`, {
+    method: "POST",
+    body: payload,
+    fallbackErrorMessage: "Unable to assign quiz to class.",
+  });
+}
+
+export function getClassAssignments(classId: string) {
+  return apiRequest<AssignmentDto[]>(`/api/classes/${classId}/assignments`, {
+    fallbackErrorMessage: "Unable to load class assignments.",
+  });
+}
+
+export function getStudentClasses() {
+  return apiRequest<ClassDto[]>("/api/classes/student", {
+    fallbackErrorMessage: "Unable to load student classes.",
+  });
+}
+
+export function joinClassByInviteCode(payload: JoinClassRequest | string) {
+  const request = typeof payload === "string" ? { inviteCode: payload } : payload;
+
+  return apiRequest<ClassDto>("/api/classes/join", {
+    method: "POST",
+    body: request,
+    fallbackErrorMessage: "Unable to join class.",
+  });
+}

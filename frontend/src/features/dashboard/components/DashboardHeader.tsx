@@ -27,6 +27,7 @@ import {
   getNotificationStatusTone,
 } from "./notifications/notificationUtils";
 import type { DashboardNotification } from "./notifications/notificationTypes";
+import { useDashboardViewer } from "../hooks/useDashboardViewer";
 
 interface DashboardHeaderProps {
   onOpenSidebar: () => void;
@@ -34,6 +35,7 @@ interface DashboardHeaderProps {
 
 export function DashboardHeader({ onOpenSidebar }: DashboardHeaderProps) {
   const { currentUser, role, signOut } = useAuth();
+  const dashboardViewer = useDashboardViewer();
   const {
     getNotificationsForRecipientIdentity,
     getUnreadCountForRecipientIdentity,
@@ -72,8 +74,8 @@ export function DashboardHeader({ onOpenSidebar }: DashboardHeaderProps) {
     : 0;
 
   const userMeta = useMemo(() => {
-    const name = currentUser?.fullName ?? "Bilgenly User";
-    const email = currentUser?.email ?? "user@bilgenly.com";
+    const name = dashboardViewer?.fullName ?? "Bilgenly User";
+    const email = dashboardViewer?.email ?? "user@bilgenly.com";
 
     switch (role) {
       case "teacher":
@@ -105,7 +107,7 @@ export function DashboardHeader({ onOpenSidebar }: DashboardHeaderProps) {
           settingsPath: "/signin",
         };
     }
-  }, [currentUser, role]);
+  }, [dashboardViewer?.email, dashboardViewer?.fullName, role]);
   const notificationsPath =
     role === "student" ? "/dashboard/student/notifications" : userMeta.settingsPath;
 
@@ -171,7 +173,7 @@ export function DashboardHeader({ onOpenSidebar }: DashboardHeaderProps) {
                 className="px-3"
                 aria-label="Profile"
               >
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-950 text-sm font-semibold text-white">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--dashboard-surface-elevated)] text-sm font-semibold text-[var(--dashboard-text-strong)] ring-1 ring-[var(--dashboard-border-soft)]">
                   {initials}
                 </div>
               </DashboardButton>
@@ -181,7 +183,7 @@ export function DashboardHeader({ onOpenSidebar }: DashboardHeaderProps) {
           <div className="relative flex justify-end">
             <DashboardSurface
               className={cn(
-                "fixed left-4 right-4 top-[84px] z-30 overflow-hidden rounded-[20px] shadow-2xl shadow-slate-900/10 sm:absolute sm:left-auto sm:right-16 sm:top-0 sm:w-[360px] sm:max-w-[360px] sm:rounded-[24px]",
+                "fixed left-4 right-4 top-[84px] z-30 overflow-hidden rounded-[20px] shadow-[var(--dashboard-shadow-overlay)] sm:absolute sm:left-auto sm:right-16 sm:top-0 sm:w-[360px] sm:max-w-[360px] sm:rounded-[24px]",
                 isNotificationsOpen
                   ? "pointer-events-auto opacity-100"
                   : "pointer-events-none opacity-0",
@@ -226,7 +228,7 @@ export function DashboardHeader({ onOpenSidebar }: DashboardHeaderProps) {
                         "border-b px-4 py-4 last:border-b-0 sm:px-5",
                         dashboardSectionDividerClassName,
                         notification.read
-                          ? "bg-white"
+                          ? "bg-[var(--dashboard-surface)]"
                           : "bg-[var(--dashboard-brand-soft-alt)]/60",
                       )}
                     >
@@ -283,7 +285,7 @@ export function DashboardHeader({ onOpenSidebar }: DashboardHeaderProps) {
                   ))
                 ) : (
                   <div className="px-5 py-8 text-center text-sm text-[var(--dashboard-text-soft)]">
-                    No notifications yet.
+                    No in-app notifications yet.
                   </div>
                 )}
               </div>
@@ -303,7 +305,7 @@ export function DashboardHeader({ onOpenSidebar }: DashboardHeaderProps) {
             <DashboardSurface
               className={cn(
                 dropdownBaseClassName,
-                "w-full max-w-[260px] rounded-[16px] shadow-2xl shadow-slate-900/10",
+                "w-full max-w-[260px] rounded-[16px] shadow-[var(--dashboard-shadow-overlay)]",
                 isProfileOpen
                   ? "pointer-events-auto opacity-100"
                   : "pointer-events-none opacity-0",

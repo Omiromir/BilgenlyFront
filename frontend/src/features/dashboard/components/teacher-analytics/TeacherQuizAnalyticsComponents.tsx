@@ -55,18 +55,12 @@ import {
 } from "../DashboardPrimitives";
 import { EmptyStateBlock } from "../EmptyStateBlock";
 import type { TeacherClassAssignedQuiz } from "../classes/teacherClassesTypes";
+import { formatCurrentDateTime } from "../../settings/settingsPreferences";
 import type {
   TeacherAssignedQuizAnalytics,
   TeacherQuestionAnalyticsItem,
   TeacherStudentQuizResultRowData,
 } from "./teacherQuizAnalyticsUtils";
-
-const dateTimeFormatter = new Intl.DateTimeFormat("en-US", {
-  month: "short",
-  day: "numeric",
-  hour: "numeric",
-  minute: "2-digit",
-});
 
 function getInitials(fullName: string) {
   return fullName
@@ -88,7 +82,7 @@ function formatDateTime(value?: string) {
     return "Invalid date";
   }
 
-  return dateTimeFormatter.format(resolvedDate);
+  return formatCurrentDateTime(resolvedDate);
 }
 
 function formatDuration(seconds?: number | null) {
@@ -216,7 +210,7 @@ export function ClassQuizAnalyticsCard({
       radius="xl"
       padding="md"
       className={cn(
-        "space-y-5 border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(247,249,254,0.92))] shadow-[0_20px_45px_rgba(18,32,58,0.08)]",
+        "space-y-5 border-[var(--dashboard-border-soft)] bg-[linear-gradient(180deg,var(--dashboard-surface-elevated),var(--dashboard-surface))] shadow-[var(--dashboard-shadow-card)]",
         className,
       )}
     >
@@ -273,15 +267,15 @@ export function ActionMenu({
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={onNotifyStudent}>
           <Mail className="h-4 w-4" />
-          Notify student
+          Request review
         </DropdownMenuItem>
         <DropdownMenuItem onClick={onReassignQuiz}>
           <RefreshCw className="h-4 w-4" />
-          Reassign quiz
+          Ask for another attempt
         </DropdownMenuItem>
         <DropdownMenuItem onClick={onScheduleFollowUp}>
           <Send className="h-4 w-4" />
-          Schedule practice
+          Suggest practice
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -304,7 +298,7 @@ export function StudentQuizResultRow({
   return (
     <TableRow
       className={cn(
-        "cursor-pointer border-[var(--dashboard-border-soft)] bg-white transition-colors hover:bg-[var(--dashboard-surface-muted)]/65",
+        "cursor-pointer border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-elevated)] transition-colors hover:bg-[var(--dashboard-surface-muted)]/65",
         isSelected &&
           "bg-[var(--dashboard-brand-soft-alt)]/70 shadow-[inset_3px_0_0_0_var(--dashboard-brand)]",
       )}
@@ -473,25 +467,27 @@ export function QuizSummaryPanel({
         <div className="h-[220px]">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={summaryChartData} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
-              <CartesianGrid stroke="#E8EDF6" strokeDasharray="3 3" vertical={false} />
+              <CartesianGrid stroke="var(--dashboard-chart-grid)" strokeDasharray="3 3" vertical={false} />
               <XAxis
                 dataKey="label"
-                tick={{ fill: "#62708B", fontSize: 12 }}
-                axisLine={{ stroke: "#D9E1EF" }}
+                tick={{ fill: "var(--dashboard-chart-axis)", fontSize: 12 }}
+                axisLine={{ stroke: "var(--dashboard-chart-axis-line)" }}
                 tickLine={false}
               />
               <YAxis
                 domain={[0, 100]}
                 tickFormatter={formatAxisPercent}
-                tick={{ fill: "#62708B", fontSize: 12 }}
-                axisLine={{ stroke: "#D9E1EF" }}
+                tick={{ fill: "var(--dashboard-chart-axis)", fontSize: 12 }}
+                axisLine={{ stroke: "var(--dashboard-chart-axis-line)" }}
                 tickLine={false}
               />
               <Tooltip
                 formatter={(value: number, _name, item) => [`${value}%`, item.payload.helper]}
                 contentStyle={{
                   borderRadius: "14px",
-                  borderColor: "#D9E1EF",
+                  borderColor: "var(--dashboard-tooltip-border)",
+                  background: "var(--dashboard-tooltip-bg)",
+                  color: "var(--dashboard-text)",
                 }}
               />
               <Bar dataKey="value" radius={[10, 10, 0, 0]}>
@@ -535,7 +531,7 @@ export function QuizSummaryPanel({
         ) : (
           <EmptyStateBlock
             title="No question-level misses yet"
-            description="Once students finish this assignment, the most-missed questions will surface here automatically."
+            description="Once students finish this assigned quiz, the most-missed questions will surface here automatically."
             icon={BookOpen}
             className="border-dashed"
           />
@@ -554,7 +550,7 @@ export function QuestionAnalyticsPanel({ questions }: QuestionAnalyticsPanelProp
     return (
       <EmptyStateBlock
         title="No per-question analytics yet"
-        description="Per-question statistics appear after at least one student finishes the selected assignment."
+        description="Per-question statistics appear after at least one student finishes the selected assigned quiz."
         icon={FileText}
         className="border-dashed"
       />
@@ -570,7 +566,7 @@ export function QuestionAnalyticsPanel({ questions }: QuestionAnalyticsPanelProp
 
   return (
     <div className="space-y-4">
-      <div className="rounded-[20px] border border-[var(--dashboard-border-soft)] bg-white px-5 py-5">
+      <div className="rounded-[20px] border border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-elevated)] px-5 py-5">
         <div className="mb-3 flex items-center gap-2">
           <AlertCircle className="h-4 w-4 text-[var(--dashboard-warning)]" />
           <p className="font-semibold text-[var(--dashboard-text-strong)]">
@@ -580,18 +576,18 @@ export function QuestionAnalyticsPanel({ questions }: QuestionAnalyticsPanelProp
         <div className="h-[280px]">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={chartData} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
-              <CartesianGrid stroke="#E8EDF6" strokeDasharray="3 3" vertical={false} />
+              <CartesianGrid stroke="var(--dashboard-chart-grid)" strokeDasharray="3 3" vertical={false} />
               <XAxis
                 dataKey="label"
-                tick={{ fill: "#62708B", fontSize: 12 }}
-                axisLine={{ stroke: "#D9E1EF" }}
+                tick={{ fill: "var(--dashboard-chart-axis)", fontSize: 12 }}
+                axisLine={{ stroke: "var(--dashboard-chart-axis-line)" }}
                 tickLine={false}
               />
               <YAxis
                 domain={[0, 100]}
                 tickFormatter={formatAxisPercent}
-                tick={{ fill: "#62708B", fontSize: 12 }}
-                axisLine={{ stroke: "#D9E1EF" }}
+                tick={{ fill: "var(--dashboard-chart-axis)", fontSize: 12 }}
+                axisLine={{ stroke: "var(--dashboard-chart-axis-line)" }}
                 tickLine={false}
               />
               <Tooltip
@@ -599,7 +595,12 @@ export function QuestionAnalyticsPanel({ questions }: QuestionAnalyticsPanelProp
                   `${value}% miss rate`,
                   item.payload.prompt,
                 ]}
-                contentStyle={{ borderRadius: "14px", borderColor: "#D9E1EF" }}
+                contentStyle={{
+                  borderRadius: "14px",
+                  borderColor: "var(--dashboard-tooltip-border)",
+                  background: "var(--dashboard-tooltip-bg)",
+                  color: "var(--dashboard-text)",
+                }}
               />
               <Bar dataKey="missRate" fill="#F97316" radius={[10, 10, 0, 0]} />
             </BarChart>
@@ -611,7 +612,7 @@ export function QuestionAnalyticsPanel({ questions }: QuestionAnalyticsPanelProp
         {questions.slice(0, 4).map((question) => (
           <div
             key={question.questionId}
-            className="rounded-[18px] border border-[var(--dashboard-border-soft)] bg-white px-4 py-4"
+            className="rounded-[18px] border border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-elevated)] px-4 py-4"
           >
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="space-y-2">
@@ -711,9 +712,9 @@ export function StudentQuizInsightsPanel({
     <DashboardSurface
       radius="xl"
       padding="md"
-      className="space-y-5 border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(247,249,254,0.94))] shadow-[0_24px_52px_rgba(18,32,58,0.08)] xl:sticky xl:top-6 xl:max-h-[calc(100vh-7rem)] xl:overflow-y-auto"
+      className="space-y-5 border-[var(--dashboard-border-soft)] bg-[linear-gradient(180deg,var(--dashboard-surface-elevated),var(--dashboard-surface))] shadow-[var(--dashboard-shadow-card)] xl:sticky xl:top-6 xl:max-h-[calc(100vh-7rem)] xl:overflow-y-auto"
     >
-      <div className="rounded-[24px] border border-[var(--dashboard-border-soft)] bg-[linear-gradient(135deg,rgba(239,246,255,0.98),rgba(255,255,255,0.92))] p-5">
+      <div className="rounded-[24px] border border-[var(--dashboard-border-soft)] bg-[linear-gradient(135deg,var(--dashboard-brand-soft-alt),var(--dashboard-surface-elevated))] p-5">
         <div className="flex items-start gap-4">
           <Avatar className="h-14 w-14 border border-[var(--dashboard-border-soft)] bg-[var(--dashboard-brand-soft-alt)]">
             <AvatarFallback className="bg-[var(--dashboard-brand-soft-alt)] text-base font-semibold text-[var(--dashboard-brand)]">
@@ -780,11 +781,11 @@ export function StudentQuizInsightsPanel({
       <div className="flex flex-wrap gap-2">
         <DashboardButton type="button" size="sm" onClick={onNotifyStudent}>
           <Mail className="h-4 w-4" />
-          Notify
+          Review Request
         </DashboardButton>
         <DashboardButton type="button" size="sm" variant="secondary" onClick={onReassignQuiz}>
           <RefreshCw className="h-4 w-4" />
-          Reassign
+          Another Attempt Requested
         </DashboardButton>
         <DashboardButton
           type="button"
@@ -793,7 +794,7 @@ export function StudentQuizInsightsPanel({
           onClick={onScheduleFollowUp}
         >
           <ArrowRight className="h-4 w-4" />
-          Follow-up
+          Practice Follow-up
         </DashboardButton>
       </div>
 
@@ -1034,17 +1035,17 @@ export function ScoreDistributionPanel({ analytics }: ScoreDistributionPanelProp
       <div className="h-[260px]">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={chartData} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
-            <CartesianGrid stroke="#E8EDF6" strokeDasharray="3 3" vertical={false} />
+            <CartesianGrid stroke="var(--dashboard-chart-grid)" strokeDasharray="3 3" vertical={false} />
             <XAxis
               dataKey="label"
-              tick={{ fill: "#62708B", fontSize: 12 }}
-              axisLine={{ stroke: "#D9E1EF" }}
+              tick={{ fill: "var(--dashboard-chart-axis)", fontSize: 12 }}
+              axisLine={{ stroke: "var(--dashboard-chart-axis-line)" }}
               tickLine={false}
             />
             <YAxis
               allowDecimals={false}
-              tick={{ fill: "#62708B", fontSize: 12 }}
-              axisLine={{ stroke: "#D9E1EF" }}
+              tick={{ fill: "var(--dashboard-chart-axis)", fontSize: 12 }}
+              axisLine={{ stroke: "var(--dashboard-chart-axis-line)" }}
               tickLine={false}
             />
             <Tooltip
@@ -1052,7 +1053,12 @@ export function ScoreDistributionPanel({ analytics }: ScoreDistributionPanelProp
                 `${value} students`,
                 item.payload.names || "No students yet",
               ]}
-              contentStyle={{ borderRadius: "14px", borderColor: "#D9E1EF" }}
+              contentStyle={{
+                borderRadius: "14px",
+                borderColor: "var(--dashboard-tooltip-border)",
+                background: "var(--dashboard-tooltip-bg)",
+                color: "var(--dashboard-text)",
+              }}
             />
             <Bar dataKey="students" fill="#2B7AF3" radius={[10, 10, 0, 0]} />
           </BarChart>
@@ -1121,22 +1127,27 @@ export function InterventionPanel({ analytics }: InterventionPanelProps) {
       <div className="h-[240px]">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={chartData} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
-            <CartesianGrid stroke="#E8EDF6" strokeDasharray="3 3" vertical={false} />
+            <CartesianGrid stroke="var(--dashboard-chart-grid)" strokeDasharray="3 3" vertical={false} />
             <XAxis
               dataKey="label"
-              tick={{ fill: "#62708B", fontSize: 12 }}
-              axisLine={{ stroke: "#D9E1EF" }}
+              tick={{ fill: "var(--dashboard-chart-axis)", fontSize: 12 }}
+              axisLine={{ stroke: "var(--dashboard-chart-axis-line)" }}
               tickLine={false}
             />
             <YAxis
               allowDecimals={false}
-              tick={{ fill: "#62708B", fontSize: 12 }}
-              axisLine={{ stroke: "#D9E1EF" }}
+              tick={{ fill: "var(--dashboard-chart-axis)", fontSize: 12 }}
+              axisLine={{ stroke: "var(--dashboard-chart-axis-line)" }}
               tickLine={false}
             />
             <Tooltip
               formatter={(value: number) => [`${value} students`, "Action queue"]}
-              contentStyle={{ borderRadius: "14px", borderColor: "#D9E1EF" }}
+              contentStyle={{
+                borderRadius: "14px",
+                borderColor: "var(--dashboard-tooltip-border)",
+                background: "var(--dashboard-tooltip-bg)",
+                color: "var(--dashboard-text)",
+              }}
             />
             <Bar dataKey="count" radius={[10, 10, 0, 0]}>
               {chartData.map((entry) => (

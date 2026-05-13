@@ -17,6 +17,11 @@ import type {
   ClassInvitationNotificationStatus,
   QuizFollowUpNotificationInput,
 } from "../../features/dashboard/components/notifications/notificationTypes";
+import {
+  createDefaultUserSettings,
+  getSettingsStorageScope,
+  readUserSettings,
+} from "../../features/dashboard/settings/userSettings";
 
 const NOTIFICATIONS_STORAGE_KEY = "bilgenly_notifications";
 
@@ -34,10 +39,10 @@ interface NotificationsContextValue {
   ) => number;
   upsertClassInvitationNotification: (
     input: ClassInvitationNotificationInput,
-  ) => DashboardNotification;
+  ) => DashboardNotification | null;
   sendQuizFollowUpNotification: (
     input: QuizFollowUpNotificationInput,
-  ) => DashboardNotification;
+  ) => DashboardNotification | null;
   markNotificationRead: (notificationId: string) => void;
   markAllNotificationsRead: (recipientUserId: string) => void;
   updateClassInvitationStatus: (
@@ -124,11 +129,11 @@ function sanitizeNotificationRecord(
       title:
         typeof notification.title === "string" && notification.title.trim()
           ? notification.title
-          : `Quiz follow-up: ${notification.quizTitle}`,
+          : `Assigned quiz follow-up: ${notification.quizTitle}`,
       message:
         typeof notification.message === "string" && notification.message.trim()
           ? notification.message
-          : `${notification.senderName} sent a follow-up for ${notification.quizTitle}.`,
+          : `${notification.senderName} added an assigned quiz follow-up for ${notification.quizTitle}.`,
       createdAt: timestamp,
       updatedAt,
       read: Boolean(notification.read),
@@ -156,7 +161,7 @@ function sanitizeNotificationRecord(
     title:
       typeof notification.title === "string" && notification.title.trim()
         ? notification.title
-        : `Class invitation: ${notification.relatedClassName}`,
+        : `Class invite: ${notification.relatedClassName}`,
     message:
       typeof notification.message === "string" && notification.message.trim()
         ? notification.message
@@ -208,6 +213,51 @@ function rebuildInvitationNotification(
       status,
     },
   );
+}
+
+function getNotificationRecipientSettings(
+  recipientUserId: string | null | undefined,
+  recipientEmail?: string | null,
+) {
+  const scope = getSettingsStorageScope({
+    userId: recipientUserId,
+    email: recipientEmail,
+    role: null,
+    token: null,
+  });
+
+  return readUserSettings(
+    scope,
+    createDefaultUserSettings({
+      role: null,
+      user: null,
+    }),
+  );
+}
+
+function isNotificationEnabled(
+  notification: DashboardNotification,
+  recipientUserId: string | null | undefined,
+  recipientEmail?: string | null,
+) {
+  const recipientSettings = getNotificationRecipientSettings(
+    recipientUserId,
+    recipientEmail,
+  );
+
+  if (!recipientSettings.notifications.push.realTimeUpdates) {
+    return false;
+  }
+
+  if (notification.type === "class_invitation") {
+    return recipientSettings.notifications.email.quizAssignments;
+  }
+
+  if (notification.followUpKind === "needs_review") {
+    return recipientSettings.notifications.email.gradingUpdates;
+  }
+
+  return recipientSettings.notifications.email.quizAssignments;
 }
 
 export function NotificationsProvider({
@@ -279,22 +329,41 @@ export function NotificationsProvider({
       notifications,
       getNotificationsForRecipient: (recipientUserId) =>
         notifications.filter(
-          (notification) => notification.recipientUserId === recipientUserId,
+          (notification) =>
+            notification.recipientUserId === recipientUserId &&
+            isNotificationEnabled(
+              notification,
+              notification.recipientUserId,
+              notification.recipientEmail,
+            ),
         ),
       getNotificationsForRecipientIdentity: (recipientUserId, recipientEmail) =>
-        notifications.filter((notification) =>
-          matchesRecipientIdentity(notification, recipientUserId, recipientEmail),
+        notifications.filter(
+          (notification) =>
+            matchesRecipientIdentity(
+              notification,
+              recipientUserId,
+              recipientEmail,
+            ) &&
+            isNotificationEnabled(notification, recipientUserId, recipientEmail),
         ),
       getUnreadCountForRecipient: (recipientUserId) =>
         notifications.filter(
           (notification) =>
-            notification.recipientUserId === recipientUserId && !notification.read,
+            notification.recipientUserId === recipientUserId &&
+            !notification.read &&
+            isNotificationEnabled(
+              notification,
+              notification.recipientUserId,
+              notification.recipientEmail,
+            ),
         ).length,
       getUnreadCountForRecipientIdentity: (recipientUserId, recipientEmail) =>
         notifications.filter(
           (notification) =>
             matchesRecipientIdentity(notification, recipientUserId, recipientEmail) &&
-            !notification.read,
+            !notification.read &&
+            isNotificationEnabled(notification, recipientUserId, recipientEmail),
         ).length,
       upsertClassInvitationNotification: (input) => {
         const existingNotification = notifications.find(
@@ -311,6 +380,16 @@ export function NotificationsProvider({
           read: false,
           status: "pending",
         });
+
+        if (
+          !isNotificationEnabled(
+            nextNotification,
+            input.recipientUserId,
+            input.recipientEmail,
+          )
+        ) {
+          return null;
+        }
 
         setNotifications((current) =>
           sortDashboardNotifications(
@@ -331,6 +410,16 @@ export function NotificationsProvider({
           updatedAt: new Date().toISOString(),
           read: false,
         });
+
+        if (
+          !isNotificationEnabled(
+            nextNotification,
+            input.recipientUserId,
+            input.recipientEmail,
+          )
+        ) {
+          return null;
+        }
 
         setNotifications((current) =>
           sortDashboardNotifications([nextNotification, ...current]),

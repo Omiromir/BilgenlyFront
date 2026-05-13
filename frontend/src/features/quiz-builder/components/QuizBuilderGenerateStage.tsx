@@ -83,7 +83,7 @@ export function QuizBuilderGenerateStage({
               </DashboardBadge>
             </div>
 
-            <div className="space-y-4 rounded-[24px] bg-white px-5 py-5 shadow-sm">
+            <div className="space-y-4 rounded-[24px] border border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-elevated)] px-5 py-5 shadow-[var(--dashboard-shadow-card)]">
               <div className="h-3 overflow-hidden rounded-full bg-[var(--dashboard-surface-muted)]">
                 <div
                   className="h-full rounded-full bg-[var(--dashboard-brand)] transition-all"

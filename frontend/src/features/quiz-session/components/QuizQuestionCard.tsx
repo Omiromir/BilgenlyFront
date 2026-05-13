@@ -68,7 +68,7 @@ export function QuizQuestionCard({
       <DashboardSurface
         radius="xl"
         padding="lg"
-        className="space-y-6 border border-[var(--dashboard-border-soft)] bg-white"
+        className="space-y-6 border border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-elevated)]"
       >
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--dashboard-border-soft)] pb-5">
           <DashboardButton
@@ -171,7 +171,7 @@ export function QuizQuestionCard({
             <DashboardButton
               type="button"
               size="lg"
-              className="min-w-[180px] rounded-[16px] bg-[#1bb7a3] hover:bg-[#159985]"
+              className="min-w-[180px] rounded-[16px] bg-[var(--dashboard-success)] hover:brightness-110"
               onClick={onSubmit}
               disabled={selectedIndices.length === 0 && question.required !== false}
             >

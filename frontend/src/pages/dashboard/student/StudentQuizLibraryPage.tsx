@@ -147,17 +147,17 @@ export function StudentQuizLibraryPage() {
       id: "assigned" as const,
       label: "Assigned",
       description:
-        "Teacher-assigned quizzes unlocked by classes you have already joined, with class context kept separate from everything else.",
+        "Assigned quizzes unlocked by joined classes, with class context kept separate from discover and personal study.",
       count: studentSources.assigned.length,
       emptyTitle: "No assigned quizzes yet",
       emptyDescription:
-        "Assigned quizzes only appear after you accept the class invitation and become an active class member.",
+        "Assigned quizzes only appear after you accept a class invite and become an active class member.",
     },
     {
       id: "discover" as const,
       label: "Discover",
       description:
-        "Browse public quizzes without mixing them into teacher-assigned class work or your personal study shelf.",
+        "Browse public quizzes without mixing them into assigned class work or your personal study shelf.",
       count: studentSources.discover.length,
       emptyTitle: "No public quizzes match this view",
       emptyDescription:
@@ -319,10 +319,10 @@ export function StudentQuizLibraryPage() {
         assignedItem.assignmentState.status === "expired" ||
         assignedItem.assignmentState.status === "attempts_exhausted"
       ) {
-        return "Open Assignment";
+        return "Open Assigned Quiz";
       }
 
-      return "Start Quiz";
+      return "Start Assigned Quiz";
     }
 
     if (item.practiceState === "completed") {
@@ -465,9 +465,9 @@ export function StudentQuizLibraryPage() {
   const getAssignedEmptyState = () => {
     if (studentSources.pendingMemberships.length) {
       return {
-        title: "Accept your class invitation first",
+        title: "Accept your class invite first",
         description:
-          "You still have pending class invitations. Once you accept them in Notifications, teacher-assigned quizzes will unlock here automatically.",
+          "You still have pending class invites. Once you accept them in Notifications, assigned quizzes will unlock here automatically.",
       };
     }
 
@@ -475,14 +475,14 @@ export function StudentQuizLibraryPage() {
       return {
         title: "You have not joined a class yet",
         description:
-          "Assigned quizzes are membership-based. Join a class from Notifications to see class work here.",
+          "Assigned quizzes are membership-based. Join a class from Notifications to see class quizzes here.",
       };
     }
 
     return {
-      title: "Your classes have no assigned quizzes yet",
-      description:
-        "You are already in at least one class, but no teacher has attached quizzes to those classes yet.",
+        title: "Your classes have no assigned quizzes yet",
+        description:
+          "You are already in at least one class, but no assigned quizzes are available in those classes yet.",
     };
   };
 
@@ -530,7 +530,7 @@ export function StudentQuizLibraryPage() {
                       {group.className}
                     </h3>
                     <p className="mt-1 text-sm leading-6 text-[var(--dashboard-text-soft)]">
-                      {group.classSubject || "Class assignment feed"} with {group.items.length}{" "}
+                      {group.classSubject || "Class assigned quiz feed"} with {group.items.length}{" "}
                       {group.items.length === 1 ? "quiz" : "quizzes"} currently assigned.
                     </p>
                   </div>
@@ -683,7 +683,7 @@ export function StudentQuizLibraryPage() {
         onClearFilters={resetFilters}
         helperText={
           activeTab === "assigned"
-            ? "Assigned quizzes only appear after invitation acceptance creates an active class membership."
+            ? "Assigned quizzes only appear after class invite acceptance creates an active class membership."
             : activeTab === "personal-library"
               ? "Personal Library combines your generated study sets, saved quizzes, and recent personal practice in one clearer place."
               : undefined

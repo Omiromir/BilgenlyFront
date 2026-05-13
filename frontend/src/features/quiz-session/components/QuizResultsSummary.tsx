@@ -47,7 +47,9 @@ export function QuizResultsSummary({
     >
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <DashboardBadge tone="brand">Quiz complete</DashboardBadge>
+          <DashboardBadge tone="brand">
+            {session.assignmentContext ? "Assigned quiz complete" : "Quiz complete"}
+          </DashboardBadge>
           <h1 className="mt-3 text-[2.35rem] font-semibold tracking-[-0.04em] text-[var(--dashboard-text-strong)]">
             {session.quiz.title}
           </h1>
@@ -58,7 +60,7 @@ export function QuizResultsSummary({
           </p>
         </div>
 
-        <div className="rounded-[24px] border border-[var(--dashboard-brand-soft)] bg-white px-6 py-5 text-center">
+        <div className="rounded-[24px] border border-[var(--dashboard-brand-soft)] bg-[var(--dashboard-surface-elevated)] px-6 py-5 text-center">
           <p className="text-sm font-medium text-[var(--dashboard-text-soft)]">
             Final score
           </p>
@@ -72,7 +74,7 @@ export function QuizResultsSummary({
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
-        <div className="rounded-[22px] border border-[var(--dashboard-border-soft)] bg-white px-5 py-4">
+        <div className="rounded-[22px] border border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-elevated)] px-5 py-4">
           <p className="text-sm font-medium text-[var(--dashboard-text-soft)]">
             Correct answers
           </p>
@@ -80,7 +82,7 @@ export function QuizResultsSummary({
             {result.correctCount}
           </p>
         </div>
-        <div className="rounded-[22px] border border-[var(--dashboard-border-soft)] bg-white px-5 py-4">
+        <div className="rounded-[22px] border border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-elevated)] px-5 py-4">
           <p className="text-sm font-medium text-[var(--dashboard-text-soft)]">
             Points earned
           </p>
@@ -88,7 +90,7 @@ export function QuizResultsSummary({
             {result.earnedPoints}
           </p>
         </div>
-        <div className="rounded-[22px] border border-[var(--dashboard-border-soft)] bg-white px-5 py-4">
+        <div className="rounded-[22px] border border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-elevated)] px-5 py-4">
           <p className="text-sm font-medium text-[var(--dashboard-text-soft)]">
             Time spent
           </p>
@@ -98,7 +100,7 @@ export function QuizResultsSummary({
         </div>
       </div>
 
-      <div className="rounded-[22px] border border-[var(--dashboard-border-soft)] bg-white px-5 py-4">
+      <div className="rounded-[22px] border border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-elevated)] px-5 py-4">
         <p className={dashboardIconTextRowClassName}>
           <Clock3 className="h-4 w-4" />
           Results overview
@@ -112,7 +114,7 @@ export function QuizResultsSummary({
         {onRetake ? (
           <DashboardButton type="button" size="lg" onClick={onRetake}>
             <RotateCcw className="h-4.5 w-4.5" />
-            Retake Quiz
+            {session.assignmentContext ? "Open Assigned Quiz" : "Retake Quiz"}
           </DashboardButton>
         ) : null}
 

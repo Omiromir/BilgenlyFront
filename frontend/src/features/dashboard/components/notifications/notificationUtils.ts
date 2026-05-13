@@ -7,13 +7,7 @@ import type {
   QuizFollowUpNotification,
   QuizFollowUpNotificationInput,
 } from "./notificationTypes";
-
-const notificationDateTimeFormatter = new Intl.DateTimeFormat("en-US", {
-  month: "short",
-  day: "numeric",
-  hour: "numeric",
-  minute: "2-digit",
-});
+import { formatCurrentDateTime } from "../../settings/settingsPreferences";
 
 export function createDashboardNotificationId() {
   return `notification-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -45,7 +39,7 @@ export function buildClassInvitationNotification(
     type: "class_invitation",
     recipientUserId: input.recipientUserId,
     recipientEmail: input.recipientEmail,
-    title: `Class invitation: ${input.relatedClassName}`,
+    title: `Class invite: ${input.relatedClassName}`,
     message,
     createdAt: options?.createdAt ?? timestamp,
     updatedAt: timestamp,
@@ -66,19 +60,19 @@ function getQuizFollowUpCopy(kind: QuizFollowUpKind) {
   switch (kind) {
     case "reassign_quiz":
       return {
-        titlePrefix: "Quiz Reassigned",
-        messagePrefix: "Your teacher asked you to take another attempt on",
+        titlePrefix: "Another Attempt Requested",
+        messagePrefix: "Your teacher asked you to try another attempt on",
       };
     case "follow_up_practice":
       return {
-        titlePrefix: "Follow-up Practice",
-        messagePrefix: "Your teacher scheduled follow-up practice for",
+        titlePrefix: "Practice Follow-up",
+        messagePrefix: "Your teacher suggested extra practice for",
       };
     case "needs_review":
     default:
       return {
-        titlePrefix: "Needs Review",
-        messagePrefix: "Your teacher wants you to review",
+        titlePrefix: "Review Request",
+        messagePrefix: "Your teacher asked you to review",
       };
   }
 }
@@ -132,18 +126,12 @@ export function sortDashboardNotifications(
 }
 
 export function formatDashboardNotificationDateTime(date: string) {
-  const resolvedDate = new Date(date);
-
-  if (Number.isNaN(resolvedDate.getTime())) {
-    return "Invalid date";
-  }
-
-  return notificationDateTimeFormatter.format(resolvedDate);
+  return formatCurrentDateTime(date);
 }
 
 export function getNotificationStatusLabel(notification: DashboardNotification) {
   if (notification.type === "quiz_follow_up") {
-    return "Sent";
+    return "In app";
   }
 
   switch (notification.status) {
@@ -180,11 +168,11 @@ export function getNotificationStatusTone(notification: DashboardNotification) {
 export function getQuizFollowUpLabel(kind: QuizFollowUpKind) {
   switch (kind) {
     case "reassign_quiz":
-      return "Reassigned";
+      return "Another attempt";
     case "follow_up_practice":
       return "Practice";
     case "needs_review":
     default:
-      return "Review";
+      return "Review request";
   }
 }

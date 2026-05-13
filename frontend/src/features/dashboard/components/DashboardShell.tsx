@@ -56,7 +56,7 @@ export function DashboardShell() {
 
         <div
           className={cn(
-            "fixed inset-0 z-40 bg-slate-950/35 transition lg:hidden",
+            "fixed inset-0 z-40 bg-[var(--dashboard-overlay)] transition lg:hidden",
             isMobileSidebarOpen
               ? "pointer-events-auto opacity-100"
               : "pointer-events-none opacity-0"
@@ -73,7 +73,7 @@ export function DashboardShell() {
           aria-hidden={!isMobileSidebarOpen}
         >
           <DashboardSidebar
-            className="min-h-full shadow-2xl shadow-slate-900/15"
+            className="min-h-full shadow-[var(--dashboard-shadow-overlay)]"
             onNavigate={() => setIsMobileSidebarOpen(false)}
             onClose={() => setIsMobileSidebarOpen(false)}
             showMobileClose

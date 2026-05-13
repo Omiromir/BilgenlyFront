@@ -43,7 +43,7 @@ export function QuizSessionSidebar({
       <DashboardSurface
         radius="xl"
         padding="md"
-        className="space-y-3 bg-[linear-gradient(180deg,#1bb7a3_0%,#13a790_100%)] text-white shadow-[0_24px_52px_rgba(19,167,144,0.22)]"
+        className="space-y-3 bg-[linear-gradient(180deg,#159d8b_0%,#128474_100%)] text-white shadow-[0_24px_52px_rgba(19,167,144,0.18)]"
       >
         <div className="space-y-2">
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-white/72">
@@ -98,7 +98,7 @@ export function QuizSessionSidebar({
               {answeredCount} of {session.quiz.questions.length} answered
             </span>
           </div>
-          <div className="mt-3 h-2 overflow-hidden rounded-full bg-white">
+          <div className="mt-3 h-2 overflow-hidden rounded-full bg-[var(--dashboard-border-soft)]">
             <div
               className="h-full rounded-full bg-[var(--dashboard-brand)] transition-[width] duration-300"
               style={{
@@ -115,7 +115,7 @@ export function QuizSessionSidebar({
         </div>
 
         {assignmentConstraints ? (
-          <div className="space-y-3 rounded-[20px] border border-[var(--dashboard-border-soft)] bg-white px-4 py-4">
+          <div className="space-y-3 rounded-[20px] border border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-elevated)] px-4 py-4">
             <div className="flex flex-wrap gap-2">
               <QuizStatusBadge status={assignmentConstraints.status} />
               <DeadlineBadge
@@ -155,11 +155,11 @@ export function QuizSessionSidebar({
                 className={cn(
                   "flex h-10 w-full items-center justify-center rounded-[12px] text-sm font-semibold transition",
                   isCurrent
-                    ? "border border-[var(--dashboard-brand-bright)] bg-white text-[var(--dashboard-brand-bright)] shadow-[0_10px_24px_rgba(33,145,246,0.14)]"
+                    ? "border border-[var(--dashboard-brand-bright)] bg-[var(--dashboard-surface-elevated)] text-[var(--dashboard-brand-bright)] shadow-[0_10px_24px_rgba(33,145,246,0.18)]"
                     : questionState.submitted
-                      ? "bg-[linear-gradient(180deg,#1bb7a3_0%,#13a790_100%)] text-white"
+                      ? "bg-[linear-gradient(180deg,#159d8b_0%,#128474_100%)] text-white"
                       : isUnlocked
-                        ? "bg-[var(--dashboard-brand-soft-alt)] text-[var(--dashboard-brand-bright)] hover:bg-[#dcedff]"
+                        ? "bg-[var(--dashboard-brand-soft-alt)] text-[var(--dashboard-brand-bright)] hover:bg-[var(--dashboard-surface-accent)]"
                         : "bg-[var(--dashboard-surface-muted)] text-[var(--dashboard-text-faint)]",
                 )}
               >

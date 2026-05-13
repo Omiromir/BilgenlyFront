@@ -82,7 +82,7 @@ export function QuizStartScreen({
           <div className="space-y-3">
             <div className="flex flex-wrap items-center gap-2">
               <DashboardBadge tone="brand">
-                {assignmentContext ? "Class assignment" : "Practice mode"}
+                {assignmentContext ? "Assigned quiz" : "Practice mode"}
               </DashboardBadge>
               <DashboardBadge tone="info">
                 {quiz.visibility === "public" ? "Public quiz" : "Private quiz"}
@@ -107,7 +107,7 @@ export function QuizStartScreen({
             <div>
               <p className="text-sm font-medium text-[var(--dashboard-text-soft)]">
                 {assignmentContext
-                  ? `${assignmentContext.className} with ${assignmentContext.assignedByName}`
+                  ? `${assignmentContext.className} assigned by ${assignmentContext.assignedByName}`
                   : quiz.sourceLabel}
               </p>
               <h1 className="mt-2 text-[2.4rem] font-semibold tracking-[-0.04em] text-[var(--dashboard-text-strong)]">
@@ -120,7 +120,7 @@ export function QuizStartScreen({
           </div>
 
           {latestResult ? (
-            <div className="rounded-[22px] border border-[var(--dashboard-brand-soft)] bg-white px-5 py-4">
+            <div className="rounded-[22px] border border-[var(--dashboard-brand-soft)] bg-[var(--dashboard-surface-elevated)] px-5 py-4">
               <p className="text-sm font-medium text-[var(--dashboard-text-soft)]">
                 Latest result
               </p>
@@ -140,7 +140,7 @@ export function QuizStartScreen({
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          <div className="rounded-[22px] border border-[var(--dashboard-border-soft)] bg-white px-5 py-4">
+          <div className="rounded-[22px] border border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-elevated)] px-5 py-4">
             <p className={dashboardIconTextRowClassName}>
               <BookOpen className="h-4 w-4" />
               Questions
@@ -149,7 +149,7 @@ export function QuizStartScreen({
               {quiz.questions.length}
             </p>
           </div>
-          <div className="rounded-[22px] border border-[var(--dashboard-border-soft)] bg-white px-5 py-4">
+          <div className="rounded-[22px] border border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-elevated)] px-5 py-4">
             <p className={dashboardIconTextRowClassName}>
               <Clock3 className="h-4 w-4" />
               Estimated time
@@ -158,7 +158,7 @@ export function QuizStartScreen({
               {quiz.durationMinutes} min
             </p>
           </div>
-          <div className="rounded-[22px] border border-[var(--dashboard-border-soft)] bg-white px-5 py-4">
+          <div className="rounded-[22px] border border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-elevated)] px-5 py-4">
             <p className={dashboardIconTextRowClassName}>
               <UserRound className="h-4 w-4" />
               Creator
@@ -170,12 +170,12 @@ export function QuizStartScreen({
         </div>
 
         {assignmentContext ? (
-          <div className="space-y-4 rounded-[22px] border border-[var(--dashboard-border-soft)] bg-white px-5 py-4">
+          <div className="space-y-4 rounded-[22px] border border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-elevated)] px-5 py-4">
             <p className="text-sm font-semibold text-[var(--dashboard-text-strong)]">
               Class instructions
             </p>
             <p className="mt-2 text-sm leading-7 text-[var(--dashboard-text-soft)]">
-              Complete this quiz one question at a time. Feedback appears after each submitted answer so you can learn before moving on.
+              Complete this assigned quiz one question at a time. Feedback appears after each submitted answer so you can learn before moving on.
             </p>
             {assignmentConstraints ? (
               <AttemptProgressIndicator
@@ -188,7 +188,7 @@ export function QuizStartScreen({
         ) : null}
 
         {latestInProgressSession && assignmentConstraints?.canResume ? (
-          <div className="rounded-[22px] border border-[var(--dashboard-warning-soft)] bg-white px-5 py-4">
+          <div className="rounded-[22px] border border-[var(--dashboard-warning-soft)] bg-[var(--dashboard-surface-elevated)] px-5 py-4">
             <p className="text-sm font-semibold text-[var(--dashboard-text-strong)]">
               Resume available
             </p>
@@ -207,7 +207,7 @@ export function QuizStartScreen({
 
         {assignmentConstraints?.status === "attempts_exhausted" ? (
           <AssignmentWarning>
-            No attempts remaining. Review your latest result or ask your teacher if you need another try.
+            No attempts remaining. Review your latest result or ask your teacher if you need another attempt.
           </AssignmentWarning>
         ) : null}
 

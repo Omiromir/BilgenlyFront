@@ -98,7 +98,7 @@ export function StudentClassesEmptyState() {
   return (
     <EmptyStateBlock
       title="No joined classes yet"
-      description="Accept a class invitation from Notifications to unlock a class workspace with assignments and teacher context."
+      description="Accept a class invite from Notifications to unlock a class workspace with assigned quizzes and teacher context."
       icon={Users}
       className="border-dashed"
     />
@@ -168,7 +168,7 @@ export function StudentClassDetailsPanel({
           </h2>
           <p className="mt-3 max-w-2xl text-sm leading-6 text-[var(--dashboard-text-soft)]">
             {teacherClass.description ||
-              "This class becomes your dedicated place for teacher-assigned practice and class-based learning."}
+              "This class becomes your dedicated place for assigned quizzes, teacher guidance, and class-based learning."}
           </p>
         </div>
       </div>
@@ -212,7 +212,7 @@ export function StudentClassDetailsPanel({
           </div>
           <div className="flex items-center gap-3 text-sm text-[var(--dashboard-text-soft)]">
             <BookOpen className="h-4 w-4" />
-            {assignedItems.length} {assignedItems.length === 1 ? "quiz" : "quizzes"} ready
+            {assignedItems.length} {assignedItems.length === 1 ? "assigned quiz" : "assigned quizzes"} ready
           </div>
         </div>
       </div>
@@ -224,7 +224,7 @@ export function StudentClassDetailsPanel({
               Assigned Quizzes
             </h3>
             <p className="mt-1 text-sm leading-6 text-[var(--dashboard-text-soft)]">
-              Class-based learning stays separate from public discovery, so it is always clear what your teacher assigned here.
+              Assigned quizzes stay separate from public discovery, so it is always clear what belongs to this class.
             </p>
           </div>
           {onOpenClass ? (
@@ -248,8 +248,8 @@ export function StudentClassDetailsPanel({
           </div>
         ) : (
           <EmptyStateBlock
-            title="No quizzes assigned yet"
-            description="You are already in this class, but your teacher has not attached any quizzes to it yet."
+            title="No class quizzes available yet"
+            description="You are already in this class, but there are no assigned quizzes available here yet."
             icon={BookOpen}
             className="border-dashed"
           />

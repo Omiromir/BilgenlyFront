@@ -118,9 +118,9 @@ export function StudentOverviewPage() {
   const getAssignedEmptyState = () => {
     if (studentSources.pendingMemberships.length) {
       return {
-        title: "Accept your class invitation",
+        title: "Accept your class invite",
         description:
-          "A pending class invite is waiting in Notifications. Accept it to unlock quizzes assigned to that class.",
+          "A pending class invite is waiting in Notifications. Accept it to unlock assigned quizzes for that class.",
       };
     }
 
@@ -128,14 +128,14 @@ export function StudentOverviewPage() {
       return {
         title: "No class memberships yet",
         description:
-          "Assigned quizzes will appear here after you join a class through the invitation flow.",
+          "Assigned quizzes will appear here after you join a class through the class invite flow.",
       };
     }
 
     return {
       title: "No assigned quizzes yet",
       description:
-        "You are already part of a class, but no quiz assignments have been sent to it yet.",
+        "You are already part of a class, but no assigned quizzes are available there yet.",
     };
   };
 
@@ -154,7 +154,7 @@ export function StudentOverviewPage() {
         description={
           assignedCount
             ? `You have ${assignedCount} class-assigned ${assignedCount === 1 ? "quiz" : "quizzes"} ready. Jump back in and keep your streak going.`
-            : "Jump into your quiz library, discover new practice sets, and stay ready for your next class assignment."
+            : "Jump into your quiz library, discover new practice sets, and stay ready for your next assigned quiz."
         }
         variant="gradient"
         actions={
@@ -261,8 +261,8 @@ export function StudentOverviewPage() {
                             : assignment.assignmentState.status === "expired" ||
                                 assignment.assignmentState.status ===
                                   "attempts_exhausted"
-                              ? "Open Assignment"
-                              : "Start Quiz"}
+                              ? "Open Assigned Quiz"
+                              : "Start Assigned Quiz"}
                     </DashboardButton>
                   </article>
                 </DashboardSurface>
@@ -296,7 +296,7 @@ export function StudentOverviewPage() {
                       <h3 className="text-[1.12rem] font-semibold text-[var(--dashboard-text-strong)]">
                         {result.title}
                       </h3>
-                      <p className="mt-1 text-sm text-slate-500">{result.date}</p>
+                      <p className="mt-1 text-sm text-[var(--dashboard-text-faint)]">{result.date}</p>
                     </div>
                   </div>
 

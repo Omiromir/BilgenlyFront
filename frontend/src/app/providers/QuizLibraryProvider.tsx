@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import type {
@@ -72,11 +73,7 @@ interface QuizLibraryProviderProps {
 }
 
 function formatQuizDate(date: Date) {
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  }).format(date);
+  return date.toISOString();
 }
 
 function getOwnerName(
@@ -254,6 +251,12 @@ export function QuizLibraryProvider({ children }: QuizLibraryProviderProps) {
   const { syncAssignedQuizDetails } = useTeacherClasses();
   const [quizzes, setQuizzes] = useState<QuizRecord[]>([]);
   const [isHydrated, setIsHydrated] = useState(false);
+  
+  // Keep sync function up-to-date via ref to avoid infinite loops
+  const syncAssignedQuizDetailsRef = useRef(syncAssignedQuizDetails);
+  useEffect(() => {
+    syncAssignedQuizDetailsRef.current = syncAssignedQuizDetails;
+  }, [syncAssignedQuizDetails]);
 
   useEffect(() => {
     setQuizzes([]);
@@ -294,13 +297,13 @@ export function QuizLibraryProvider({ children }: QuizLibraryProviderProps) {
     }
 
     quizzes.forEach((quiz) => {
-      syncAssignedQuizDetails(quiz.id, {
+      syncAssignedQuizDetailsRef.current(quiz.id, {
         title: quiz.title,
         topic: quiz.topic,
         questionCount: quiz.questions.length || quiz.questionCount,
       });
     });
-  }, [isHydrated, quizzes, syncAssignedQuizDetails]);
+  }, [isHydrated, quizzes]);
 
   const value = useMemo<QuizLibraryContextValue>(
     () => ({

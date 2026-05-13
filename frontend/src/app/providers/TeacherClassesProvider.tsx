@@ -27,9 +27,11 @@ import { normalizeEmail } from "../../features/auth/validation";
 import { useNotifications } from "./NotificationsProvider";
 import {
   getNotificationRecipientUserIdByEmail,
+  getMockStudentById,
   mockTeacherUser,
+  defaultMockStudentId,
+  type MockDashboardUser,
 } from "../../features/dashboard/mock/mockUsers";
-import { useAuth } from "./AuthProvider";
 import {
   archiveClass as archiveClassRequest,
   assignQuizToClass as assignQuizToClassRequest,
@@ -47,10 +49,14 @@ import {
   mergeRemoteClassesWithLocalCache,
   toCreateClassRequest,
 } from "../../features/dashboard/api/classesAdapters";
-import { getRequestErrorMessage } from "../../lib/apiClient";
+import { getRequestErrorMessage, isGuidString } from "../../lib/apiClient";
+import type { UserRole } from "../../features/auth/api";
 
 const TEACHER_CLASSES_STORAGE_KEY = "bilgenly_teacher_classes";
 const HIDDEN_ASSIGNMENTS_STORAGE_KEY = "bilgenly_hidden_class_assignments";
+const AUTH_ROLE_KEY = "bilgenly_role";
+const AUTH_TOKEN_KEY = "bilgenly_token";
+const AUTH_USER_KEY = "bilgenly_current_user";
 
 export interface StudentClassMembershipRecord {
   teacherClass: TeacherClassRecord;
@@ -113,6 +119,84 @@ const TeacherClassesContext = createContext<
 
 interface TeacherClassesProviderProps {
   children: ReactNode;
+}
+
+interface StoredAuthUserProfile {
+  userId: string;
+  username: string;
+  email: string;
+  role: string;
+}
+
+function getInitials(name: string) {
+  return name
+    .split(" ")
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+}
+
+function mapAuthUserToDashboardUser(
+  authUser: StoredAuthUserProfile,
+  fallbackRole: UserRole | null,
+): MockDashboardUser | null {
+  const normalizedRole = authUser.role.toLowerCase() as UserRole;
+  const role = fallbackRole ?? normalizedRole;
+
+  if (role !== "teacher" && role !== "student") {
+    return null;
+  }
+
+  const fallbackUser =
+    role === "teacher"
+      ? mockTeacherUser
+      : role === "student"
+        ? getMockStudentById(defaultMockStudentId)
+        : null;
+
+  return {
+    id: authUser.userId || `email:${authUser.email.trim().toLowerCase()}`,
+    role,
+    fullName: authUser.username,
+    email: authUser.email,
+    initials: getInitials(authUser.username),
+    joinedLabel: fallbackUser?.joinedLabel ?? "Joined recently",
+    location: fallbackUser?.location ?? "Location not set",
+    bio: fallbackUser?.bio ?? "Bilgenly user",
+  };
+}
+
+function readStoredAuthSnapshot() {
+  const role = localStorage.getItem(AUTH_ROLE_KEY) as UserRole | null;
+  const token = localStorage.getItem(AUTH_TOKEN_KEY);
+  const savedUser = localStorage.getItem(AUTH_USER_KEY);
+
+  let authUser: StoredAuthUserProfile | null = null;
+
+  if (savedUser) {
+    try {
+      authUser = JSON.parse(savedUser) as StoredAuthUserProfile;
+    } catch {
+      authUser = null;
+    }
+  }
+
+  const fallbackUser =
+    role === "teacher"
+      ? mockTeacherUser
+      : role === "student"
+        ? getMockStudentById(defaultMockStudentId)
+        : null;
+  const currentUser = authUser
+    ? mapAuthUserToDashboardUser(authUser, role)
+    : fallbackUser;
+
+  return {
+    role,
+    token,
+    currentUser,
+  };
 }
 
 function getInvitationStatusFromLegacyStatus(
@@ -384,7 +468,8 @@ async function loadStudentClassesFromApi(
 export function TeacherClassesProvider({
   children,
 }: TeacherClassesProviderProps) {
-  const { currentUser, role, token } = useAuth();
+  const authSnapshot = readStoredAuthSnapshot();
+  const { currentUser, role, token } = authSnapshot;
   const [classes, setClasses] = useState<TeacherClassRecord[]>(() =>
     loadStoredClasses(),
   );
@@ -773,6 +858,12 @@ export function TeacherClassesProvider({
         );
       },
       assignQuizToClasses: async (quiz, classIds, settings) => {
+        if (!isGuidString(quiz.quizId)) {
+          throw new Error(
+            "This quiz is only stored in local library data right now. It needs a real backend quiz ID before it can be assigned to a class.",
+          );
+        }
+
         const activeClassIds = Array.from(
           new Set(
             classIds.filter((classId) =>

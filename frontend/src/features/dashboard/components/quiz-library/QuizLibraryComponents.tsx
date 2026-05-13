@@ -341,7 +341,7 @@ export function QuizCard({
 }: QuizCardProps) {
   return (
     <DashboardSurface asChild radius="xl" padding="md" className="h-full">
-      <article className="flex h-full flex-col">
+      <article className="flex h-full min-w-0 flex-col">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex flex-wrap gap-2">
             <StatusBadge status={item.status} />
@@ -355,13 +355,13 @@ export function QuizCard({
         </div>
 
         <div className="mt-5">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--dashboard-text-faint)]">
+          <p className="break-words text-xs font-semibold uppercase tracking-[0.18em] text-[var(--dashboard-text-faint)] [overflow-wrap:anywhere]">
             {item.topic}
           </p>
-          <h3 className="mt-3 text-[1.2rem] font-semibold text-[var(--dashboard-text-strong)]">
+          <h3 className="mt-3 break-words text-[1.2rem] font-semibold text-[var(--dashboard-text-strong)] [overflow-wrap:anywhere]">
             {item.title}
           </h3>
-          <p className="mt-3 text-sm leading-6 text-[var(--dashboard-text-soft)]">
+          <p className="mt-3 overflow-hidden break-words text-sm leading-6 text-[var(--dashboard-text-soft)] [overflow-wrap:anywhere]">
             {item.description}
           </p>
         </div>
@@ -416,7 +416,7 @@ export function AssignedQuizCard({
 
   return (
     <DashboardSurface asChild radius="xl" padding="md" className="h-full">
-      <article className="flex h-full flex-col">
+      <article className="flex h-full min-w-0 flex-col">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex flex-wrap gap-2">
             <QuizSourceBadge label="Assigned quiz" />
@@ -431,13 +431,13 @@ export function AssignedQuizCard({
         </div>
 
         <div className="mt-5">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--dashboard-text-faint)]">
+          <p className="break-words text-xs font-semibold uppercase tracking-[0.18em] text-[var(--dashboard-text-faint)] [overflow-wrap:anywhere]">
             {item.topic}
           </p>
-          <h3 className="mt-3 text-[1.2rem] font-semibold text-[var(--dashboard-text-strong)]">
+          <h3 className="mt-3 break-words text-[1.2rem] font-semibold text-[var(--dashboard-text-strong)] [overflow-wrap:anywhere]">
             {item.title}
           </h3>
-          <p className="mt-3 text-sm leading-6 text-[var(--dashboard-text-soft)]">
+          <p className="mt-3 overflow-hidden break-words text-sm leading-6 text-[var(--dashboard-text-soft)] [overflow-wrap:anywhere]">
             {item.description}
           </p>
         </div>

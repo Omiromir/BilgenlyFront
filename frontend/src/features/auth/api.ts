@@ -87,27 +87,25 @@ export async function signUp(data: SignUpFormValues) {
 }
 
 export async function updateRole(role: string) {
-    try {
-        const response = await fetch(`${API_URL}/api/auth/role`, {
-            method: "PATCH",
-            headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${getToken()}`
-            },
-            body: JSON.stringify({ role }),
-        });
+  try {
+    const result = await apiRequest<{
+      token: string;
+      role: string;
+      userId: string;
+      username: string;
+      email: string;
+    }>("/api/auth/role", {
+      method: "PATCH",
+      body: { role },
+      fallbackErrorMessage: "Failed to update role",
+    });
 
-        if (!response.ok) {
-            throw new Error(await readErrorMessage(response, "Failed to update role"));
-        }
-
-        const result = await response.json();
-        saveAuth(result.token, result.role);
-        markOnboardingDone();
-        return result;
-    } catch (error) {
-        throw new Error(getRequestErrorMessage(error, "Failed to update role"));
-    }
+    saveAuth(result.token, result.role);
+    markOnboardingDone();
+    return result;
+  } catch (error) {
+    throw new Error(getRequestErrorMessage(error, "Failed to update role"));
+  }
 }
 
 export async function requestPasswordReset(_: ResetPasswordFormValues) {

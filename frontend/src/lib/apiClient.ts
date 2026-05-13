@@ -35,7 +35,7 @@ function buildUrl(path: string) {
 async function parseResponseBody(response: Response) {
   const contentType = response.headers.get("content-type") ?? "";
 
-  if (contentType.includes("application/json")) {
+  if (contentType.includes("json")) {
     return response.json();
   }
 
@@ -56,6 +56,53 @@ function extractErrorMessage(payload: unknown, fallbackMessage: string) {
 
   if (typeof payload === "string" && payload.trim()) {
     return payload;
+  }
+
+  if (payload && typeof payload === "object") {
+    const title =
+      "title" in payload && typeof (payload as { title?: unknown }).title === "string"
+        ? (payload as { title: string }).title.trim()
+        : "";
+    const errors =
+      "errors" in payload &&
+      (payload as { errors?: unknown }).errors &&
+      typeof (payload as { errors?: unknown }).errors === "object"
+        ? ((payload as { errors: Record<string, unknown> }).errors ?? {})
+        : null;
+
+    if (errors) {
+      const quizIdErrors = [
+        errors.quizId,
+        errors.QuizId,
+        errors["$.quizId"],
+        errors["$.QuizId"],
+      ].flatMap((value) => (Array.isArray(value) ? value : typeof value === "string" ? [value] : []));
+
+      if (quizIdErrors.length) {
+        return "This quiz is not synced with the backend yet, so it cannot be assigned to a class.";
+      }
+
+      const dtoErrors = [
+        errors.dto,
+        errors.Dto,
+      ].flatMap((value) => (Array.isArray(value) ? value : typeof value === "string" ? [value] : []));
+
+      const firstFieldError = Object.values(errors).flatMap((value) =>
+        Array.isArray(value) ? value : typeof value === "string" ? [value] : [],
+      )[0];
+
+      if (typeof firstFieldError === "string" && firstFieldError.trim()) {
+        if (dtoErrors.length && title) {
+          return title;
+        }
+
+        return firstFieldError;
+      }
+    }
+
+    if (title) {
+      return title;
+    }
   }
 
   return fallbackMessage;
@@ -125,4 +172,10 @@ export async function apiRequest<T>(
 
 export function getApiBaseUrl() {
   return API_BASE_URL;
+}
+
+export function isGuidString(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value.trim(),
+  );
 }

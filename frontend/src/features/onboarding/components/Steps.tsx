@@ -295,64 +295,58 @@ export function LoadingStep({ loadingPct }: LoadingStepProps) {
 }
 
 interface RecommendationsStepProps {
-  onContinue: () => void;
+    onContinue: () => void;
+    isLoading?: boolean;
+    error?: string | null;
 }
 
-export function RecommendationsStep({
-  onContinue,
-}: RecommendationsStepProps) {
-  return (
-    <div>
-      <div className="step-centered recommendations-header">
-        <h2 className="step-title step-title-lg">You&apos;re all set</h2>
-        <p className="step-subtitle step-subtitle-tight">
-          Here&apos;s where to start - your AI dashboard is ready.
-        </p>
-      </div>
+export function RecommendationsStep({ onContinue, isLoading, error }: RecommendationsStepProps) {
+    return (
+        <div>
+            <div className="step-centered recommendations-header">
+                <h2 className="step-title step-title-lg">You&apos;re all set</h2>
+                <p className="step-subtitle step-subtitle-tight">
+                    Here&apos;s where to start - your AI dashboard is ready.
+                </p>
+            </div>
 
-      <div className="recommendations-grid">
-        {recommendations.map((recommendation, index) => (
-          <div key={index} className="rec-card" style={{ flex: 1 }}>
+            <div className="recommendations-grid">
+                {recommendations.map((recommendation, index) => (
+                    <div key={index} className="rec-card" style={{ flex: 1 }}>
             <span
-              className="tag"
-              style={{
-                background: `${recommendation.tagColor}15`,
-                color: recommendation.tagColor,
-                marginBottom: 8,
-                display: "block",
-              }}
+                className="tag"
+                style={{
+                    background: `${recommendation.tagColor}15`,
+                    color: recommendation.tagColor,
+                    marginBottom: 8,
+                    display: "block",
+                }}
             >
               {recommendation.tag}
             </span>
-            <div
-              style={{
-                fontSize: 13,
-                fontWeight: 600,
-                color: "#1a1a2e",
-                lineHeight: 1.3,
-                marginBottom: 4,
-              }}
-            >
-              {recommendation.title}
+                        <div style={{ fontSize: 13, fontWeight: 600, color: "#1a1a2e", lineHeight: 1.3, marginBottom: 4 }}>
+                            {recommendation.title}
+                        </div>
+                        <div style={{ fontSize: 11, color: "#888" }}>{recommendation.sub}</div>
+                        <div style={{ fontSize: 11, color: "#888", marginTop: 2 }}>{recommendation.time}</div>
+                    </div>
+                ))}
             </div>
-            <div style={{ fontSize: 11, color: "#888" }}>
-              {recommendation.sub}
-            </div>
-            <div style={{ fontSize: 11, color: "#888", marginTop: 2 }}>
-              {recommendation.time}
-            </div>
-          </div>
-        ))}
-      </div>
 
-      <button
-        className="btn-primary"
-        style={{ marginBottom: 12 }}
-        type="button"
-        onClick={onContinue}
-      >
-        Go to my dashboard
-      </button>
-    </div>
-  );
+            {error && (
+                <p style={{ color: "#e53e3e", fontSize: 13, textAlign: "center", marginBottom: 8 }}>
+                    {error}
+                </p>
+            )}
+            <button
+                className="btn-primary"
+                style={{ marginBottom: 12, opacity: isLoading ? 0.7 : 1 }}
+                type="button"
+                onClick={onContinue}
+                disabled={isLoading}
+            >
+                {isLoading ? "Saving..." : "Go to my dashboard"}
+            </button>
+        </div>
+    );
 }

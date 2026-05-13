@@ -7,6 +7,7 @@ import type {
 
 const AUTH_TOKEN_KEY = "bilgenly_token";
 const AUTH_ROLE_KEY = "bilgenly_role";
+const ONBOARDING_KEY = "bilgenly_onboarding_done";
 
 export type UserRole = "teacher" | "student" | "moderator";
 
@@ -30,6 +31,14 @@ export function getToken() {
 
 export function getRole() {
   return localStorage.getItem(AUTH_ROLE_KEY);
+}
+
+export function isOnboardingDone() {
+    return localStorage.getItem(ONBOARDING_KEY) === "true";
+}
+
+export function markOnboardingDone() {
+    localStorage.setItem(ONBOARDING_KEY, "true");
 }
 
 export function logout() {
@@ -77,9 +86,34 @@ export async function signUp(data: SignUpFormValues) {
   }
 }
 
+export async function updateRole(role: string) {
+    try {
+        const response = await fetch(`${API_URL}/api/auth/role`, {
+            method: "PATCH",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${getToken()}`
+            },
+            body: JSON.stringify({ role }),
+        });
+
+        if (!response.ok) {
+            throw new Error(await readErrorMessage(response, "Failed to update role"));
+        }
+
+        const result = await response.json();
+        saveAuth(result.token, result.role);
+        markOnboardingDone();
+        return result;
+    } catch (error) {
+        throw new Error(getRequestErrorMessage(error, "Failed to update role"));
+    }
+}
+
 export async function requestPasswordReset(_: ResetPasswordFormValues) {
   return new Promise((resolve) => window.setTimeout(resolve, 400));
 }
+
 
 export async function getMe() {
   return apiRequest<{

@@ -46,5 +46,14 @@ public class AuthController  : ControllerBase
 
         return Ok(new { userId, email, username, role });
     }
+    [HttpPatch("role")]
+    [Authorize]
+    public async Task<IActionResult> UpdateRole([FromBody] UpdateRoleDto dto)
+    {
+        var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+        var (result, error) = await _authService.UpdateRoleAsync(userId, dto);
+        if (result is null) return BadRequest(new { message = error });
+        return Ok(result);
+    }
     
 }

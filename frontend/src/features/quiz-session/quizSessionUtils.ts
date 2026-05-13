@@ -222,6 +222,10 @@ export function formatQuizScore(percentage: number) {
   return `${percentage}%`;
 }
 
+export function formatQuizPoints(earnedPoints: number, totalPoints: number) {
+  return `${earnedPoints}/${totalPoints} pts`;
+}
+
 export function formatQuizAttemptDate(value: string) {
   return formatCurrentDate(value);
 }
@@ -281,7 +285,10 @@ export function buildQuizPlaybackSummary(
 
     return {
       practiceState: "completed",
-      practiceProgressLabel: `Last score ${formatQuizScore(latestResult.percentage)} | ${latestResult.correctCount}/${latestResult.totalQuestions} correct`,
+      practiceProgressLabel: `Last score ${formatQuizScore(latestResult.percentage)} | ${formatQuizPoints(
+        latestResult.earnedPoints,
+        latestResult.totalPoints,
+      )}`,
       attemptCount: completedSessions.length,
       averageScore,
     };

@@ -361,10 +361,10 @@ export function useQuizAnalytics(quizId: string | null) {
   );
 }
 
-export function useMyAnalytics() {
+export function useMyAnalytics(enabled = true) {
   return useAsyncResource<MyAnalyticsDto>(
-    true,
-    [],
+    enabled,
+    [enabled],
     getMyAnalytics,
     "Unable to load student analytics.",
   );

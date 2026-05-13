@@ -1,7 +1,6 @@
 import { BookOpen, CalendarDays, SearchX, UserRound, Users } from "../../../../components/icons/AppIcons";
 import { cn } from "../../../../components/ui/utils";
 import type { StudentClassMembershipRecord } from "../../../../app/providers/TeacherClassesProvider";
-import { mockTeacherUser } from "../../mock/mockUsers";
 import { EmptyStateBlock } from "../EmptyStateBlock";
 import {
   DashboardBadge,
@@ -14,6 +13,20 @@ import { AssignedQuizCard } from "../quiz-library/QuizLibraryComponents";
 import type { StudentAssignedQuizLibraryItem } from "../quiz-library/studentQuizLibrarySources";
 import type { QuizCardAction } from "../quiz-library/quizLibraryTypes";
 import { formatTeacherClassDate } from "./teacherClassesUtils";
+
+function getTeacherDisplayName(membershipRecord: StudentClassMembershipRecord) {
+  const teacherName = membershipRecord.teacherClass.teacherName?.trim();
+
+  if (teacherName) {
+    return teacherName;
+  }
+
+  const latestAssignmentTeacherName = membershipRecord.teacherClass.assignedQuizzes
+    .map((assignment) => assignment.assignedByName?.trim())
+    .find((value) => Boolean(value));
+
+  return latestAssignmentTeacherName || "Teacher name unavailable";
+}
 
 interface StudentClassCardProps {
   membershipRecord: StudentClassMembershipRecord;
@@ -132,6 +145,7 @@ interface StudentClassDetailsPanelProps {
   assignedItems: StudentAssignedQuizLibraryItem[];
   onOpenClass?: () => void;
   getAssignedActions: (item: StudentAssignedQuizLibraryItem) => QuizCardAction[];
+  teacherNameByClassId?: Record<string, string>;
 }
 
 export function StudentClassDetailsPanel({
@@ -139,6 +153,7 @@ export function StudentClassDetailsPanel({
   assignedItems,
   onOpenClass,
   getAssignedActions,
+  teacherNameByClassId = {},
 }: StudentClassDetailsPanelProps) {
   if (!membershipRecord) {
     return (
@@ -152,6 +167,9 @@ export function StudentClassDetailsPanel({
   }
 
   const { teacherClass, membership } = membershipRecord;
+  const teacherDisplayName =
+    teacherNameByClassId[teacherClass.id]?.trim() ||
+    getTeacherDisplayName(membershipRecord);
 
   return (
     <DashboardSurface radius="xl" padding="md" className="space-y-6">
@@ -177,7 +195,7 @@ export function StudentClassDetailsPanel({
         <div className={dashboardInsetBlockClassName}>
           <p className={dashboardMetaTextClassName}>Teacher</p>
           <p className="mt-2 text-lg font-semibold text-[var(--dashboard-text-strong)]">
-            {mockTeacherUser.fullName}
+            {teacherDisplayName}
           </p>
         </div>
         <div className={dashboardInsetBlockClassName}>
@@ -204,7 +222,7 @@ export function StudentClassDetailsPanel({
         <div className="grid gap-3 md:grid-cols-3">
           <div className="flex items-center gap-3 text-sm text-[var(--dashboard-text-soft)]">
             <UserRound className="h-4 w-4" />
-            {mockTeacherUser.fullName}
+            {teacherDisplayName}
           </div>
           <div className="flex items-center gap-3 text-sm text-[var(--dashboard-text-soft)]">
             <CalendarDays className="h-4 w-4" />

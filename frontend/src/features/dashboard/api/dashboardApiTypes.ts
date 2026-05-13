@@ -16,6 +16,7 @@ export interface ClassDto {
   name: string;
   subject: string;
   description: string;
+  teacherName: string;
   inviteCode: string;
   isArchived: boolean;
   studentCount: number;
@@ -129,4 +130,47 @@ export interface MyAnalyticsDto {
   totalAttempts: number;
   averageScore: number;
   attempts: AttemptSummaryDto[];
+}
+
+export interface CreateQuizAnswerRequest {
+  text: string;
+  isCorrect: boolean;
+}
+
+export interface CreateQuizQuestionRequest {
+  text: string;
+  questionType: string;
+  position: number;
+  answers: CreateQuizAnswerRequest[];
+}
+
+export interface CreateQuizRequest {
+  title: string;
+  description: string;
+  isPublic: boolean;
+  questions: CreateQuizQuestionRequest[];
+}
+
+export interface QuizAnswerDto {
+  id: string;
+  text: string;
+  isCorrect: boolean;
+}
+
+export interface QuizQuestionDto {
+  id: string;
+  text: string;
+  questionType: string;
+  position: number;
+  answers: QuizAnswerDto[];
+}
+
+export interface QuizDto {
+  id: string;
+  title: string;
+  description: string;
+  isPublic: boolean;
+  createdBy: string;
+  createdAt: string;
+  questions: QuizQuestionDto[];
 }

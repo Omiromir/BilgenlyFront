@@ -38,7 +38,6 @@ import {
   TeacherStudentStatusBadge,
 } from "../../../features/dashboard/components/classes/TeacherClassesComponents";
 import type {
-  TeacherClassRecord,
   TeacherClassStudent,
   TeacherClassStudentStatus,
 } from "../../../features/dashboard/components/classes/teacherClassesTypes";
@@ -55,10 +54,10 @@ interface TeacherStudentRosterRow {
   inviteCode: string;
   quizCount: number;
   student: TeacherClassStudent;
-  derivedId: number;
-  gender: "Male" | "Female";
-  averageGrade: number;
-  missingDays: number;
+  studentRef: string;
+  genderLabel: string;
+  averageGradeLabel: string;
+  missingDaysLabel: string;
 }
 
 function getInitials(fullName: string) {
@@ -74,30 +73,21 @@ function escapeCsvValue(value: string | number) {
   return `"${String(value).replace(/"/g, '""')}"`;
 }
 
-function hashString(value: string) {
-  let hash = 0;
-
-  for (let index = 0; index < value.length; index += 1) {
-    hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
-  }
-
-  return hash;
+function buildStudentReference(student: TeacherClassStudent) {
+  const normalizedId = student.linkedUserId || student.id;
+  const compactId = normalizedId.replace(/[^a-zA-Z0-9]/g, "").slice(0, 6);
+  return compactId ? compactId.toUpperCase() : "—";
 }
 
-function deriveStudentMetrics(
-  teacherClass: TeacherClassRecord,
-  student: TeacherClassStudent,
-) {
-  const seed = hashString(`${teacherClass.id}-${student.id}-${student.email}`);
-
+function buildStudentRosterMetadata(student: TeacherClassStudent) {
   return {
-    derivedId: 100 + (seed % 900),
-    gender: seed % 2 === 0 ? "Male" : "Female",
-    averageGrade: Number((5 + ((seed >> 3) % 51) / 10).toFixed(1)),
-    missingDays: (seed >> 5) % 21,
+    studentRef: buildStudentReference(student),
+    genderLabel: "—",
+    averageGradeLabel: "—",
+    missingDaysLabel: "—",
   } satisfies Pick<
     TeacherStudentRosterRow,
-    "derivedId" | "gender" | "averageGrade" | "missingDays"
+    "studentRef" | "genderLabel" | "averageGradeLabel" | "missingDaysLabel"
   >;
 }
 
@@ -127,7 +117,7 @@ export function TeacherStudentsPage() {
     () =>
       classes.flatMap((teacherClass) =>
         teacherClass.students.map((student) => {
-          const derived = deriveStudentMetrics(teacherClass, student);
+          const metadata = buildStudentRosterMetadata(student);
 
           return {
             rowId: `${teacherClass.id}-${student.id}`,
@@ -137,7 +127,7 @@ export function TeacherStudentsPage() {
             inviteCode: teacherClass.inviteCode,
             quizCount: teacherClass.quizCount,
             student,
-            ...derived,
+            ...metadata,
           };
         }),
       ),
@@ -150,14 +140,7 @@ export function TeacherStudentsPage() {
         deferredClassFilter === "all" ? true : row.classId === deferredClassFilter;
       const matchesStatus =
         statusFilter === "all" ? true : row.student.status === statusFilter;
-      const matchesGrade =
-        gradeFilter === "all"
-          ? true
-          : gradeFilter === "high"
-            ? row.averageGrade >= 8.5
-            : gradeFilter === "mid"
-              ? row.averageGrade >= 7 && row.averageGrade < 8.5
-              : row.averageGrade < 7;
+      const matchesGrade = gradeFilter === "all";
 
       return matchesClass && matchesStatus && matchesGrade;
     });
@@ -244,11 +227,11 @@ export function TeacherStudentsPage() {
           escapeCsvValue(row.derivedId),
           escapeCsvValue(row.student.fullName),
           escapeCsvValue(row.student.email),
-          escapeCsvValue(row.gender),
+          escapeCsvValue(row.genderLabel),
           escapeCsvValue(row.className),
           escapeCsvValue(row.classSubject || "General"),
-          escapeCsvValue(row.averageGrade),
-          escapeCsvValue(row.missingDays),
+          escapeCsvValue(row.averageGradeLabel),
+          escapeCsvValue(row.missingDaysLabel),
           escapeCsvValue(row.student.status),
           escapeCsvValue(
             formatTeacherClassDate(getTeacherClassStudentActivityDate(row.student)),
@@ -381,18 +364,12 @@ export function TeacherStudentsPage() {
               <label>
                 <select
                   value={gradeFilter}
-                  onChange={(event) =>
-                    setGradeFilter(
-                      event.target.value as "all" | "high" | "mid" | "needs-attention",
-                    )
-                  }
+                  onChange={() => setGradeFilter("all")}
+                  disabled
                   className={`${dashboardSelectVariants({ size: "md" })} h-10 min-w-[130px] rounded-[12px] border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-elevated)] px-3 text-sm`}
-                  aria-label="Filter students by average grade"
+                  aria-label="Average grade data is unavailable"
                 >
-                  <option value="all">Avg. grade</option>
-                  <option value="high">8.5 and up</option>
-                  <option value="mid">7.0 to 8.4</option>
-                  <option value="needs-attention">Below 7.0</option>
+                  <option value="all">Avg. grade unavailable</option>
                 </select>
               </label>
 
@@ -507,7 +484,7 @@ export function TeacherStudentsPage() {
                         </TableCell>
 
                         <TableCell className="px-3 py-3 text-sm font-medium text-[var(--dashboard-text-soft)]">
-                          {row.derivedId}
+                          {row.studentRef}
                         </TableCell>
 
                         <TableCell className="px-3 py-3">
@@ -529,7 +506,7 @@ export function TeacherStudentsPage() {
                         </TableCell>
 
                         <TableCell className="px-3 py-3 text-sm text-[var(--dashboard-text-soft)]">
-                          {row.gender}
+                          {row.genderLabel}
                         </TableCell>
 
                         <TableCell className="px-3 py-3 text-sm text-[var(--dashboard-text-soft)]">
@@ -537,11 +514,11 @@ export function TeacherStudentsPage() {
                         </TableCell>
 
                         <TableCell className="px-3 py-3 text-sm font-semibold text-[var(--dashboard-text-strong)]">
-                          {row.averageGrade}
+                          {row.averageGradeLabel}
                         </TableCell>
 
                         <TableCell className="px-3 py-3 text-sm text-[var(--dashboard-text-soft)]">
-                          {row.missingDays}
+                          {row.missingDaysLabel}
                         </TableCell>
 
                         <TableCell className="px-3 py-3">

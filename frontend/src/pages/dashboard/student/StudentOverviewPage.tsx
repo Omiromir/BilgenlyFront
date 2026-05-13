@@ -296,7 +296,12 @@ export function StudentOverviewPage() {
                       <h3 className="text-[1.12rem] font-semibold text-[var(--dashboard-text-strong)]">
                         {result.title}
                       </h3>
-                      <p className="mt-1 text-sm text-[var(--dashboard-text-faint)]">{result.date}</p>
+                      <p className="mt-1 text-sm text-[var(--dashboard-text-faint)]">
+                        {result.date}
+                      </p>
+                      <p className="mt-1 text-sm text-[var(--dashboard-text-soft)]">
+                        {result.detail}
+                      </p>
                     </div>
                   </div>
 

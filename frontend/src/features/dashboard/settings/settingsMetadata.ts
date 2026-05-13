@@ -2,8 +2,6 @@ import type { ThemeMode } from "./userSettings";
 import {
   SETTINGS_COUNTRY_OPTIONS,
   SETTINGS_DATE_FORMAT_OPTIONS,
-  SETTINGS_LANGUAGE_OPTIONS,
-  SETTINGS_TIME_ZONE_OPTIONS,
 } from "./settingsPreferences";
 
 export interface SettingsToggleMetadata {
@@ -52,7 +50,6 @@ export const dashboardSettingsMetadata: SettingsScreenMetadata = {
     fields: [
       { id: "fullName", label: "Full Name" },
       { id: "email", label: "Email" },
-      { id: "phoneNumber", label: "Phone Number" },
       { id: "bio", label: "Bio", kind: "textarea" },
     ],
     location: [
@@ -60,11 +57,6 @@ export const dashboardSettingsMetadata: SettingsScreenMetadata = {
         id: "country",
         label: "Country",
         options: SETTINGS_COUNTRY_OPTIONS,
-      },
-      {
-        id: "timeZone",
-        label: "Time Zone",
-        options: SETTINGS_TIME_ZONE_OPTIONS,
       },
     ],
   },
@@ -118,11 +110,6 @@ export const dashboardSettingsMetadata: SettingsScreenMetadata = {
       { value: "system", label: "System" },
     ],
     region: [
-      {
-        id: "language",
-        label: "Language",
-        options: SETTINGS_LANGUAGE_OPTIONS,
-      },
       {
         id: "dateFormat",
         label: "Date Format",

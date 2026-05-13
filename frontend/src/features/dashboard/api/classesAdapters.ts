@@ -1,6 +1,7 @@
 import {
   buildTeacherStudentNameFromEmail,
   createTeacherClassAssignmentId,
+  isTeacherStudentPlaceholderName,
   normalizeTeacherClassFormValues,
   sortTeacherClasses,
   sortTeacherClassStudents,
@@ -23,10 +24,19 @@ function mapStudentDto(
   student: ClassDto["students"][number],
   existingStudent?: TeacherClassStudent,
 ) {
+  const fallbackNameFromEmail = buildTeacherStudentNameFromEmail(
+    student.email || existingStudent?.email || "",
+  );
+  const existingName =
+    existingStudent?.fullName &&
+    !isTeacherStudentPlaceholderName(existingStudent.fullName)
+      ? existingStudent.fullName
+      : "";
+
   return {
     id: student.studentId,
-    fullName: student.username || existingStudent?.fullName || buildTeacherStudentNameFromEmail(student.email),
-    email: student.email,
+    fullName: student.username || existingName || fallbackNameFromEmail,
+    email: student.email || existingStudent?.email || "",
     status: "joined" as const,
     invitationStatus: "accepted" as const,
     invitedAt: existingStudent?.invitedAt ?? student.joinedAt,
@@ -185,6 +195,7 @@ export function mapClassDtoToTeacherClassRecord(
     name: teacherClass.name,
     description: teacherClass.description,
     subject: teacherClass.subject,
+    teacherName: teacherClass.teacherName || existingClass?.teacherName || "",
     inviteCode: teacherClass.inviteCode,
     createdAt: teacherClass.createdAt,
     updatedAt: teacherClass.updatedAt,

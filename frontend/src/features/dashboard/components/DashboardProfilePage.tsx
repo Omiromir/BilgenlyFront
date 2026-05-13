@@ -9,95 +9,228 @@ import {
   Medal,
   TrendingUp,
 } from "../../../components/icons/AppIcons";
-import { DashboardPageHeader } from "./DashboardPageHeader";
+import { useRef } from "react";
+import { Input } from "../../../components/ui/input";
+import { Textarea } from "../../../components/ui/textarea";
 import { cn } from "../../../components/ui/utils";
+import { useProfile } from "../hooks/useProfile";
 import type {
   ProfileStat,
-  ProfileSummary,
-} from "../mock/sharedUi";
+} from "../profile/profileTypes";
+import { DashboardPageHeader } from "./DashboardPageHeader";
 import {
   DashboardButton,
   DashboardSurface,
   dashboardIconChipVariants,
+  dashboardInputVariants,
   dashboardMetaTextClassName,
   dashboardPageClassName,
   dashboardSectionDividerClassName,
+  dashboardTextareaVariants,
 } from "./DashboardPrimitives";
 
 interface DashboardProfilePageProps {
   title: string;
   subtitle: string;
-  profile: ProfileSummary;
 }
 
 export function DashboardProfilePage({
   title,
   subtitle,
-  profile,
 }: DashboardProfilePageProps) {
+  const {
+    profile,
+    formValues,
+    formErrors,
+    isEditing,
+    isSaving,
+    isDirty,
+    canSave,
+    startEditing,
+    cancelEditing,
+    saveProfile,
+    updateField,
+    updateAvatarFile,
+  } = useProfile();
+  const avatarInputRef = useRef<HTMLInputElement | null>(null);
+
+  if (!profile) {
+    return (
+      <div className={dashboardPageClassName}>
+        <DashboardPageHeader title={title} subtitle={subtitle} />
+      </div>
+    );
+  }
+
+  const handleOpenAvatarPicker = () => {
+    avatarInputRef.current?.click();
+  };
+  const displayInitials = formValues.fullName
+    .split(" ")
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+
   return (
     <div className={dashboardPageClassName}>
       <DashboardPageHeader title={title} subtitle={subtitle} />
+
+      <input
+        ref={avatarInputRef}
+        type="file"
+        accept="image/png,image/jpeg,image/webp,image/gif"
+        className="hidden"
+        onChange={(event) => {
+          updateAvatarFile(event.target.files?.[0] ?? null);
+          event.target.value = "";
+        }}
+      />
 
       <DashboardSurface asChild radius="lg" padding="none" className="overflow-hidden">
         <section>
           <div
             className="relative h-[116px] px-4 py-4 sm:px-6"
             style={{ background: "var(--dashboard-gradient)" }}
-          >
-            <DashboardButton
-              type="button"
-              variant="hero"
-              size="sm"
-              className="absolute right-4 top-4 backdrop-blur"
-            >
-              <Camera className="h-4 w-4" />
-              Edit Cover
-            </DashboardButton>
-          </div>
+          />
 
           <div className="px-5 pb-6 sm:px-6">
             <div className="flex flex-col gap-6 pt-5 lg:flex-row lg:items-start lg:justify-between">
               <div className="min-w-0 flex flex-col gap-5 md:flex-row md:items-start">
                 <div className="-mt-16 relative h-[108px] w-[108px] shrink-0 rounded-full bg-[var(--dashboard-surface-elevated)] p-1 shadow-[var(--dashboard-shadow-card)] ring-1 ring-[var(--dashboard-border-soft)]">
-                  <div className="flex h-full w-full items-center justify-center rounded-full bg-[var(--dashboard-surface)] text-[40px] font-semibold text-[var(--dashboard-brand)]">
-                    {profile.initials}
+                  <div className="flex h-full w-full items-center justify-center overflow-hidden rounded-full bg-[var(--dashboard-surface)] text-[40px] font-semibold text-[var(--dashboard-brand)]">
+                    {formValues.avatarUrl ? (
+                      <img
+                        src={formValues.avatarUrl}
+                        alt={`${profile.name} avatar`}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      displayInitials || profile.initials
+                    )}
                   </div>
                   <DashboardButton
                     type="button"
                     size="iconSm"
                     className="absolute bottom-2 right-1"
+                    onClick={handleOpenAvatarPicker}
                   >
                     <Camera className="h-4 w-4" />
                   </DashboardButton>
                 </div>
 
                 <div className="min-w-0 flex-1 space-y-4 pt-1 md:pt-5">
-                  <div>
-                    <h2 className="break-words text-[2rem] font-semibold tracking-tight text-[var(--dashboard-text-strong)]">
-                      {profile.name}
-                    </h2>
-                    <p className="text-lg text-[var(--dashboard-text-soft)]">{profile.roleLabel}</p>
+                  <div className="space-y-3">
+                    {isEditing ? (
+                      <div className="space-y-2">
+                        <Input
+                          value={formValues.fullName}
+                          onChange={(event) => updateField("fullName", event.target.value)}
+                          aria-invalid={Boolean(formErrors.fullName)}
+                          className={cn(
+                            dashboardInputVariants({ size: "lg" }),
+                            "h-14 rounded-[18px] border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-elevated)] px-5 text-[2rem] font-semibold tracking-tight shadow-none focus-visible:ring-0",
+                          )}
+                        />
+                        {formErrors.fullName ? (
+                          <p className="text-sm text-[var(--dashboard-danger)]">
+                            {formErrors.fullName}
+                          </p>
+                        ) : null}
+                      </div>
+                    ) : (
+                      <h2 className="break-words text-[2rem] font-semibold tracking-tight text-[var(--dashboard-text-strong)]">
+                        {profile.name}
+                      </h2>
+                    )}
+                    <p className="text-lg text-[var(--dashboard-text-soft)]">
+                      {profile.roleLabel}
+                    </p>
                   </div>
 
                   <div className="flex flex-col gap-3 text-sm text-[var(--dashboard-text-soft)] md:flex-row md:flex-wrap md:gap-x-10">
-                    <InfoLine icon={Mail} text={profile.email} />
-                    <InfoLine icon={CalendarDays} text={profile.joinedLabel} />
-                    <InfoLine icon={MapPin} text={profile.location} />
+                    {isEditing ? (
+                      <>
+                        <EditableInfoLine
+                          icon={Mail}
+                          value={formValues.email}
+                          error={formErrors.email}
+                          type="email"
+                          onChange={(value) => updateField("email", value)}
+                        />
+                        <InfoLine icon={CalendarDays} text={profile.joinedLabel} />
+                        <EditableInfoLine
+                          icon={MapPin}
+                          value={formValues.location}
+                          placeholder="Location"
+                          onChange={(value) => updateField("location", value)}
+                        />
+                      </>
+                    ) : (
+                      <>
+                        <InfoLine icon={Mail} text={profile.email} />
+                        <InfoLine icon={CalendarDays} text={profile.joinedLabel} />
+                        <InfoLine icon={MapPin} text={profile.location} />
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
 
-              <DashboardButton type="button" size="lg" className="self-start">
-                Edit Profile
-              </DashboardButton>
+              {isEditing ? (
+                <div className="flex flex-wrap gap-3 self-start">
+                  <DashboardButton
+                    type="button"
+                    size="lg"
+                    variant="secondary"
+                    onClick={cancelEditing}
+                    disabled={isSaving}
+                  >
+                    Cancel
+                  </DashboardButton>
+                  <DashboardButton
+                    type="button"
+                    size="lg"
+                    onClick={() => void saveProfile()}
+                    disabled={!canSave}
+                  >
+                    {isSaving ? "Saving..." : "Save Changes"}
+                  </DashboardButton>
+                </div>
+              ) : (
+                <DashboardButton type="button" size="lg" className="self-start" onClick={startEditing}>
+                  Edit Profile
+                </DashboardButton>
+              )}
             </div>
 
             <div className={cn("mt-6 border-t pt-5", dashboardSectionDividerClassName)}>
               <h3 className="text-[1.55rem] font-semibold text-[var(--dashboard-text-strong)]">Bio</h3>
-              <p className="mt-2 max-w-4xl text-[17px] leading-8 text-[var(--dashboard-text-soft)]">
-                {profile.bio}
-              </p>
+              {isEditing ? (
+                <div className="mt-3 space-y-2">
+                  <Textarea
+                    value={formValues.bio}
+                    onChange={(event) => updateField("bio", event.target.value)}
+                    aria-invalid={Boolean(formErrors.bio)}
+                    className={cn(
+                      dashboardTextareaVariants({ size: "md" }),
+                      "min-h-[132px] rounded-[22px] border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-elevated)] px-5 py-4 text-[17px] leading-8 shadow-none focus-visible:ring-0",
+                    )}
+                  />
+                  <div className="flex items-center justify-between gap-3 text-sm">
+                    <span className="text-[var(--dashboard-text-faint)]">
+                      {formValues.bio.trim().length}/280
+                    </span>
+                    {formErrors.bio ? (
+                      <span className="text-[var(--dashboard-danger)]">{formErrors.bio}</span>
+                    ) : null}
+                  </div>
+                </div>
+              ) : (
+                <p className="mt-2 max-w-4xl text-[17px] leading-8 text-[var(--dashboard-text-soft)]">
+                  {profile.bio}
+                </p>
+              )}
             </div>
           </div>
         </section>
@@ -121,7 +254,7 @@ export function DashboardProfilePage({
             <div className="px-5 py-3 sm:px-6">
               {profile.activity.map((item, index) => (
                 <div
-                  key={`${item.title}-${item.time}`}
+                  key={`${item.title}-${item.time}-${index}`}
                   className={cn(
                     "flex gap-4 py-5",
                     index < profile.activity.length - 1 &&
@@ -181,6 +314,42 @@ function InfoLine({
       <Icon className="h-4 w-4 shrink-0 text-[var(--dashboard-text-faint)]" />
       <span className="break-words">{text}</span>
     </span>
+  );
+}
+
+function EditableInfoLine({
+  icon: Icon,
+  value,
+  error,
+  placeholder,
+  type = "text",
+  onChange,
+}: {
+  icon: LucideIcon;
+  value: string;
+  error?: string;
+  placeholder?: string;
+  type?: "text" | "email";
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="min-w-0 space-y-1">
+      <span className="inline-flex min-w-0 items-center gap-2">
+        <Icon className="h-4 w-4 shrink-0 text-[var(--dashboard-text-faint)]" />
+        <Input
+          type={type}
+          value={value}
+          placeholder={placeholder}
+          onChange={(event) => onChange(event.target.value)}
+          aria-invalid={Boolean(error)}
+          className={cn(
+            dashboardInputVariants({ size: "sm" }),
+            "h-9 min-w-[220px] rounded-[12px] border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-elevated)] px-3 shadow-none focus-visible:ring-0",
+          )}
+        />
+      </span>
+      {error ? <p className="pl-6 text-sm text-[var(--dashboard-danger)]">{error}</p> : null}
+    </label>
   );
 }
 

@@ -9,9 +9,6 @@ import {
 import type { UserRole } from "../../lib/auth";
 import { getMe } from "../../features/auth/api";
 import {
-  defaultMockStudentId,
-  getMockStudentById,
-  mockTeacherUser,
   type MockDashboardUser,
 } from "../../features/dashboard/mock/mockUsers";
 
@@ -22,6 +19,10 @@ interface AuthContextValue {
   token: string | null;
   currentUser: MockDashboardUser | null;
   setRole: (role: UserRole | null) => void;
+  updateCurrentUserProfile: (updates: {
+    username?: string;
+    email?: string;
+  }) => void;
   signInAsRole: (
     role: UserRole,
     token?: string,
@@ -39,6 +40,39 @@ interface AuthUserProfile {
   username: string;
   email: string;
   role: string;
+}
+
+function readStoredRole(): UserRole | null {
+  const savedRole = localStorage.getItem(AUTH_ROLE_KEY);
+
+  if (
+    savedRole === "teacher" ||
+    savedRole === "student" ||
+    savedRole === "moderator"
+  ) {
+    return savedRole;
+  }
+
+  return null;
+}
+
+function readStoredToken() {
+  return localStorage.getItem(AUTH_TOKEN_KEY);
+}
+
+function readStoredUser(): AuthUserProfile | null {
+  const savedUser = localStorage.getItem(AUTH_USER_KEY);
+
+  if (!savedUser) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(savedUser) as AuthUserProfile;
+  } catch {
+    localStorage.removeItem(AUTH_USER_KEY);
+    return null;
+  }
 }
 
 function getInitials(name: string) {
@@ -61,22 +95,15 @@ function mapAuthUserToDashboardUser(
     return null;
   }
 
-  const fallbackUser =
-    role === "teacher"
-      ? mockTeacherUser
-      : role === "student"
-        ? getMockStudentById(defaultMockStudentId)
-        : null;
-
   return {
     id: authUser.userId || `email:${authUser.email.trim().toLowerCase()}`,
     role,
     fullName: authUser.username,
     email: authUser.email,
     initials: getInitials(authUser.username),
-    joinedLabel: fallbackUser?.joinedLabel ?? "Joined recently",
-    location: fallbackUser?.location ?? "Location not set",
-    bio: fallbackUser?.bio ?? "Bilgenly user",
+    joinedLabel: "Join date unavailable",
+    location: "",
+    bio: "",
   };
 }
 
@@ -87,33 +114,12 @@ interface AuthProviderProps {
 }
 
 export function AuthProvider({ children }: AuthProviderProps) {
-  const [role, setRoleState] = useState<UserRole | null>(null);
-  const [token, setTokenState] = useState<string | null>(null);
-  const [authUser, setAuthUser] = useState<AuthUserProfile | null>(null);
+  const [role, setRoleState] = useState<UserRole | null>(() => readStoredRole());
+  const [token, setTokenState] = useState<string | null>(() => readStoredToken());
+  const [authUser, setAuthUser] = useState<AuthUserProfile | null>(() => readStoredUser());
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const savedRole = localStorage.getItem(AUTH_ROLE_KEY) as UserRole | null;
-    const savedToken = localStorage.getItem(AUTH_TOKEN_KEY);
-    const savedUser = localStorage.getItem(AUTH_USER_KEY);
-
-    if (
-      savedRole === "teacher" ||
-      savedRole === "student" ||
-      savedRole === "moderator"
-    ) {
-      setRoleState(savedRole);
-    }
-    if (savedToken) {
-      setTokenState(savedToken);
-    }
-    if (savedUser) {
-      try {
-        setAuthUser(JSON.parse(savedUser) as AuthUserProfile);
-      } catch {
-        localStorage.removeItem(AUTH_USER_KEY);
-      }
-    }
     setIsLoading(false);
   }, []);
 
@@ -133,14 +139,22 @@ export function AuthProvider({ children }: AuthProviderProps) {
         if (isMounted) {
           setAuthUser(user);
           localStorage.setItem(AUTH_USER_KEY, JSON.stringify(user));
+
+          const normalizedRole = user.role.toLowerCase() as UserRole;
+          if (
+            normalizedRole === "teacher" ||
+            normalizedRole === "student" ||
+            normalizedRole === "moderator"
+          ) {
+            setRoleState(normalizedRole);
+            localStorage.setItem(AUTH_ROLE_KEY, normalizedRole);
+          }
         }
       } catch (error) {
-        // Silently fail - user is authenticated but we couldn't fetch full details
-        // This is acceptable, we have the token and basic role
-        if (isMounted) {
-          setAuthUser(null);
-          localStorage.removeItem(AUTH_USER_KEY);
-        }
+        // Preserve the existing authenticated session during normal navigation
+        // or transient backend errors. Explicit sign-out remains the only flow
+        // that clears stored auth.
+        void error;
       }
     };
 
@@ -195,15 +209,31 @@ export function AuthProvider({ children }: AuthProviderProps) {
     localStorage.removeItem(AUTH_TOKEN_KEY);
     localStorage.removeItem(AUTH_USER_KEY);
   };
-  const fallbackUser =
-    role === "teacher"
-      ? mockTeacherUser
-      : role === "student"
-        ? getMockStudentById(defaultMockStudentId)
-        : null;
+  const updateCurrentUserProfile = ({
+    username,
+    email,
+  }: {
+    username?: string;
+    email?: string;
+  }) => {
+    setAuthUser((current) => {
+      if (!current) {
+        return current;
+      }
+
+      const nextUser = {
+        ...current,
+        username: typeof username === "string" ? username.trim() || current.username : current.username,
+        email: typeof email === "string" ? email.trim() || current.email : current.email,
+      };
+
+      localStorage.setItem(AUTH_USER_KEY, JSON.stringify(nextUser));
+      return nextUser;
+    });
+  };
   const currentUser = authUser
     ? mapAuthUserToDashboardUser(authUser, role)
-    : fallbackUser;
+    : null;
 
   const value = useMemo(
     () => ({
@@ -213,6 +243,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       isLoading,
       currentUser,
       setRole,
+      updateCurrentUserProfile,
       signInAsRole,
       signOut,
     }),

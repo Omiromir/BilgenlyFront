@@ -3,6 +3,7 @@ import { BookOpen, Play } from "../../../components/icons/AppIcons";
 import { useLocation, useNavigate } from "react-router";
 import { toast } from "sonner";
 import { useAuth } from "../../../app/providers/AuthProvider";
+import { useNotifications } from "../../../app/providers/NotificationsProvider";
 import { useTeacherClasses } from "../../../app/providers/TeacherClassesProvider";
 import { Dialog } from "../../../components/ui/dialog";
 import { DashboardPageHeader } from "../../../features/dashboard/components/DashboardPageHeader";
@@ -72,6 +73,7 @@ export function StudentClassesPage() {
   const { quizzes } = useQuizLibrary();
   const { sessions } = useQuizSessions();
   const { openQuiz } = useQuizLauncher();
+  const { getNotificationsForRecipientIdentity } = useNotifications();
   const studentViewer = currentUser?.role === "student" ? currentUser : null;
   const studentIdentity = useMemo(
     () => ({
@@ -91,6 +93,29 @@ export function StudentClassesPage() {
     () => buildStudentQuizLibrarySources(classes, quizzes, studentIdentity, sessions),
     [classes, quizzes, sessions, studentIdentity],
   );
+  const notificationTeacherNameByClassId = useMemo(() => {
+    if (!studentViewer) {
+      return {};
+    }
+
+    return getNotificationsForRecipientIdentity(
+      studentViewer.id,
+      studentViewer.email,
+    )
+      .filter((notification) => notification.type === "class_invitation")
+      .reduce<Record<string, string>>((accumulator, notification) => {
+        const senderName = notification.senderName.trim();
+
+        if (senderName) {
+          accumulator[notification.relatedClassId] = senderName;
+        }
+
+        return accumulator;
+      }, {});
+  }, [
+    getNotificationsForRecipientIdentity,
+    studentViewer,
+  ]);
   const joinedMemberships = useMemo(
     () =>
       studentViewer
@@ -329,6 +354,7 @@ export function StudentClassesPage() {
           membershipRecord={selectedMembership}
           assignedItems={selectedAssignedItems}
           getAssignedActions={getAssignedActions}
+          teacherNameByClassId={notificationTeacherNameByClassId}
           onOpenClass={() =>
             navigate("/dashboard/student/quiz-library", {
               state: { libraryTab: "assigned" },

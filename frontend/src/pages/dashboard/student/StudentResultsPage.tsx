@@ -29,6 +29,7 @@ import { buildQuizSessionPath, buildQuizSessionSearch } from "../../../features/
 import {
   formatQuizAttemptDate,
   formatQuizAttemptDuration,
+  formatQuizPoints,
   formatQuizScore,
   getQuizSessionResultSummary,
 } from "../../../features/quiz-session/quizSessionUtils";
@@ -352,8 +353,8 @@ export function StudentResultsPage() {
                       {formatQuizScore(result.percentage)}
                     </p>
                     <p className="text-sm text-[var(--dashboard-text-soft)]">
-                      {result.totalQuestions
-                        ? `${result.correctCount}/${result.totalQuestions} correct`
+                      {result.totalPoints
+                        ? formatQuizPoints(result.earnedPoints, result.totalPoints)
                         : "Summary only"}
                     </p>
                   </div>
@@ -362,11 +363,11 @@ export function StudentResultsPage() {
                 <div className="mt-5 grid gap-4 text-sm text-[var(--dashboard-text-soft)] md:grid-cols-2">
                   <div className={dashboardIconTextRowClassName}>
                     <CheckCircle2 className="h-4 w-4 text-[var(--dashboard-brand)]" />
-                    Correct: {result.totalQuestions ? result.correctCount : "--"}
+                    Points earned: {result.totalPoints ? result.earnedPoints : "--"}
                   </div>
                   <div className={dashboardIconTextRowClassName}>
                     <Award className="h-4 w-4 text-[var(--dashboard-brand-strong)]" />
-                    Incorrect: {result.totalQuestions ? result.incorrectCount : "--"}
+                    Points remaining: {result.totalPoints ? result.totalPoints - result.earnedPoints : "--"}
                   </div>
                   <div className={dashboardIconTextRowClassName}>
                     <Clock3 className="h-4 w-4 text-[var(--dashboard-brand)]" />

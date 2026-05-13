@@ -1,8 +1,13 @@
 import { useNavigate } from 'react-router';
+import { useAuth } from "../../app/providers/AuthProvider";
+import { getDashboardPathByRole } from "../../lib/auth";
 import { LandingButton } from './LandingButton';
 
 export function CTASection() {
   const navigate = useNavigate();
+  const { isAuthenticated, role } = useAuth();
+  const primaryActionPath =
+    isAuthenticated && role ? getDashboardPathByRole(role) : "/signup";
 
   return (
     <section className="bg-[#111827] px-4 py-16 sm:px-6 lg:px-8">
@@ -24,9 +29,9 @@ export function CTASection() {
             variant="primary"
             size="md"
             className="hover:-translate-y-[1px]"
-            onClick={() => navigate('/signup')}
+            onClick={() => navigate(primaryActionPath)}
           >
-            Get started now
+            {isAuthenticated ? "Open dashboard" : "Get started now"}
           </LandingButton>
           <button className="h-11 cursor-pointer rounded-xl border-2 border-white px-6 font-['Montserrat',sans-serif] text-[15px] text-white transition-all duration-200 ease-out hover:-translate-y-[1px] hover:bg-white hover:text-[#111827] active:translate-y-0 active:scale-[0.98]">
             Learn more

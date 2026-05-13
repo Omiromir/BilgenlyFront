@@ -47,10 +47,8 @@ interface DashboardSettingsPageProps {
 interface AccountFormValues {
   fullName: string;
   email: string;
-  phoneNumber: string;
   bio: string;
   country: string;
-  timeZone: string;
 }
 
 interface AccountFormErrors {
@@ -91,10 +89,8 @@ function buildAccountFormValues(profile: UserSettingsProfile): AccountFormValues
   return {
     fullName: profile.fullName,
     email: profile.email,
-    phoneNumber: profile.phoneNumber,
     bio: profile.bio,
     country: profile.country,
-    timeZone: profile.timeZone,
   };
 }
 
@@ -156,7 +152,6 @@ export function DashboardSettingsPage({
     updateThemeMode,
     updateNotificationPreference,
     updatePreferenceField,
-    revokeSession,
     updatePassword,
   } = useSettings();
   const [activeTab, setActiveTab] = useState<SettingsTab>("account");
@@ -172,10 +167,8 @@ export function DashboardSettingsPage({
   >({
     fullName: false,
     email: false,
-    phoneNumber: false,
     bio: false,
     country: false,
-    timeZone: false,
   });
   const [passwordValues, setPasswordValues] =
     useState<PasswordFormValues>(emptyPasswordForm);
@@ -194,10 +187,8 @@ export function DashboardSettingsPage({
     setAccountTouched({
       fullName: false,
       email: false,
-      phoneNumber: false,
       bio: false,
       country: false,
-      timeZone: false,
     });
   }, [persistedAccountValues]);
 
@@ -244,10 +235,8 @@ export function DashboardSettingsPage({
     const nextTouched = {
       fullName: true,
       email: true,
-      phoneNumber: true,
       bio: true,
       country: true,
-      timeZone: true,
     };
     setAccountTouched(nextTouched);
 
@@ -278,10 +267,8 @@ export function DashboardSettingsPage({
     setAccountTouched({
       fullName: false,
       email: false,
-      phoneNumber: false,
       bio: false,
       country: false,
-      timeZone: false,
     });
   };
 
@@ -368,6 +355,7 @@ export function DashboardSettingsPage({
             <>
               <SettingsPanel title="Account Information">
                 <div className="space-y-5">
+                  <div className="grid gap-5 lg:grid-cols-2">
                   {metadata.account.fields.map((field) => (
                     <FieldRenderer
                       key={field.id}
@@ -388,6 +376,7 @@ export function DashboardSettingsPage({
                       )}
                     />
                   ))}
+                  </div>
 
                   <div className="flex flex-wrap gap-3 pt-1">
                     <DashboardButton
@@ -411,8 +400,8 @@ export function DashboardSettingsPage({
                 </div>
               </SettingsPanel>
 
-              <SettingsPanel title="Location & Time Zone">
-                <div className="space-y-5">
+              <SettingsPanel title="Location">
+                <div className="grid gap-5 lg:grid-cols-2">
                   {metadata.account.location.map((field) => (
                     <SelectLikeField
                       key={field.id}
@@ -462,48 +451,6 @@ export function DashboardSettingsPage({
                   >
                     Update Password
                   </DashboardButton>
-                </div>
-              </SettingsPanel>
-
-              <SettingsPanel title="Active Sessions">
-                <div className="space-y-3">
-                  {settings.security.sessions.map((session) => (
-                    <div
-                      key={session.id}
-                      className="flex items-center justify-between gap-4 rounded-[16px] border border-[var(--dashboard-border-soft)] px-4 py-4"
-                    >
-                      <div>
-                        <p className="text-[15px] font-semibold text-[var(--dashboard-text-strong)]">
-                          {session.device}
-                        </p>
-                        <p className="text-sm text-[var(--dashboard-text-soft)]">
-                          {session.description}
-                        </p>
-                      </div>
-
-                      {session.actionLabel ? (
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            const result = await revokeSession(session.id);
-                            toast.success(
-                              result.mode === "remote"
-                                ? "Session revoked."
-                                : "Session removed from local settings. Hook this action to a backend revoke endpoint for real sign-out.",
-                            );
-                          }}
-                          className={cn(
-                            "text-sm font-medium",
-                            session.destructive
-                              ? "text-[var(--dashboard-danger)]"
-                              : "text-[var(--dashboard-text-strong)]",
-                          )}
-                        >
-                          {session.actionLabel}
-                        </button>
-                      ) : null}
-                    </div>
-                  ))}
                 </div>
               </SettingsPanel>
             </>
@@ -597,22 +544,20 @@ export function DashboardSettingsPage({
                 </div>
               </SettingsPanel>
 
-              <SettingsPanel title="Language & Region">
-                <div className="space-y-5">
+              <SettingsPanel title="Regional Format">
+                <div className="grid gap-5 lg:grid-cols-2">
                   {metadata.preferences.region.map((field) => (
                     <SelectLikeField
                       key={field.id}
                       field={field}
-                      value={settings.profile[field.id as "language" | "dateFormat"]}
+                      value={settings.profile[field.id as "dateFormat"]}
                       onChange={(event) => {
                         updatePreferenceField(
-                          field.id as "language" | "dateFormat",
+                          field.id as "dateFormat",
                           event.target.value,
                         );
                         toast.success(
-                          field.id === "language"
-                            ? "Language preference saved for locale-aware formatting."
-                            : "Date format preference saved.",
+                          "Date format preference saved.",
                         );
                       }}
                     />

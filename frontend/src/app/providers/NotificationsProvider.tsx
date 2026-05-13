@@ -229,7 +229,6 @@ function getNotificationRecipientSettings(
   return readUserSettings(
     scope,
     createDefaultUserSettings({
-      role: null,
       user: null,
     }),
   );

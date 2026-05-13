@@ -8,6 +8,7 @@ import {
 import type { QuizSessionRecord } from "../../../quiz-session/quizSessionTypes";
 import {
   formatQuizAttemptDate,
+  formatQuizPoints,
   getQuizSessionResultSummary,
 } from "../../../quiz-session/quizSessionUtils";
 import type { StudentQuizLibrarySources } from "../quiz-library/studentQuizLibrarySources";
@@ -24,6 +25,7 @@ export interface StudentOverviewRecentResultItem {
   title: string;
   date: string;
   score: string;
+  detail: string;
   scoreTone: "blue" | "emerald";
 }
 
@@ -173,6 +175,9 @@ function buildOverviewStats(
   const scores = completedSessions.map(
     (session) => getQuizSessionResultSummary(session).percentage,
   );
+  const latestResult = completedSessions[0]
+    ? getQuizSessionResultSummary(completedSessions[0])
+    : null;
   const latestScore = scores[0] ?? null;
   const averageScore = scores.length
     ? Math.round(scores.reduce((total, score) => total + score, 0) / scores.length)
@@ -217,7 +222,10 @@ function buildOverviewStats(
       change:
         latestScore === null
           ? "Complete a quiz to track your progress"
-          : `Latest score ${latestScore}%`,
+          : `Latest result ${formatQuizPoints(
+              latestResult?.earnedPoints ?? 0,
+              latestResult?.totalPoints ?? 0,
+            )} · ${latestScore}%`,
       icon: TrendingUp,
       iconClassName:
         "bg-[var(--dashboard-brand-soft)] text-[var(--dashboard-brand-strong)]",
@@ -238,12 +246,14 @@ function buildOverviewStats(
 
 function buildRecentResults(completedSessions: QuizSessionRecord[]) {
   return completedSessions.slice(0, 3).map((session) => {
-    const score = getQuizSessionResultSummary(session).percentage;
+    const result = getQuizSessionResultSummary(session);
+    const score = result.percentage;
 
     return {
       title: session.quiz.title,
       date: formatQuizAttemptDate(session.finishedAt ?? session.updatedAt),
       score: `${score}%`,
+      detail: formatQuizPoints(result.earnedPoints, result.totalPoints),
       scoreTone: score >= 90 ? "emerald" : "blue",
     } satisfies StudentOverviewRecentResultItem;
   });

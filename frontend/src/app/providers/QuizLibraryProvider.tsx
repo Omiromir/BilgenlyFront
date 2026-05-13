@@ -14,6 +14,8 @@ import type {
   QuizQuestionRecord,
   QuizRecord,
 } from "../../features/dashboard/components/quiz-library/quizLibraryTypes";
+import { isGuidString } from "../../lib/apiClient";
+import { createQuiz as createQuizRequest } from "../../features/dashboard/api/quizzesApi";
 import { useAuth } from "./AuthProvider";
 import { useTeacherClasses } from "./TeacherClassesProvider";
 
@@ -41,6 +43,7 @@ interface SaveGeneratedQuizInput {
 interface QuizLibraryContextValue {
   quizzes: QuizRecord[];
   saveGeneratedQuiz: (input: SaveGeneratedQuizInput) => QuizRecord;
+  ensureQuizHasBackendId: (quizId: string) => Promise<string>;
   getQuizById: (quizId: string) => QuizRecord | undefined;
   syncQuizPracticeState: (
     quizId: string,
@@ -110,6 +113,24 @@ function sanitizeQuizRecord(quiz: QuizRecord): QuizRecord {
     ...quiz,
     tags: normalizeTags(quiz.tags ?? []),
   };
+}
+
+function toCreateQuizQuestionType(
+  question: QuizQuestionRecord,
+) {
+  if (question.questionType === "True/False") {
+    return "TrueFalse";
+  }
+
+  return "MCQ";
+}
+
+function getCorrectAnswerIndexes(question: QuizQuestionRecord) {
+  if (question.selectionMode === "multiple" && question.correctIndexes?.length) {
+    return question.correctIndexes;
+  }
+
+  return [question.correctIndex];
 }
 
 function loadQuizLibraryFromStorage() {
@@ -353,6 +374,62 @@ export function QuizLibraryProvider({ children }: QuizLibraryProviderProps) {
           return next;
         });
         return quiz;
+      },
+      ensureQuizHasBackendId: async (quizId) => {
+        if (isGuidString(quizId)) {
+          return quizId;
+        }
+
+        const sourceQuiz = quizzes.find((quiz) => quiz.id === quizId);
+
+        if (!sourceQuiz) {
+          throw new Error("Unable to find that quiz in your library.");
+        }
+
+        if (sourceQuiz.ownerRole !== "teacher") {
+          throw new Error("Only teacher quizzes can be assigned to classes.");
+        }
+
+        const createdQuiz = await createQuizRequest({
+          title: sourceQuiz.title,
+          description: sourceQuiz.description,
+          isPublic: sourceQuiz.visibility === "public",
+          questions: sourceQuiz.questions.map((question, index) => {
+            const correctIndexes = getCorrectAnswerIndexes(question);
+
+            return {
+              text: question.text,
+              questionType: toCreateQuizQuestionType(question),
+              position: index,
+              answers: question.options.map((option, optionIndex) => ({
+                text: option,
+                isCorrect: correctIndexes.includes(optionIndex),
+              })),
+            };
+          }),
+        });
+
+        setQuizzes((current) =>
+          current.map((quiz) =>
+            quiz.id === quizId
+              ? {
+                  ...quiz,
+                  id: createdQuiz.id,
+                  ownerName: createdQuiz.createdBy || quiz.ownerName,
+                  visibility: createdQuiz.isPublic ? "public" : "private",
+                  status: createdQuiz.isPublic
+                    ? "published-public"
+                    : quiz.status === "draft" || quiz.status === "generated" || quiz.status === "edited"
+                      ? "published-private"
+                      : quiz.status,
+                  updatedAt: createdQuiz.createdAt || quiz.updatedAt,
+                  note: "Synced to the backend so it can be assigned to classes.",
+                }
+              : quiz,
+          ),
+        );
+
+        return createdQuiz.id;
       },
       getQuizById: (quizId) => quizzes.find((quiz) => quiz.id === quizId),
       syncQuizPracticeState: (quizId, updates) => {

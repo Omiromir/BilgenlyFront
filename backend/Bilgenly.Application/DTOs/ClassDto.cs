@@ -6,6 +6,7 @@ public class ClassDto
     public string Name { get; set; } = string.Empty;
     public string Subject { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
+    public string TeacherName { get; set; } = string.Empty;
     public string InviteCode { get; set; } = string.Empty;
     public bool IsArchived { get; set; }
     public int StudentCount { get; set; }

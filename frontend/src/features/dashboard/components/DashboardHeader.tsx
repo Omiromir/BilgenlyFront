@@ -75,13 +75,15 @@ export function DashboardHeader({ onOpenSidebar }: DashboardHeaderProps) {
 
   const userMeta = useMemo(() => {
     const name = dashboardViewer?.fullName ?? "Bilgenly User";
-    const email = dashboardViewer?.email ?? "user@bilgenly.com";
+    const email = dashboardViewer?.email ?? "";
+    const roleLabel = dashboardViewer?.roleLabel ?? (role ? role.charAt(0).toUpperCase() + role.slice(1) : "User");
 
     switch (role) {
       case "teacher":
         return {
           name,
           email,
+          roleLabel,
           profilePath: "/dashboard/teacher/profile",
           settingsPath: "/dashboard/teacher/settings",
         };
@@ -89,6 +91,7 @@ export function DashboardHeader({ onOpenSidebar }: DashboardHeaderProps) {
         return {
           name,
           email,
+          roleLabel,
           profilePath: "/dashboard/student/profile",
           settingsPath: "/dashboard/student/settings",
         };
@@ -96,6 +99,7 @@ export function DashboardHeader({ onOpenSidebar }: DashboardHeaderProps) {
         return {
           name,
           email,
+          roleLabel,
           profilePath: "/dashboard/moderator",
           settingsPath: "/dashboard/moderator",
         };
@@ -103,11 +107,12 @@ export function DashboardHeader({ onOpenSidebar }: DashboardHeaderProps) {
         return {
           name,
           email,
+          roleLabel,
           profilePath: "/signin",
           settingsPath: "/signin",
         };
     }
-  }, [dashboardViewer?.email, dashboardViewer?.fullName, role]);
+  }, [dashboardViewer?.email, dashboardViewer?.fullName, dashboardViewer?.roleLabel, role]);
   const notificationsPath =
     role === "student" ? "/dashboard/student/notifications" : userMeta.settingsPath;
 
@@ -117,6 +122,7 @@ export function DashboardHeader({ onOpenSidebar }: DashboardHeaderProps) {
     .join("")
     .toUpperCase()
     .slice(0, 2);
+  const avatarUrl = dashboardViewer?.avatarUrl ?? null;
   const dropdownBaseClassName =
     "absolute right-0 top-0 z-30 overflow-hidden transition";
 
@@ -174,7 +180,15 @@ export function DashboardHeader({ onOpenSidebar }: DashboardHeaderProps) {
                 aria-label="Profile"
               >
                 <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--dashboard-surface-elevated)] text-sm font-semibold text-[var(--dashboard-text-strong)] ring-1 ring-[var(--dashboard-border-soft)]">
-                  {initials}
+                  {avatarUrl ? (
+                    <img
+                      src={avatarUrl}
+                      alt={`${userMeta.name} avatar`}
+                      className="h-full w-full rounded-full object-cover"
+                    />
+                  ) : (
+                    initials
+                  )}
                 </div>
               </DashboardButton>
             </div>
@@ -314,15 +328,23 @@ export function DashboardHeader({ onOpenSidebar }: DashboardHeaderProps) {
               padding="none"
             >
               <div className="flex items-center gap-3 px-4 py-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--dashboard-brand)] text-lg font-semibold text-white">
-                  {initials}
+                <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-full bg-[var(--dashboard-brand)] text-lg font-semibold text-white">
+                  {avatarUrl ? (
+                    <img
+                      src={avatarUrl}
+                      alt={`${userMeta.name} avatar`}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    initials
+                  )}
                 </div>
                 <div className="min-w-0">
                   <p className="truncate text-[1.05rem] font-semibold text-[var(--dashboard-text-strong)]">
                     {userMeta.name}
                   </p>
                   <p className="truncate text-[15px] capitalize text-[var(--dashboard-text-soft)]">
-                    {role ?? "user"}
+                    {userMeta.roleLabel}
                   </p>
                   <p className="truncate pt-1 text-sm text-[var(--dashboard-text-soft)]">
                     {userMeta.email}

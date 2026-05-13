@@ -1,4 +1,3 @@
-import type { UserRole } from "../../../lib/auth";
 import type { MockDashboardUser } from "../mock/mockUsers";
 import type { ThemeMode, UserSettings } from "./settingsTypes";
 import {
@@ -6,27 +5,7 @@ import {
   getDefaultDateFormat,
   getDefaultLanguage,
   getDefaultTimeZone,
-  normalizeCountry,
 } from "./settingsPreferences";
-
-function getRoleLabel(role: UserRole | null | undefined) {
-  if (!role) {
-    return "Bilgenly User";
-  }
-
-  return role.charAt(0).toUpperCase() + role.slice(1);
-}
-
-function getDefaultCountry(location: string | null | undefined) {
-  if (!location?.trim()) {
-    return getPreferenceDefaultCountry();
-  }
-
-  return normalizeCountry(
-    location.split(",")[0]?.trim(),
-    getPreferenceDefaultCountry(),
-  );
-}
 
 export function getProfileInitials(fullName: string) {
   return fullName
@@ -44,22 +23,20 @@ export function getThemeMode(value: unknown, fallback: ThemeMode): ThemeMode {
 }
 
 export function createDefaultUserSettings({
-  role,
   user,
 }: {
-  role: UserRole | null;
   user: MockDashboardUser | null;
 }): UserSettings {
-  const fullName = user?.fullName ?? "Bilgenly User";
-  const email = user?.email ?? "user@bilgenly.com";
-  const country = getDefaultCountry(user?.location);
+  const fullName = user?.fullName ?? "";
+  const email = user?.email ?? "";
+  const country = getPreferenceDefaultCountry();
 
   return {
     profile: {
       fullName,
       email,
-      phoneNumber: "+1 (555) 123-4567",
-      bio: user?.bio ?? `${getRoleLabel(role)} profile`,
+      phoneNumber: "",
+      bio: "",
       country,
       timeZone: getDefaultTimeZone(),
       language: getDefaultLanguage(),

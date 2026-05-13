@@ -69,7 +69,8 @@ public class ClassService
         classEntity.UpdatedAt = DateTime.UtcNow;
 
         await _classRepository.SaveChangesAsync();
-        return (MapToDto(classEntity), null);
+        var refreshedClass = await _classRepository.GetByIdAsync(classEntity.Id);
+        return (MapToDto(refreshedClass ?? classEntity), null);
     }
 
     public async Task<(bool Success, string? Error)> ArchiveClassAsync(
@@ -152,8 +153,7 @@ public class ClassService
             Status = status
         };
 
-        classEntity.Assignments.Add(assignment);
-        classEntity.UpdatedAt = DateTime.UtcNow;
+        await _classRepository.AddAssignmentAsync(assignment);
         await _classRepository.SaveChangesAsync();
 
         return (MapAssignmentToDto(assignment, quiz), null);
@@ -183,6 +183,7 @@ public class ClassService
         Name = c.Name,
         Subject = c.Subject,
         Description = c.Description,
+        TeacherName = c.Teacher?.Username ?? string.Empty,
         InviteCode = c.InviteCode,
         IsArchived = c.IsArchived,
         StudentCount = c.ClassStudents.Count,

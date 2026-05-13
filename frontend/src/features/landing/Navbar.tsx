@@ -1,16 +1,24 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router";
-import logo from "../../assets/logo.png";
 import { LandingButton } from "./LandingButton";
 import { BilgenlyLogo } from "../../components/shared/BilgenlyLogo";
+import { useAuth } from "../../app/providers/AuthProvider";
+import { getDashboardPathByRole } from "../../lib/auth";
 
 export function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const navigate = useNavigate();
+  const { isAuthenticated, role } = useAuth();
 
   const handleAuthNavigation = (path: "/signin" | "/signup") => {
     setIsMenuOpen(false);
+
+    if (isAuthenticated && role) {
+      navigate(getDashboardPathByRole(role));
+      return;
+    }
+
     navigate(path);
   };
 
@@ -71,21 +79,34 @@ export function Navbar() {
         </div>
 
         <div className="flex items-center gap-3 sm:gap-5">
-          <button
-            className="hidden font-['Montserrat',sans-serif] text-[16px] font-bold text-[#4B5563] transition-all duration-200 ease-out  hover:text-[#111827] md:inline lg:text-[20px]"
-            onClick={() => handleAuthNavigation("/signin")}
-            type="button"
-          >
-            Log in
-          </button>
-          <LandingButton
-            variant="primary"
-            size="sm"
-            className="hidden  md:inline-flex"
-            onClick={() => handleAuthNavigation("/signup")}
-          >
-            Get started
-          </LandingButton>
+          {isAuthenticated ? (
+            <LandingButton
+              variant="primary"
+              size="sm"
+              className="hidden md:inline-flex"
+              onClick={() => handleAuthNavigation("/signup")}
+            >
+              Open dashboard
+            </LandingButton>
+          ) : (
+            <>
+              <button
+                className="hidden font-['Montserrat',sans-serif] text-[16px] font-bold text-[#4B5563] transition-all duration-200 ease-out  hover:text-[#111827] md:inline lg:text-[20px]"
+                onClick={() => handleAuthNavigation("/signin")}
+                type="button"
+              >
+                Log in
+              </button>
+              <LandingButton
+                variant="primary"
+                size="sm"
+                className="hidden md:inline-flex"
+                onClick={() => handleAuthNavigation("/signup")}
+              >
+                Get started
+              </LandingButton>
+            </>
+          )}
           <button
             className="grid h-10 w-10 place-items-center rounded-lg border border-[#D1D5DB] text-[#111827] transition-colors hover:bg-[#F3F4F6] md:hidden"
             aria-label="Toggle navigation menu"
@@ -168,22 +189,34 @@ export function Navbar() {
           </div>
 
           <div className="mt-4 flex items-center gap-2 border-t border-[#E5E7EB] pt-4">
-            {" "}
-            <button
-              className="h-10 flex-1 rounded-lg border border-[#D1D5DB] px-3 text-[14px] font-semibold text-[#4B5563] transition-colors hover:bg-[#F3F4F6] hover:text-[#111827]"
-              onClick={() => handleAuthNavigation("/signin")}
-              type="button"
-            >
-              Log in
-            </button>
-            <LandingButton
-              variant="primary"
-              size="sm"
-              className="!h-10 !flex-1 !px-4 !text-[14px]"
-              onClick={() => handleAuthNavigation("/signup")}
-            >
-              Get started
-            </LandingButton>
+            {isAuthenticated ? (
+              <LandingButton
+                variant="primary"
+                size="sm"
+                className="!h-10 !w-full !px-4 !text-[14px]"
+                onClick={() => handleAuthNavigation("/signup")}
+              >
+                Open dashboard
+              </LandingButton>
+            ) : (
+              <>
+                <button
+                  className="h-10 flex-1 rounded-lg border border-[#D1D5DB] px-3 text-[14px] font-semibold text-[#4B5563] transition-colors hover:bg-[#F3F4F6] hover:text-[#111827]"
+                  onClick={() => handleAuthNavigation("/signin")}
+                  type="button"
+                >
+                  Log in
+                </button>
+                <LandingButton
+                  variant="primary"
+                  size="sm"
+                  className="!h-10 !flex-1 !px-4 !text-[14px]"
+                  onClick={() => handleAuthNavigation("/signup")}
+                >
+                  Get started
+                </LandingButton>
+              </>
+            )}
           </div>
         </div>
       </div>

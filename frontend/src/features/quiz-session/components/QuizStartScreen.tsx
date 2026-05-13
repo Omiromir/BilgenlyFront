@@ -26,6 +26,7 @@ import type {
 import type { QuizSessionRecord } from "../quizSessionTypes";
 import {
   formatQuizAttemptDate,
+  formatQuizPoints,
   formatQuizScore,
   getQuizSessionResultSummary,
   getSubmittedQuestionCount,
@@ -128,7 +129,10 @@ export function QuizStartScreen({
                 {formatQuizScore(latestResult.percentage)}
               </p>
               <p className="mt-1 text-sm leading-6 text-[var(--dashboard-text-soft)]">
-                {latestResult.correctCount}/{latestResult.totalQuestions} correct on{" "}
+                {formatQuizPoints(
+                  latestResult.earnedPoints,
+                  latestResult.totalPoints,
+                )} earned on{" "}
                 {formatQuizAttemptDate(
                   latestCompletedSession?.finishedAt ??
                     latestCompletedSession?.updatedAt ??

@@ -39,7 +39,6 @@ import {
   validateAssignmentSettings,
   type AssignmentSettingsFormValues,
 } from "../../../features/assignments/assignmentConstraints";
-import { isGuidString } from "../../../lib/apiClient";
 import {
   LibrarySectionHeader,
   LibraryTabs,
@@ -73,8 +72,14 @@ export function TeacherQuizLibraryPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const { classes, assignQuizToClasses } = useTeacherClasses();
-  const { quizzes, deleteQuiz, duplicateQuizToLibrary, publishQuiz, toggleSavedQuiz } =
-    useQuizLibrary();
+  const {
+    quizzes,
+    deleteQuiz,
+    duplicateQuizToLibrary,
+    ensureQuizHasBackendId,
+    publishQuiz,
+    toggleSavedQuiz,
+  } = useQuizLibrary();
   const { openQuiz } = useQuizLauncher();
   const teacherQuizLibraryItems = getQuizLibraryItemsForRole(quizzes, "teacher");
   const initialTab = location.state?.libraryTab as TeacherLibraryTab | undefined;
@@ -101,9 +106,6 @@ export function TeacherQuizLibraryPage() {
     () => classes.filter((teacherClass) => teacherClass.status === "active"),
     [classes],
   );
-  const quizPendingAssignmentHasBackendId = quizPendingAssignment
-    ? isGuidString(quizPendingAssignment.id)
-    : true;
 
   const getTeacherItemsForTab = (tab: TeacherLibraryTab) => {
     switch (tab) {
@@ -252,9 +254,10 @@ export function TeacherQuizLibraryPage() {
     }
 
     try {
+      const backendQuizId = await ensureQuizHasBackendId(quizPendingAssignment.id);
       const assignedClassIds = await assignQuizToClasses(
         {
-          quizId: quizPendingAssignment.id,
+          quizId: backendQuizId,
           title: quizPendingAssignment.title,
           topic: quizPendingAssignment.topic,
           questionCount: quizPendingAssignment.questionCount,
@@ -578,16 +581,6 @@ export function TeacherQuizLibraryPage() {
               </div>
             ) : null}
 
-            {quizPendingAssignment && !quizPendingAssignmentHasBackendId ? (
-              <div className="rounded-[18px] border border-[var(--dashboard-warning-soft)] bg-[var(--dashboard-warning-soft)]/35 px-4 py-3">
-                <p className="text-sm leading-6 text-[var(--dashboard-warning)]">
-                  This quiz is still local-only and does not have a backend quiz ID yet. It can
-                  be previewed and edited, but the class assignment API will reject it until the
-                  quiz is saved through a backend-backed quiz flow.
-                </p>
-              </div>
-            ) : null}
-
             <div className="space-y-3">
               {activeClasses.length ? (
                 activeClasses.map((teacherClass) => {
@@ -688,7 +681,6 @@ export function TeacherQuizLibraryPage() {
               type="button"
               size="lg"
               onClick={handleAssignQuizToClasses}
-              disabled={!quizPendingAssignmentHasBackendId}
             >
               Assign quiz
             </DashboardButton>

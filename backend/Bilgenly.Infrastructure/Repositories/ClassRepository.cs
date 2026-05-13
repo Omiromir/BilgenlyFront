@@ -28,13 +28,18 @@ public class ClassRepository : IClassRepository
 
     public async Task<Class?> GetByInviteCodeAsync(string inviteCode)
         => await _context.Classes
+            .Include(c => c.Teacher)
             .Include(c => c.ClassStudents)
+            .ThenInclude(cs => cs.Student)
+            .Include(c => c.Assignments)
+            .ThenInclude(a => a.Quiz)
             .FirstOrDefaultAsync(c => c.InviteCode == inviteCode);
 
     public async Task<IEnumerable<Class>> GetByTeacherIdAsync(Guid teacherId)
         => await _context.Classes
             .Where(c => c.TeacherId == teacherId)
             .Include(c => c.ClassStudents)
+            .ThenInclude(cs => cs.Student)
             .Include(c => c.Assignments) 
             .ThenInclude(a => a.Quiz)
             .OrderByDescending(c => c.UpdatedAt)
@@ -44,6 +49,8 @@ public class ClassRepository : IClassRepository
         => await _context.Classes
             .Where(c => c.ClassStudents.Any(cs => cs.StudentId == studentId))
             .Include(c => c.Teacher)
+            .Include(c => c.ClassStudents)
+            .ThenInclude(cs => cs.Student)
             .Include(c => c.Assignments) 
             .ThenInclude(a => a.Quiz)
             .OrderByDescending(c => c.UpdatedAt)
@@ -68,6 +75,9 @@ public class ClassRepository : IClassRepository
 
     public async Task AddAsync(Class classEntity)
         => await _context.Classes.AddAsync(classEntity);
+
+    public async Task AddAssignmentAsync(Assignment assignment)
+        => await _context.Assignments.AddAsync(assignment);
 
     public async Task SaveChangesAsync()
         => await _context.SaveChangesAsync();

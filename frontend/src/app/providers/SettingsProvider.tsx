@@ -76,7 +76,12 @@ interface SettingsProviderProps {
 }
 
 export function SettingsProvider({ children }: SettingsProviderProps) {
-  const { currentUser: authCurrentUser, role, token } = useAuth();
+  const {
+    currentUser: authCurrentUser,
+    role,
+    token,
+    updateCurrentUserProfile,
+  } = useAuth();
   const [isHydrated, setIsHydrated] = useState(false);
   const [systemTheme, setSystemTheme] = useState<"light" | "dark">("light");
 
@@ -91,8 +96,8 @@ export function SettingsProvider({ children }: SettingsProviderProps) {
     [authCurrentUser?.email, authCurrentUser?.id, role, token],
   );
   const defaultSettings = useMemo(
-    () => createDefaultUserSettings({ role, user: authCurrentUser }),
-    [authCurrentUser, role],
+    () => createDefaultUserSettings({ user: authCurrentUser }),
+    [authCurrentUser],
   );
   const scopedSettingsSnapshot = useMemo(
     () => readUserSettings(storageScope, defaultSettings),
@@ -184,6 +189,11 @@ export function SettingsProvider({ children }: SettingsProviderProps) {
   };
 
   const saveProfileSettings = (profile: UserSettingsProfile) => {
+    updateCurrentUserProfile({
+      username: profile.fullName,
+      email: profile.email,
+    });
+
     persistSettings((current) => ({
       ...current,
       profile,

@@ -50,6 +50,7 @@ export interface TeacherClassRecord {
   name: string;
   description: string;
   subject: string;
+  teacherName?: string;
   inviteCode: string;
   createdAt: string;
   updatedAt: string;

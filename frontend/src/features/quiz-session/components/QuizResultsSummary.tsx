@@ -76,18 +76,18 @@ export function QuizResultsSummary({
       <div className="grid gap-4 md:grid-cols-3">
         <div className="rounded-[22px] border border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-elevated)] px-5 py-4">
           <p className="text-sm font-medium text-[var(--dashboard-text-soft)]">
-            Correct answers
-          </p>
-          <p className="mt-3 text-[1.6rem] font-semibold text-[var(--dashboard-text-strong)]">
-            {result.correctCount}
-          </p>
-        </div>
-        <div className="rounded-[22px] border border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-elevated)] px-5 py-4">
-          <p className="text-sm font-medium text-[var(--dashboard-text-soft)]">
             Points earned
           </p>
           <p className="mt-3 text-[1.6rem] font-semibold text-[var(--dashboard-text-strong)]">
             {result.earnedPoints}
+          </p>
+        </div>
+        <div className="rounded-[22px] border border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-elevated)] px-5 py-4">
+          <p className="text-sm font-medium text-[var(--dashboard-text-soft)]">
+            Points remaining
+          </p>
+          <p className="mt-3 text-[1.6rem] font-semibold text-[var(--dashboard-text-strong)]">
+            {Math.max(result.totalPoints - result.earnedPoints, 0)}
           </p>
         </div>
         <div className="rounded-[22px] border border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-elevated)] px-5 py-4">

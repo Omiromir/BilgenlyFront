@@ -11,6 +11,7 @@ public interface IClassRepository
     Task<Assignment?> GetAssignmentByIdAsync(Guid assignmentId);
     Task<IEnumerable<Assignment>> GetAssignmentsByClassIdAsync(Guid classId);
     Task AddAsync(Class classEntity);
+    Task AddAssignmentAsync(Assignment assignment);
     Task SaveChangesAsync();
     void Remove(Class classEntity);
 }

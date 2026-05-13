@@ -59,6 +59,11 @@ export function buildTeacherStudentNameFromEmail(email: string) {
     .join(" ");
 }
 
+export function isTeacherStudentPlaceholderName(fullName: string) {
+  const normalized = fullName.trim().toLowerCase();
+  return normalized === "" || normalized === "invited student";
+}
+
 export function parseTeacherStudentEmails(value: string) {
   return value
     .split(/[\s,;]+/)

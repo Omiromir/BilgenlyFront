@@ -27,9 +27,6 @@ import { normalizeEmail } from "../../features/auth/validation";
 import { useNotifications } from "./NotificationsProvider";
 import {
   getNotificationRecipientUserIdByEmail,
-  getMockStudentById,
-  mockTeacherUser,
-  defaultMockStudentId,
   type MockDashboardUser,
 } from "../../features/dashboard/mock/mockUsers";
 import {
@@ -148,22 +145,34 @@ function mapAuthUserToDashboardUser(
     return null;
   }
 
-  const fallbackUser =
-    role === "teacher"
-      ? mockTeacherUser
-      : role === "student"
-        ? getMockStudentById(defaultMockStudentId)
-        : null;
-
   return {
     id: authUser.userId || `email:${authUser.email.trim().toLowerCase()}`,
     role,
     fullName: authUser.username,
     email: authUser.email,
     initials: getInitials(authUser.username),
-    joinedLabel: fallbackUser?.joinedLabel ?? "Joined recently",
-    location: fallbackUser?.location ?? "Location not set",
-    bio: fallbackUser?.bio ?? "Bilgenly user",
+    joinedLabel: "Join date unavailable",
+    location: "",
+    bio: "",
+  };
+}
+
+function buildFallbackDashboardUser(role: UserRole | null): MockDashboardUser | null {
+  if (role !== "teacher" && role !== "student") {
+    return null;
+  }
+
+  const fullName = role === "teacher" ? "Teacher" : "Student";
+
+  return {
+    id: `fallback-${role}`,
+    role,
+    fullName,
+    email: "",
+    initials: getInitials(fullName),
+    joinedLabel: "Join date unavailable",
+    location: "",
+    bio: "",
   };
 }
 
@@ -182,12 +191,7 @@ function readStoredAuthSnapshot() {
     }
   }
 
-  const fallbackUser =
-    role === "teacher"
-      ? mockTeacherUser
-      : role === "student"
-        ? getMockStudentById(defaultMockStudentId)
-        : null;
+  const fallbackUser = buildFallbackDashboardUser(role);
   const currentUser = authUser
     ? mapAuthUserToDashboardUser(authUser, role)
     : fallbackUser;
@@ -334,6 +338,10 @@ function sanitizeTeacherClassRecord(
         : "",
     subject:
       typeof teacherClass.subject === "string" ? teacherClass.subject : "",
+    teacherName:
+      typeof (teacherClass as { teacherName?: unknown }).teacherName === "string"
+        ? (teacherClass as { teacherName: string }).teacherName
+        : undefined,
     inviteCode:
       typeof teacherClass.inviteCode === "string"
         ? teacherClass.inviteCode
@@ -479,6 +487,7 @@ export function TeacherClassesProvider({
     Record<string, string[]>
   >(() => loadHiddenAssignments());
   const {
+    notifications,
     removeClassInvitationNotification,
     removeNotificationsForClass,
     syncClassInvitationMetadata,
@@ -486,7 +495,9 @@ export function TeacherClassesProvider({
     upsertClassInvitationNotification,
   } = useNotifications();
   const teacherActor =
-    role === "teacher" && currentUser ? currentUser : mockTeacherUser;
+    role === "teacher" && currentUser
+      ? currentUser
+      : buildFallbackDashboardUser("teacher")!;
   const studentUserId = currentUser?.role === "student" ? currentUser.id : null;
   const studentEmail =
     currentUser?.role === "student" ? currentUser.email : null;
@@ -507,6 +518,63 @@ export function TeacherClassesProvider({
       JSON.stringify(hiddenAssignmentIdsByClass),
     );
   }, [hiddenAssignmentIdsByClass]);
+
+  useEffect(() => {
+    if (role !== "student" || (!studentUserId && !studentEmail) || !notifications.length) {
+      return;
+    }
+
+    const normalizedStudentEmail = studentEmail ? normalizeEmail(studentEmail) : "";
+    const teacherNameByClassId = notifications.reduce<Record<string, string>>(
+      (accumulator, notification) => {
+        if (notification.type !== "class_invitation") {
+          return accumulator;
+        }
+
+        const matchesStudent =
+          (studentUserId && notification.recipientUserId === studentUserId) ||
+          (normalizedStudentEmail &&
+            normalizeEmail(notification.recipientEmail) === normalizedStudentEmail);
+
+        if (!matchesStudent) {
+          return accumulator;
+        }
+
+        const senderName = notification.senderName.trim();
+
+        if (senderName) {
+          accumulator[notification.relatedClassId] = senderName;
+        }
+
+        return accumulator;
+      },
+      {},
+    );
+
+    if (!Object.keys(teacherNameByClassId).length) {
+      return;
+    }
+
+    setClasses((current) => {
+      let hasChanges = false;
+
+      const nextClasses = current.map((teacherClass) => {
+        const nextTeacherName = teacherNameByClassId[teacherClass.id]?.trim();
+
+        if (!nextTeacherName || teacherClass.teacherName?.trim() === nextTeacherName) {
+          return teacherClass;
+        }
+
+        hasChanges = true;
+        return {
+          ...teacherClass,
+          teacherName: nextTeacherName,
+        };
+      });
+
+      return hasChanges ? nextClasses : current;
+    });
+  }, [notifications, role, studentEmail, studentUserId]);
 
   const refreshClasses = useCallback(async () => {
     if (!token || (role !== "teacher" && role !== "student")) {

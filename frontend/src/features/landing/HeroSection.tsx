@@ -1,10 +1,15 @@
 import { motion } from "motion/react";
 import { useNavigate } from "react-router";
+import { useAuth } from "../../app/providers/AuthProvider";
+import { getDashboardPathByRole } from "../../lib/auth";
 import { BrowserMockup } from "./BrowserMockup";
 import { LandingButton } from "./LandingButton";
 
 export function HeroSection() {
   const navigate = useNavigate();
+  const { isAuthenticated, role } = useAuth();
+  const primaryActionPath =
+    isAuthenticated && role ? getDashboardPathByRole(role) : "/signup";
 
   return (
     <section
@@ -41,9 +46,9 @@ export function HeroSection() {
             variant="primary"
             size="md"
             className="w-full max-w-[240px] rounded-[15px] sm:min-w-[169px]"
-            onClick={() => navigate("/signup")}
+            onClick={() => navigate(primaryActionPath)}
           >
-            Get started
+            {isAuthenticated ? "Go to dashboard" : "Get started"}
           </LandingButton>
           <LandingButton
             variant="secondary"

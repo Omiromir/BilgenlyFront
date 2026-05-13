@@ -1,32 +1,567 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
+import { useAuth } from "../../../app/providers/AuthProvider";
+import { useQuizLibrary } from "../../../app/providers/QuizLibraryProvider";
+import { useQuizSessions } from "../../../app/providers/QuizSessionProvider";
 import { useSettings } from "../../../app/providers/SettingsProvider";
-import type { ProfileSummary } from "../mock/sharedUi";
+import { useTeacherClasses } from "../../../app/providers/TeacherClassesProvider";
+import { getProfileInitials } from "../settings/userSettings";
+import type {
+  ProfileActivityItem,
+  ProfileField,
+  ProfileFormErrors,
+  ProfileFormValues,
+  ProfileStat,
+  ProfileSummary,
+} from "../profile/profileTypes";
 import { useDashboardViewer } from "./useDashboardViewer";
+import { useMyAnalytics } from "./useDashboardAnalytics";
+import {
+  formatQuizScore,
+  getQuizSessionResultSummary,
+} from "../../quiz-session/quizSessionUtils";
 
-export function useProfile(fallback: ProfileSummary) {
-    const dashboardViewer = useDashboardViewer();
-    const { settings } = useSettings();
+const MAX_BIO_LENGTH = 280;
+const MAX_AVATAR_FILE_SIZE_BYTES = 1024 * 1024;
+const ALLOWED_AVATAR_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+]);
 
-    return useMemo(() => {
-        if (!dashboardViewer) {
-            return fallback;
-        }
+interface ProfileActivityEvent {
+  title: string;
+  description: string;
+  timestamp: string;
+}
 
-        return {
-            ...fallback,
-            name: dashboardViewer.fullName,
-            email: dashboardViewer.email,
-            roleLabel: dashboardViewer.roleLabel,
-            initials: dashboardViewer.initials,
-            joinedLabel: dashboardViewer.joinedLabel,
-            location: settings.profile.country,
-            bio: settings.profile.bio,
-            personalInfo: [
-                { label: "Full Name", value: settings.profile.fullName },
-                { label: "Email", value: settings.profile.email },
-                { label: "Phone", value: settings.profile.phoneNumber },
-                { label: "Location", value: settings.profile.country },
-            ],
-        };
-    }, [dashboardViewer, fallback, settings.profile.bio, settings.profile.country, settings.profile.email, settings.profile.fullName, settings.profile.phoneNumber]);
+interface UseProfileResult {
+  profile: ProfileSummary | null;
+  formValues: ProfileFormValues;
+  formErrors: ProfileFormErrors;
+  isEditing: boolean;
+  isSaving: boolean;
+  isDirty: boolean;
+  canSave: boolean;
+  startEditing: () => void;
+  cancelEditing: () => void;
+  saveProfile: () => Promise<void>;
+  updateField: <TField extends keyof ProfileFormValues>(
+    field: TField,
+    value: ProfileFormValues[TField],
+  ) => void;
+  updateAvatarFile: (file: File | null) => void;
+}
+
+function buildRoleLabel(role: string | null | undefined) {
+  switch (role) {
+    case "teacher":
+      return "Teacher";
+    case "student":
+      return "Student";
+    case "moderator":
+      return "Moderator";
+    default:
+      return "User";
+  }
+}
+
+function buildProfileFormValues(profile: {
+  fullName: string;
+  email: string;
+  bio: string;
+  location: string;
+  avatarUrl: string | null;
+}): ProfileFormValues {
+  return {
+    fullName: profile.fullName,
+    email: profile.email,
+    bio: profile.bio,
+    location: profile.location,
+    avatarUrl: profile.avatarUrl,
+  };
+}
+
+function validateEmail(value: string) {
+  const normalizedValue = value.trim();
+
+  if (!normalizedValue) {
+    return "Email is required.";
+  }
+
+  const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailPattern.test(normalizedValue)
+    ? undefined
+    : "Enter a valid email address.";
+}
+
+function validateProfileForm(values: ProfileFormValues): ProfileFormErrors {
+  return {
+    fullName: values.fullName.trim() ? undefined : "Full name is required.",
+    email: validateEmail(values.email),
+    bio:
+      values.bio.trim().length > MAX_BIO_LENGTH
+        ? `Bio must be ${MAX_BIO_LENGTH} characters or fewer.`
+        : undefined,
+  };
+}
+
+function hasErrors(errors: ProfileFormErrors) {
+  return Object.values(errors).some(Boolean);
+}
+
+function formatProfileValue(value: string | null | undefined, fallback = "Not provided") {
+  return value?.trim() ? value.trim() : fallback;
+}
+
+function parseIsoTimestamp(timestamp: string) {
+  const parsed = new Date(timestamp);
+  return Number.isNaN(parsed.getTime()) ? 0 : parsed.getTime();
+}
+
+function sortActivityEvents(events: ProfileActivityEvent[]) {
+  return [...events].sort(
+    (left, right) => parseIsoTimestamp(right.timestamp) - parseIsoTimestamp(left.timestamp),
+  );
+}
+
+function buildTeacherStats(
+  ownedQuizCount: number,
+  activeClassCount: number,
+  assignedQuizCount: number,
+  joinedStudentCount: number,
+): ProfileStat[] {
+  return [
+    { label: "Quizzes Created", value: String(ownedQuizCount), icon: "book" },
+    { label: "Classes Active", value: String(activeClassCount), icon: "badge" },
+    { label: "Assigned Quizzes", value: String(assignedQuizCount), icon: "trend" },
+    { label: "Joined Students", value: String(joinedStudentCount), icon: "clock" },
+  ];
+}
+
+function buildStudentStats(
+  completedQuizCount: number,
+  joinedClassCount: number,
+  averageScore: number | null,
+  badgesEarned: number,
+): ProfileStat[] {
+  return [
+    { label: "Quizzes Completed", value: String(completedQuizCount), icon: "book" },
+    { label: "Classes Joined", value: String(joinedClassCount), icon: "badge" },
+    {
+      label: "Average Score",
+      value: averageScore === null ? "--" : formatQuizScore(averageScore),
+      icon: "trend",
+    },
+    { label: "Badges Earned", value: String(badgesEarned), icon: "clock" },
+  ];
+}
+
+function buildTeacherActivity(
+  teacherName: string,
+  quizzes: {
+    id: string;
+    title: string;
+    updatedAt: string;
+  }[],
+  classes: {
+    id: string;
+    name: string;
+    updatedAt: string;
+    assignedQuizzes: {
+      assignmentId: string;
+      title: string;
+      assignedAt: string;
+    }[];
+  }[],
+  formatDateTime: (value: string | Date) => string,
+): ProfileActivityItem[] {
+  const events = sortActivityEvents([
+    ...quizzes.map((quiz) => ({
+      title: "Updated quiz",
+      description: quiz.title,
+      timestamp: quiz.updatedAt,
+    })),
+    ...classes.map((teacherClass) => ({
+      title: "Updated class",
+      description: teacherClass.name,
+      timestamp: teacherClass.updatedAt,
+    })),
+    ...classes.flatMap((teacherClass) =>
+      teacherClass.assignedQuizzes.map((assignment) => ({
+        title: "Assigned quiz",
+        description: `${assignment.title} in ${teacherClass.name}`,
+        timestamp: assignment.assignedAt,
+      })),
+    ),
+  ]).slice(0, 5);
+
+  if (!events.length) {
+    return [
+      {
+        title: "No activity yet",
+        description: `${teacherName} has not created classes or quizzes yet.`,
+        time: "Activity will appear here as you work.",
+      },
+    ];
+  }
+
+  return events.map((event) => ({
+    title: event.title,
+    description: event.description,
+    time: formatDateTime(event.timestamp),
+  }));
+}
+
+function buildStudentActivity(
+  completedAttempts: {
+    attemptId: string;
+    quizTitle: string;
+    score: number;
+    dateTaken: string;
+  }[],
+  joinedClasses: {
+    classId: string;
+    className: string;
+    joinedAt: string;
+  }[],
+  formatDateTime: (value: string | Date) => string,
+): ProfileActivityItem[] {
+  const events = sortActivityEvents([
+    ...completedAttempts.map((attempt) => ({
+      title: "Completed quiz",
+      description: `${attempt.quizTitle} - ${formatQuizScore(attempt.score)}`,
+      timestamp: attempt.dateTaken,
+    })),
+    ...joinedClasses.map((joinedClass) => ({
+      title: "Joined class",
+      description: joinedClass.className,
+      timestamp: joinedClass.joinedAt,
+    })),
+  ]).slice(0, 5);
+
+  if (!events.length) {
+    return [
+      {
+        title: "No activity yet",
+        description: "Activity will appear after you join classes or finish quizzes.",
+        time: "Start with any quiz or class invite.",
+      },
+    ];
+  }
+
+  return events.map((event) => ({
+    title: event.title,
+    description: event.description,
+    time: formatDateTime(event.timestamp),
+  }));
+}
+
+export function useProfile(): UseProfileResult {
+  const { role } = useAuth();
+  const dashboardViewer = useDashboardViewer();
+  const {
+    settings,
+    isHydrated,
+    saveProfileSettings,
+    formatDateTime,
+  } = useSettings();
+  const { classes } = useTeacherClasses();
+  const { quizzes } = useQuizLibrary();
+  const { getCompletedSessionsForRole } = useQuizSessions();
+  const analyticsState = useMyAnalytics(role === "student");
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const joinedTeacherClasses = useMemo(
+    () =>
+      role === "teacher"
+        ? classes
+        : [],
+    [classes, role],
+  );
+  const joinedStudentClasses = useMemo(
+    () =>
+      role === "student"
+        ? classes.filter((teacherClass) =>
+            teacherClass.students.some((student) => student.status === "joined"),
+          )
+        : [],
+    [classes, role],
+  );
+  const teacherOwnedQuizzes = useMemo(() => {
+    if (role !== "teacher" || !dashboardViewer?.fullName) {
+      return [];
+    }
+
+    return quizzes.filter(
+      (quiz) =>
+        quiz.ownerRole === "teacher" &&
+        quiz.ownerName.trim().toLowerCase() ===
+          dashboardViewer.fullName.trim().toLowerCase(),
+    );
+  }, [dashboardViewer?.fullName, quizzes, role]);
+  const completedSessions = getCompletedSessionsForRole(role === "teacher" ? "teacher" : "student");
+
+  const persistedProfile = useMemo<ProfileSummary | null>(() => {
+    if (!dashboardViewer) {
+      return null;
+    }
+
+    const joinedLabel = "Join date unavailable";
+    const location = settings.profile.country;
+    const fullName = settings.profile.fullName;
+    const email = settings.profile.email;
+    const bio = settings.profile.bio.trim();
+    const avatarUrl = settings.profile.avatarUrl;
+    const personalInfo: ProfileField[] = [
+      { label: "Full Name", value: formatProfileValue(fullName) },
+      { label: "Email", value: formatProfileValue(email) },
+      { label: "Location", value: formatProfileValue(location) },
+    ];
+
+    if (role === "teacher") {
+      const joinedStudentCount = joinedTeacherClasses.reduce(
+        (total, teacherClass) =>
+          total +
+          teacherClass.students.filter((student) => student.status === "joined").length,
+        0,
+      );
+      const assignedQuizCount = joinedTeacherClasses.reduce(
+        (total, teacherClass) => total + teacherClass.assignedQuizzes.length,
+        0,
+      );
+
+      return {
+        name: fullName,
+        roleLabel: buildRoleLabel(role),
+        email,
+        joinedLabel,
+        location: formatProfileValue(location),
+        bio: bio || "Add a short bio from your profile or settings page.",
+        initials: getProfileInitials(fullName),
+        avatarUrl,
+        stats: buildTeacherStats(
+          teacherOwnedQuizzes.length,
+          joinedTeacherClasses.filter((teacherClass) => teacherClass.status === "active").length,
+          assignedQuizCount,
+          joinedStudentCount,
+        ),
+        activity: buildTeacherActivity(
+          fullName,
+          teacherOwnedQuizzes.map((quiz) => ({
+            id: quiz.id,
+            title: quiz.title,
+            updatedAt: quiz.updatedAt,
+          })),
+          joinedTeacherClasses.map((teacherClass) => ({
+            id: teacherClass.id,
+            name: teacherClass.name,
+            updatedAt: teacherClass.updatedAt,
+            assignedQuizzes: teacherClass.assignedQuizzes.map((assignment) => ({
+              assignmentId: assignment.assignmentId,
+              title: assignment.title,
+              assignedAt: assignment.assignedAt,
+            })),
+          })),
+          formatDateTime,
+        ),
+        personalInfo,
+      };
+    }
+
+    const analyticsAttempts = analyticsState.data?.attempts ?? [];
+    const completedQuizCount = analyticsAttempts.length || completedSessions.length;
+    const averageScore =
+      analyticsAttempts.length > 0
+        ? Math.round(analyticsState.data?.averageScore ?? 0)
+        : completedSessions.length
+          ? Math.round(
+              completedSessions.reduce((total, session) => {
+                return total + getQuizSessionResultSummary(session).percentage;
+              }, 0) / completedSessions.length,
+            )
+          : null;
+    const joinedClassCount = joinedStudentClasses.length;
+    const studentActivityAttempts =
+      analyticsAttempts.length > 0
+        ? analyticsAttempts.map((attempt) => ({
+            attemptId: attempt.attemptId,
+            quizTitle: attempt.quizTitle,
+            score: attempt.score,
+            dateTaken: attempt.dateTaken,
+          }))
+        : completedSessions.map((session) => ({
+            attemptId: session.id,
+            quizTitle: session.quiz.title,
+            score: getQuizSessionResultSummary(session).percentage,
+            dateTaken: session.finishedAt ?? session.updatedAt,
+          }));
+
+    return {
+      name: fullName,
+      roleLabel: buildRoleLabel(role),
+      email,
+      joinedLabel,
+      location: formatProfileValue(location),
+      bio: bio || "Add a short bio from your profile or settings page.",
+      initials: getProfileInitials(fullName),
+      avatarUrl,
+      stats: buildStudentStats(
+        completedQuizCount,
+        joinedClassCount,
+        averageScore,
+        0,
+      ),
+      activity: buildStudentActivity(
+        studentActivityAttempts,
+        joinedStudentClasses.map((teacherClass) => {
+          const joinedStudent =
+            teacherClass.students.find((student) => student.status === "joined") ??
+            teacherClass.students[0];
+
+          return {
+            classId: teacherClass.id,
+            className: teacherClass.name,
+            joinedAt: joinedStudent?.joinedAt ?? teacherClass.updatedAt,
+          };
+        }),
+        formatDateTime,
+      ),
+      personalInfo,
+    };
+  }, [
+    analyticsState.data?.attempts,
+    analyticsState.data?.averageScore,
+    completedSessions,
+    dashboardViewer,
+    formatDateTime,
+    joinedStudentClasses,
+    joinedTeacherClasses,
+    role,
+    settings.profile.avatarUrl,
+    settings.profile.bio,
+    settings.profile.country,
+    settings.profile.dateFormat,
+    settings.profile.email,
+    settings.profile.fullName,
+    settings.profile.language,
+    settings.profile.phoneNumber,
+    settings.profile.timeZone,
+    teacherOwnedQuizzes,
+  ]);
+
+  const persistedFormValues = useMemo(
+    () =>
+      buildProfileFormValues({
+        fullName: settings.profile.fullName,
+        email: settings.profile.email,
+        bio: settings.profile.bio,
+        location: settings.profile.country,
+        avatarUrl: settings.profile.avatarUrl,
+      }),
+    [
+      settings.profile.avatarUrl,
+      settings.profile.bio,
+      settings.profile.country,
+      settings.profile.email,
+      settings.profile.fullName,
+    ],
+  );
+  const [formValues, setFormValues] = useState<ProfileFormValues>(persistedFormValues);
+
+  useEffect(() => {
+    if (!isEditing) {
+      setFormValues(persistedFormValues);
+    }
+  }, [isEditing, persistedFormValues]);
+
+  const formErrors = useMemo(() => validateProfileForm(formValues), [formValues]);
+  const isDirty =
+    JSON.stringify(formValues) !== JSON.stringify(persistedFormValues);
+  const canSave = isHydrated && isDirty && !hasErrors(formErrors) && !isSaving;
+
+  const saveProfile = async () => {
+    if (!canSave) {
+      if (hasErrors(formErrors)) {
+        toast.error("Please fix the highlighted profile fields.");
+      }
+      return;
+    }
+
+    setIsSaving(true);
+
+    try {
+      saveProfileSettings({
+        ...settings.profile,
+        fullName: formValues.fullName.trim(),
+        email: formValues.email.trim(),
+        bio: formValues.bio.trim(),
+        country: formValues.location.trim(),
+        avatarUrl: formValues.avatarUrl,
+      });
+      setIsEditing(false);
+      toast.success("Profile updated.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return {
+    profile: persistedProfile,
+    formValues,
+    formErrors,
+    isEditing,
+    isSaving,
+    isDirty,
+    canSave,
+    startEditing: () => setIsEditing(true),
+    cancelEditing: () => {
+      setFormValues(persistedFormValues);
+      setIsEditing(false);
+    },
+    saveProfile,
+    updateField: (field, value) => {
+      setFormValues((current) => ({
+        ...current,
+        [field]: value,
+      } as ProfileFormValues));
+    },
+    updateAvatarFile: (file) => {
+      if (!file) {
+        setFormValues((current) => ({
+          ...current,
+          avatarUrl: persistedFormValues.avatarUrl,
+        }));
+        return;
+      }
+
+      if (!ALLOWED_AVATAR_TYPES.has(file.type)) {
+        toast.error("Use a PNG, JPG, WEBP, or GIF image for your avatar.");
+        return;
+      }
+
+      if (file.size > MAX_AVATAR_FILE_SIZE_BYTES) {
+        toast.error("Avatar image must be 1 MB or smaller.");
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = () => {
+        const nextAvatarUrl =
+          typeof reader.result === "string" ? reader.result : null;
+
+        setFormValues((current) => ({
+          ...current,
+          avatarUrl: nextAvatarUrl,
+        }));
+        setIsEditing(true);
+      };
+      reader.onerror = () => {
+        toast.error("Unable to read that image. Try a different file.");
+      };
+      reader.readAsDataURL(file);
+    },
+  };
 }

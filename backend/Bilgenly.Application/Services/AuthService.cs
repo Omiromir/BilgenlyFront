@@ -47,7 +47,8 @@ public class AuthService
             Token = GenerateToken(user),
             Username = user.Username,
             Email = user.Email,
-            Role = user.Role.ToString()
+            Role = user.Role.ToString(),
+            OnboardingCompleted = true,
         }, null);
     }
 
@@ -65,7 +66,8 @@ public class AuthService
             Token = GenerateToken(user),
             Username = user.Username,
             Email = user.Email,
-            Role = user.Role.ToString()
+            Role = user.Role.ToString(),
+            OnboardingCompleted = true,
         }, null);
     }
 
@@ -130,7 +132,8 @@ public class AuthService
             Token = GenerateToken(user),
             Username = user.Username,
             Email = user.Email,
-            Role = user.Role.ToString()
+            Role = user.Role.ToString(),
+            OnboardingCompleted = true,
         }, null);
     }
     

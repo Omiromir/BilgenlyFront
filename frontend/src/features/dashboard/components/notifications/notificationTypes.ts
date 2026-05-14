@@ -31,6 +31,7 @@ interface DashboardNotificationBase {
 export interface ClassInvitationNotification extends DashboardNotificationBase {
   type: "class_invitation";
   actionType: "class_invitation";
+  inviteCode: string;
   status: ClassInvitationNotificationStatus;
 }
 
@@ -53,6 +54,7 @@ export interface ClassInvitationNotificationInput {
   recipientEmail: string;
   relatedClassId: string;
   relatedClassName: string;
+  inviteCode: string;
   senderName: string;
   senderEmail: string;
   studentId: string;

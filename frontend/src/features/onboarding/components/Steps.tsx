@@ -1,7 +1,7 @@
 import type { Dispatch, SetStateAction } from "react";
 import {
   experienceOptions,
-  goalOptions,
+  getGoalOptionsForRole,
   paceOptions,
   recommendations,
   reminderTimes,
@@ -19,6 +19,8 @@ interface ChoiceStepProps extends SharedStepProps {
 }
 
 interface ReminderStepProps extends SharedStepProps {
+  onContinue: () => void;
+  onSkip: () => void;
   reminderTime: string;
   setReminderTime: Dispatch<SetStateAction<string>>;
 }
@@ -82,7 +84,7 @@ export function RoleStep({ go, selected, setSelected }: ChoiceStepProps) {
     <div>
       <h2 className="step-title">Which describes you best?</h2>
       <p className="step-subtitle">
-        We&apos;ll set up the right dashboard and tools for your role.
+        Choose your role to continue. We&apos;ll set up the right dashboard and tools for you.
       </p>
       <ChoiceList
         options={roleOptions}
@@ -103,6 +105,8 @@ export function RoleStep({ go, selected, setSelected }: ChoiceStepProps) {
 }
 
 export function GoalStep({ go, selected, setSelected }: ChoiceStepProps) {
+  const goalOptions = getGoalOptionsForRole(selected.role);
+
   return (
     <div>
       <h2 className="step-title">What&apos;s your main goal?</h2>
@@ -186,7 +190,8 @@ export function PaceStep({ go, selected, setSelected }: ChoiceStepProps) {
 }
 
 export function ReminderStep({
-  go,
+  onContinue,
+  onSkip,
   reminderTime,
   setReminderTime,
 }: ReminderStepProps) {
@@ -217,12 +222,12 @@ export function ReminderStep({
         className="btn-primary"
         style={{ marginBottom: 12 }}
         type="button"
-        onClick={() => go("loading")}
+        onClick={onContinue}
       >
         Save and continue
       </button>
       <div style={{ textAlign: "center" }}>
-        <button className="skip-link" type="button" onClick={() => go("loading")}>
+        <button className="skip-link" type="button" onClick={onSkip}>
           I&apos;ll do this later
         </button>
       </div>
@@ -345,7 +350,7 @@ export function RecommendationsStep({ onContinue, isLoading, error }: Recommenda
                 onClick={onContinue}
                 disabled={isLoading}
             >
-                {isLoading ? "Saving..." : "Go to my dashboard"}
+                {isLoading ? "Creating account..." : "Complete onboarding"}
             </button>
         </div>
     );

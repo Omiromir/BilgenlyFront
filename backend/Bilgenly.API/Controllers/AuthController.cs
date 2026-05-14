@@ -44,7 +44,7 @@ public class AuthController  : ControllerBase
         var username = User.FindFirst(ClaimTypes.Name)?.Value;
         var role  = User.FindFirst(ClaimTypes.Role)?.Value;
 
-        return Ok(new { userId, email, username, role });
+        return Ok(new { userId, email, username, role, onboardingCompleted = true });
     }
     [HttpPatch("role")]
     [Authorize]

@@ -129,6 +129,7 @@ public class ClassService
 
         var quiz = await _quizRepository.GetByIdAsync(dto.QuizId);
         if (quiz is null) return (null, "Quiz not found");
+        if (quiz.UserId != teacherId) return (null, "You can only assign quizzes that belong to your account.");
 
         var alreadyAssigned = classEntity.Assignments
             .Any(a => a.QuizId == dto.QuizId && a.Status == "active");
@@ -213,9 +214,19 @@ public class ClassService
         }).ToList(),
         Quizzes = c.Assignments.Select(a => new ClassQuizDto
         {
+            AssignmentId = a.Id,
             QuizId = a.QuizId,
             QuizTitle = a.Quiz?.Title ?? "",
-            AssignedAt = a.AssignedAt
+            Topic = a.Quiz?.Topic ?? "",
+            QuestionCount = a.Quiz?.Questions.Count ?? 0,
+            AssignedAt = a.AssignedAt,
+            Deadline = a.Deadline,
+            MaxAttempts = a.MaxAttempts,
+            AllowLateSubmissions = a.AllowLateSubmissions,
+            AssignedBy = a.AssignedBy,
+            AssignedByName = a.AssignedByName,
+            Visibility = a.Visibility,
+            Status = a.Status,
         }).ToList()
     };
 }

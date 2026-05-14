@@ -157,7 +157,9 @@ export function QuizSessionSidebar({
                   isCurrent
                     ? "border border-[var(--dashboard-brand-bright)] bg-[var(--dashboard-surface-elevated)] text-[var(--dashboard-brand-bright)] shadow-[0_10px_24px_rgba(33,145,246,0.18)]"
                     : questionState.submitted
-                      ? "bg-[linear-gradient(180deg,#159d8b_0%,#128474_100%)] text-white"
+                      ? questionState.isCorrect
+                        ? "bg-[linear-gradient(180deg,#159d8b_0%,#128474_100%)] text-white"
+                        : "bg-[var(--dashboard-danger)] text-white"
                       : isUnlocked
                         ? "bg-[var(--dashboard-brand-soft-alt)] text-[var(--dashboard-brand-bright)] hover:bg-[var(--dashboard-surface-accent)]"
                         : "bg-[var(--dashboard-surface-muted)] text-[var(--dashboard-text-faint)]",

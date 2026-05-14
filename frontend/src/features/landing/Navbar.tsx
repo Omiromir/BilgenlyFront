@@ -3,19 +3,18 @@ import { Link, useNavigate } from "react-router";
 import { LandingButton } from "./LandingButton";
 import { BilgenlyLogo } from "../../components/shared/BilgenlyLogo";
 import { useAuth } from "../../app/providers/AuthProvider";
-import { getDashboardPathByRole } from "../../lib/auth";
 
 export function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const navigate = useNavigate();
-  const { isAuthenticated, role } = useAuth();
+  const { defaultRedirectPath, isAuthenticated, onboardingCompleted } = useAuth();
 
   const handleAuthNavigation = (path: "/signin" | "/signup") => {
     setIsMenuOpen(false);
 
-    if (isAuthenticated && role) {
-      navigate(getDashboardPathByRole(role));
+    if (isAuthenticated) {
+      navigate(defaultRedirectPath);
       return;
     }
 
@@ -86,7 +85,7 @@ export function Navbar() {
               className="hidden md:inline-flex"
               onClick={() => handleAuthNavigation("/signup")}
             >
-              Open dashboard
+              {onboardingCompleted ? "Open dashboard" : "Continue setup"}
             </LandingButton>
           ) : (
             <>
@@ -196,7 +195,7 @@ export function Navbar() {
                 className="!h-10 !w-full !px-4 !text-[14px]"
                 onClick={() => handleAuthNavigation("/signup")}
               >
-                Open dashboard
+                {onboardingCompleted ? "Open dashboard" : "Continue setup"}
               </LandingButton>
             ) : (
               <>

@@ -4,7 +4,6 @@ import { toast } from "sonner";
 import { signIn } from "../api";
 import { usePasswordVisibility } from "../hooks";
 import type { SignInFormErrors, SignInFormValues } from "../types";
-import type { UserRole } from "../../../lib/auth";
 import {
   normalizeEmail,
   validateEmail,
@@ -13,10 +12,11 @@ import {
 } from "../validation";
 import { getDashboardPathByRole } from "../../../lib/auth";
 import {useAuth} from "../../../app/providers/AuthProvider";
+import { clearOnboardingDraft, clearRegistrationDraft } from "../registrationDraft";
 
 export function SignInForm() {
   const navigate = useNavigate();
-  const { signInAsRole } = useAuth();
+  const { authenticate } = useAuth();
   const { inputType, isVisible, toggleVisibility } = usePasswordVisibility();
   const [values, setValues] = useState<SignInFormValues>({
     email: "",
@@ -91,14 +91,16 @@ export function SignInForm() {
       try {
           setIsSubmitting(true);
           const result = await signIn({ ...normalizedValues, rememberMe });
-          signInAsRole(result.role.toLowerCase() as UserRole, result.token, {
-            userId: result.userId ?? "",
-            username: result.username,
-            email: result.email,
-            role: result.role,
-          });
-          const dashboardPath = getDashboardPathByRole(result.role.toLowerCase());
-          navigate(dashboardPath);
+          const authenticatedUser = authenticate(result);
+          const normalizedRole = authenticatedUser.role.toLowerCase();
+
+          clearRegistrationDraft();
+          clearOnboardingDraft();
+          navigate(
+            authenticatedUser.onboardingCompleted
+              ? getDashboardPathByRole(normalizedRole as "teacher" | "student" | "moderator")
+              : "/onboarding",
+          );
       } catch (error) {
           const message = error instanceof Error ? error.message : "Login failed";
           setServerError(message);
@@ -211,9 +213,10 @@ export function SignInForm() {
       <button
         className="auth-secondary"
         type="button"
-        onClick={() => navigate("/onboarding")}
+        disabled
+        aria-disabled="true"
       >
-        Sign In With Google
+        Google sign-in unavailable
       </button>
     </form>
   );

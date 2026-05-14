@@ -16,7 +16,12 @@ public class ClassRepository : IClassRepository
 
     public void Remove(Class classEntity)
         => _context.Classes.Remove(classEntity);
+    public async Task<ClassStudent?> GetClassStudentAsync(Guid classId, Guid studentId)
+        => await _context.ClassStudents
+            .FirstOrDefaultAsync(cs => cs.ClassId == classId && cs.StudentId == studentId);
 
+    public void RemoveClassStudent(ClassStudent classStudent)
+        => _context.ClassStudents.Remove(classStudent);
     public async Task<Class?> GetByIdAsync(Guid id)
         => await _context.Classes
             .Include(c => c.Teacher)

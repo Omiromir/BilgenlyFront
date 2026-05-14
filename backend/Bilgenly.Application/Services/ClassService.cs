@@ -98,6 +98,25 @@ public class ClassService
         await _classRepository.SaveChangesAsync();
         return (true, null);
     }
+    public async Task<(bool Success, string? Error)> RemoveStudentAsync(
+        Guid classId, Guid studentId, Guid teacherId)
+    {
+        var classEntity = await _classRepository.GetByIdAsync(classId);
+        if (classEntity is null)
+            return (false, "Class not found");
+
+        if (classEntity.TeacherId != teacherId)
+            return (false, "You are not the teacher of this class");
+
+        var classStudent = await _classRepository.GetClassStudentAsync(classId, studentId);
+        if (classStudent is null)
+            return (false, "Student is not in this class");
+
+        _classRepository.RemoveClassStudent(classStudent);
+        await _classRepository.SaveChangesAsync();
+
+        return (true, null);
+    }
     public async Task<(ClassDto? Result, string? Error)> JoinClassAsync(
         string inviteCode, Guid studentId)
     {

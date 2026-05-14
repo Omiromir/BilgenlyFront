@@ -1,18 +1,20 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router";
+import { toast } from "sonner";
 import { useQuizLibrary } from "../../../app/providers/QuizLibraryProvider";
 import { useQuizSessions } from "../../../app/providers/QuizSessionProvider";
+import { useStudentAttempts } from "../../../app/providers/StudentAttemptsProvider";
 import { useTeacherClasses } from "../../../app/providers/TeacherClassesProvider";
 import {
   getAssignmentLevelStatus,
-  toAssignmentConstraintSource,
 } from "../../../features/assignments/assignmentConstraints";
-import { useAssignmentConstraints } from "../../../features/assignments/useAssignmentConstraints";
+import { buildAssignedQuizAvailability } from "../../../features/assignments/assignedQuizAvailability";
 import {
   DashboardButton,
   DashboardSurface,
   dashboardPageNarrowClassName,
 } from "../../../features/dashboard/components/DashboardPrimitives";
+import { buildCompletedSessionFromAttempt } from "../../../features/quiz-session/api/attemptAdapters";
 import { QuizPlayer } from "../../../features/quiz-session/components/QuizPlayer";
 import { QuizResultsSummary } from "../../../features/quiz-session/components/QuizResultsSummary";
 import { QuizReviewList } from "../../../features/quiz-session/components/QuizReviewList";
@@ -77,6 +79,12 @@ export function QuizSessionPage({ viewerRole }: QuizSessionPageProps) {
     getSessionById,
     sessions,
   } = useQuizSessions();
+  const {
+    attempts,
+    isLoading: attemptsLoading,
+    error: attemptsError,
+    refreshAttempts,
+  } = useStudentAttempts();
   const navigationState = (location.state as QuizLaunchNavigationState | null) ?? null;
   const assignmentId = searchParams.get("assignment");
   const sessionId = searchParams.get("session");
@@ -88,31 +96,83 @@ export function QuizSessionPage({ viewerRole }: QuizSessionPageProps) {
   const latestInProgressSession = quiz
     ? getLatestInProgressSession(quiz.id, viewerRole, assignmentId)
     : undefined;
-  const latestCompletedSession = quiz
-    ? getLatestCompletedSession(quiz.id, viewerRole, assignmentId)
-    : undefined;
-  const assignmentConstraints = useAssignmentConstraints({
-    assignment: assignmentContext
-      ? toAssignmentConstraintSource(assignmentContext)
-      : null,
-    sessions,
-    viewerRole,
-    refreshIntervalMs: 1000,
-  });
+  const backendAssignmentState = useMemo(
+    () =>
+      quiz && viewerRole === "student" && assignmentContext
+        ? buildAssignedQuizAvailability({
+            quizId: quiz.id,
+            assignmentId,
+            maxAttempts: assignmentContext.maxAttempts,
+            deadline: assignmentContext.deadline,
+            allowLateSubmissions: assignmentContext.allowLateSubmissions,
+            attempts,
+            sessions,
+            isLoading: attemptsLoading,
+            error: attemptsError,
+          })
+        : null,
+    [assignmentContext, assignmentId, attempts, attemptsError, attemptsLoading, quiz, sessions, viewerRole],
+  );
+  const requestedCompletedAttempt = useMemo(
+    () =>
+      sessionId && quiz
+        ? attempts.find(
+            (attempt) =>
+              attempt.id === sessionId &&
+              attempt.isCompleted &&
+              attempt.quizId === quiz.id,
+          ) ?? null
+        : null,
+    [attempts, quiz, sessionId],
+  );
+  const fallbackCompletedAttempt = useMemo(
+    () =>
+      backendAssignmentState?.latestCompletedAttempt && quiz
+        ? buildCompletedSessionFromAttempt(
+            quiz,
+            backendAssignmentState.latestCompletedAttempt,
+            {
+              assignmentContext,
+              attemptNumber: backendAssignmentState.attemptsUsed,
+              sourceLabel: navigationState?.launchSourceLabel ?? quiz.sourceLabel,
+            },
+          )
+        : null,
+    [assignmentContext, backendAssignmentState, navigationState?.launchSourceLabel, quiz],
+  );
+  const requestedCompletedSession = useMemo(
+    () =>
+      requestedCompletedAttempt && quiz
+        ? buildCompletedSessionFromAttempt(
+            quiz,
+            requestedCompletedAttempt,
+            {
+              assignmentContext,
+              sourceLabel: navigationState?.launchSourceLabel ?? quiz.sourceLabel,
+            },
+          )
+        : null,
+    [assignmentContext, navigationState?.launchSourceLabel, quiz, requestedCompletedAttempt],
+  );
+  const latestCompletedSession =
+    (quiz ? getLatestCompletedSession(quiz.id, viewerRole, assignmentId) : undefined) ??
+    fallbackCompletedAttempt ??
+    undefined;
+  const assignmentConstraints = backendAssignmentState;
   const activeSession =
     sessionId && quiz
       ? (() => {
           const matchingSession = getSessionById(sessionId);
 
           if (
-            !matchingSession ||
-            matchingSession.quizId !== quiz.id ||
-            matchingSession.viewerRole !== viewerRole
+            matchingSession &&
+            matchingSession.quizId === quiz.id &&
+            matchingSession.viewerRole === viewerRole
           ) {
-            return undefined;
+            return matchingSession;
           }
 
-          return matchingSession;
+          return requestedCompletedSession ?? undefined;
         })()
       : undefined;
   const resolvedBackLink = useMemo(() => {
@@ -144,6 +204,13 @@ export function QuizSessionPage({ viewerRole }: QuizSessionPageProps) {
       state: undefined,
     };
   }, [assignmentContext, navigationState, viewerRole]);
+
+  // Refetch backend attempts when quiz is completed to update attempt counts
+  useEffect(() => {
+    if (viewerRole === "student" && activeSession?.status === "completed") {
+      void refreshAttempts();
+    }
+  }, [activeSession?.status, activeSession?.finishedAt, refreshAttempts, viewerRole]);
 
   if (!quiz) {
     return (
@@ -184,23 +251,36 @@ export function QuizSessionPage({ viewerRole }: QuizSessionPageProps) {
     );
   };
 
-  const handleStart = () => {
+  const handleStart = async () => {
     if (assignmentConstraints && !assignmentConstraints.canStart) {
       if (assignmentConstraints.canResume && latestInProgressSession) {
         openSession(latestInProgressSession.id);
+      } else if (assignmentConstraints.status === "attempts_exhausted") {
+        toast.error("You have used all attempts for this quiz.");
+      } else if (assignmentConstraints.deadlinePassed) {
+        toast.error("The deadline for this quiz has passed.");
       }
 
       return;
     }
 
-    const nextSession = createSession(quiz, {
-      viewerRole,
-      sourceType: launchSourceType,
-      sourceLabel: launchSourceLabel,
-      assignmentContext,
-    });
+    try {
+      const nextSession = await createSession(quiz, {
+        viewerRole,
+        sourceType: launchSourceType,
+        sourceLabel: launchSourceLabel,
+        assignmentContext,
+      });
 
-    openSession(nextSession.id);
+      openSession(nextSession.id);
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Unable to start that quiz.",
+      );
+      if (viewerRole === "student") {
+        void refreshAttempts();
+      }
+    }
   };
 
   const handleResume = () => {
@@ -231,7 +311,7 @@ export function QuizSessionPage({ viewerRole }: QuizSessionPageProps) {
         <div className="space-y-6">
           <QuizResultsSummary
             session={activeSession}
-            onRetake={assignmentConstraints?.canStart ? handleStart : undefined}
+          onRetake={assignmentConstraints?.canStart ? handleStart : undefined}
             returnLink={resolvedBackLink}
             secondaryLink={
               viewerRole === "student"

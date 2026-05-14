@@ -37,6 +37,7 @@ import {
   TeacherClassesSearchEmptyState,
 } from "../../../features/dashboard/components/classes/TeacherClassesComponents";
 import type {
+  TeacherClassAssignedQuiz,
   TeacherClassFormValues,
   TeacherClassRecord,
   TeacherClassStatus,
@@ -45,9 +46,11 @@ import { isDraftQuiz } from "../../../features/dashboard/components/quiz-library
 import { matchesTeacherClassSearch } from "../../../features/dashboard/components/classes/teacherClassesUtils";
 import { useAssignmentInsights } from "../../../features/dashboard/hooks/useDashboardAnalytics";
 import { useDashboardPageMeta } from "../../../features/dashboard/hooks/useDashboardPageMeta";
+import { useAuth } from "../../../app/providers/AuthProvider";
 
 export function TeacherClassesPage() {
   const meta = useDashboardPageMeta();
+  const { currentUser } = useAuth();
   const {
     classes,
     isLoading,
@@ -65,6 +68,10 @@ export function TeacherClassesPage() {
   const [isAddStudentsDialogOpen, setIsAddStudentsDialogOpen] = useState(false);
   const [isAssignQuizDialogOpen, setIsAssignQuizDialogOpen] = useState(false);
   const [editingClass, setEditingClass] = useState<TeacherClassRecord | null>(null);
+  const [createDialogError, setCreateDialogError] = useState<string | null>(null);
+  const [editDialogError, setEditDialogError] = useState<string | null>(null);
+  const [isCreatingClass, setIsCreatingClass] = useState(false);
+  const [isSavingClass, setIsSavingClass] = useState(false);
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | TeacherClassStatus>("all");
@@ -91,23 +98,34 @@ export function TeacherClassesPage() {
   }, [selectedClassId]);
 
   const handleCreateClass = async (values: TeacherClassFormValues) => {
-    try {
-      const nextClass = await createClass(values);
-      setSelectedClassId(nextClass.id);
-      setIsCreateDialogOpen(false);
-    } catch (nextError) {
-      toast.error(
-        nextError instanceof Error ? nextError.message : "Unable to create class.",
-      );
-    }
-  };
-
-  const handleEditClass = async (values: TeacherClassFormValues) => {
-    if (!editingClass) {
+    if (isCreatingClass) {
       return;
     }
 
     try {
+      setIsCreatingClass(true);
+      setCreateDialogError(null);
+      const nextClass = await createClass(values);
+      setSelectedClassId(nextClass.id);
+      setIsCreateDialogOpen(false);
+    } catch (nextError) {
+      const message =
+        nextError instanceof Error ? nextError.message : "Unable to create class.";
+      setCreateDialogError(message);
+      toast.error(message);
+    } finally {
+      setIsCreatingClass(false);
+    }
+  };
+
+  const handleEditClass = async (values: TeacherClassFormValues) => {
+    if (!editingClass || isSavingClass) {
+      return;
+    }
+
+    try {
+      setIsSavingClass(true);
+      setEditDialogError(null);
       const updatedClass = await updateClass(editingClass.id, values);
 
       if (updatedClass) {
@@ -116,9 +134,12 @@ export function TeacherClassesPage() {
 
       setEditingClass(null);
     } catch (nextError) {
-      toast.error(
-        nextError instanceof Error ? nextError.message : "Unable to update class.",
-      );
+      const message =
+        nextError instanceof Error ? nextError.message : "Unable to update class.";
+      setEditDialogError(message);
+      toast.error(message);
+    } finally {
+      setIsSavingClass(false);
     }
   };
 
@@ -172,15 +193,23 @@ export function TeacherClassesPage() {
     );
   };
 
-  const handleRemoveAssignedQuiz = (quiz: { quizId: string; title: string }) => {
+  const handleRemoveAssignedQuiz = async (quiz: TeacherClassAssignedQuiz) => {
     if (!selectedClass || selectedClass.status !== "active") {
       return;
     }
 
-    removeQuizFromClass(selectedClass.id, quiz.quizId);
-    setMembershipFeedback(
-      `${quiz.title} is no longer visible to joined members of ${selectedClass.name}.`,
-    );
+    try {
+      await removeQuizFromClass(selectedClass.id, quiz.assignmentId);
+      setMembershipFeedback(
+        `${quiz.title} is no longer visible to joined members of ${selectedClass.name}.`,
+      );
+    } catch (nextError) {
+      toast.error(
+        nextError instanceof Error
+          ? nextError.message
+          : "Unable to remove assigned quiz.",
+      );
+    }
   };
 
   const selectedClass =
@@ -189,7 +218,11 @@ export function TeacherClassesPage() {
   const assignmentInsightsState = useAssignmentInsights(
     selectedClass?.assignedQuizzes ?? [],
   );
-  const assignableQuizzes = getQuizLibraryItemsForRole(quizzes, "teacher").filter(
+  const assignableQuizzes = getQuizLibraryItemsForRole(
+    quizzes,
+    "teacher",
+    currentUser?.id,
+  ).filter(
     (quiz) => quiz.isOwner && !isDraftQuiz(quiz.status) && quiz.status !== "archived",
   );
   const filteredClasses = classes.filter((teacherClass) => {
@@ -277,7 +310,10 @@ export function TeacherClassesPage() {
           <DashboardButton
             type="button"
             size="lg"
-            onClick={() => setIsCreateDialogOpen(true)}
+            onClick={() => {
+              setCreateDialogError(null);
+              setIsCreateDialogOpen(true);
+            }}
           >
             <span className="text-lg leading-none">+</span>
             Create Class
@@ -381,8 +417,15 @@ export function TeacherClassesPage() {
       <TeacherClassFormDialog
         open={isCreateDialogOpen}
         mode="create"
-        onOpenChange={setIsCreateDialogOpen}
+        onOpenChange={(open) => {
+          setIsCreateDialogOpen(open);
+          if (!open) {
+            setCreateDialogError(null);
+          }
+        }}
         onSubmit={handleCreateClass}
+        isSubmitting={isCreatingClass}
+        submitError={createDialogError}
       />
 
       <TeacherClassFormDialog
@@ -400,9 +443,12 @@ export function TeacherClassesPage() {
         onOpenChange={(open) => {
           if (!open) {
             setEditingClass(null);
+            setEditDialogError(null);
           }
         }}
         onSubmit={handleEditClass}
+        isSubmitting={isSavingClass}
+        submitError={editDialogError}
       />
 
       <AddStudentsDialog

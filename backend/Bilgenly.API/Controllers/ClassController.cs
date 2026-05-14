@@ -20,7 +20,15 @@ public class ClassController : ControllerBase
         _classService = classService;
         _classRepository = classRepository; 
     }
-
+    [HttpDelete("{classId}/students/{studentId}")]
+    [Authorize(Roles = "Teacher")]
+    public async Task<IActionResult> RemoveStudent(Guid classId, Guid studentId)
+    {
+        var teacherId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+        var (success, error) = await _classService.RemoveStudentAsync(classId, studentId, teacherId);
+        if (!success) return BadRequest(new { message = error });
+        return Ok(new { message = "Student removed from class" });
+    }
     [HttpPost]
     [Authorize(Roles = "Teacher")]
     public async Task<IActionResult> CreateClass(CreateClassDto dto)
@@ -87,7 +95,15 @@ public class ClassController : ControllerBase
         if (result is null) return BadRequest(new { message = error });
         return Ok(result);
     }
-
+    [HttpDelete("{classId}/assignments/{assignmentId}")]
+    [Authorize(Roles = "Teacher")]
+    public async Task<IActionResult> RemoveAssignment(Guid classId, Guid assignmentId)
+    {
+        var teacherId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+        var (success, error) = await _classService.RemoveAssignmentAsync(classId, assignmentId, teacherId);
+        if (!success) return BadRequest(new { message = error });
+        return Ok(new { message = "Assignment removed" });
+    }
     [HttpPost("{classId}/assignments")]
     [Authorize(Roles = "Teacher")]
     public async Task<IActionResult> AssignQuiz(Guid classId, [FromBody] AssignQuizDto dto)
@@ -100,7 +116,7 @@ public class ClassController : ControllerBase
     }
 
     [HttpGet("{classId}/assignments")]
-    [Authorize(Roles = "Teacher")]
+    [Authorize(Roles = "Teacher, Student")]
     public async Task<IActionResult> GetAssignments(Guid classId)
     {
         var assignments = await _classRepository.GetAssignmentsByClassIdAsync(classId);

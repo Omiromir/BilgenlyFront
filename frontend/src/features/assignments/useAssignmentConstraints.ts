@@ -10,6 +10,7 @@ interface UseAssignmentConstraintsOptions {
   sessions?: QuizSessionRecord[];
   viewerRole?: "teacher" | "student";
   refreshIntervalMs?: number;
+  backendAttemptCount?: number;
 }
 
 export function useAssignmentConstraints({
@@ -17,6 +18,7 @@ export function useAssignmentConstraints({
   sessions = [],
   viewerRole = "student",
   refreshIntervalMs = 30000,
+  backendAttemptCount,
 }: UseAssignmentConstraintsOptions) {
   const [now, setNow] = useState(() => Date.now());
 
@@ -36,7 +38,13 @@ export function useAssignmentConstraints({
 
   return useMemo(
     () =>
-      buildAssignmentConstraintState(assignment, sessions, viewerRole, now),
-    [assignment, now, sessions, viewerRole],
+      buildAssignmentConstraintState(
+        assignment,
+        sessions,
+        viewerRole,
+        now,
+        backendAttemptCount,
+      ),
+    [assignment, now, sessions, viewerRole, backendAttemptCount],
   );
 }

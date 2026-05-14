@@ -58,6 +58,7 @@ export interface AssignmentConstraintState {
   canRetry: boolean;
   latestScore: number | null;
   bestScore: number | null;
+  backendAttemptCount?: number;
 }
 
 const assignmentDeadlineFormatter = new Intl.DateTimeFormat("en-US", {
@@ -252,6 +253,7 @@ export function buildAssignmentConstraintState(
   sessions: QuizSessionRecord[],
   viewerRole: "teacher" | "student" = "student",
   now = Date.now(),
+  backendAttemptCount?: number,
 ): AssignmentConstraintState | null {
   if (!assignment) {
     return null;
@@ -269,7 +271,9 @@ export function buildAssignmentConstraintState(
     relatedSessions.find((session) => session.status === "in-progress") ?? null;
   const latestAttempt = relatedSessions[0] ?? null;
   const latestCompletedAttempt = completedAttempts[0] ?? null;
-  const attemptsUsed = completedAttempts.length;
+  // Use backend attempt count as source of truth if provided, otherwise use local session count
+  const attemptsUsed =
+    typeof backendAttemptCount === "number" ? backendAttemptCount : completedAttempts.length;
   const hasUnlimitedAttempts = assignment.maxAttempts === null;
   const attemptsRemaining = hasUnlimitedAttempts
     ? null
@@ -340,6 +344,7 @@ export function buildAssignmentConstraintState(
       (hasUnlimitedAttempts || attemptsRemaining !== 0),
     latestScore,
     bestScore,
+    backendAttemptCount,
   };
 }
 

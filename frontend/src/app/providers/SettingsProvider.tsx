@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { useAuth } from "./AuthProvider";
@@ -28,10 +29,7 @@ import {
   resolveLocale,
   syncFormattingPreferences,
 } from "../../features/dashboard/settings/settingsPreferences";
-import {
-  changePassword,
-  revokeSessionById,
-} from "../../features/auth/api";
+import { changePassword, revokeSessionById } from "../../features/auth/api";
 
 interface PasswordUpdateInput {
   currentPassword: string;
@@ -58,13 +56,14 @@ interface SettingsContextValue {
     value: string,
   ) => void;
   locale: string;
-  formatDate: (value: string | Date, options?: { includeYear?: boolean }) => string;
+  formatDate: (
+    value: string | Date,
+    options?: { includeYear?: boolean },
+  ) => string;
   formatDateTime: (value: string | Date) => string;
   formatShortDate: (value: string | Date) => string;
   revokeSession: (sessionId: string) => Promise<SecurityActionResult>;
-  updatePassword: (
-    input: PasswordUpdateInput,
-  ) => Promise<SecurityActionResult>;
+  updatePassword: (input: PasswordUpdateInput) => Promise<SecurityActionResult>;
 }
 
 const SettingsContext = createContext<SettingsContextValue | undefined>(
@@ -84,16 +83,19 @@ export function SettingsProvider({ children }: SettingsProviderProps) {
   } = useAuth();
   const [isHydrated, setIsHydrated] = useState(false);
   const [systemTheme, setSystemTheme] = useState<"light" | "dark">("light");
+  const hydratedStorageScopeRef = useRef<string | null>(null);
 
+  const userId = authCurrentUser?.id ?? null;
+  const userEmail = authCurrentUser?.email ?? null;
   const storageScope = useMemo(
     () =>
       getSettingsStorageScope({
-        userId: authCurrentUser?.id,
-        email: authCurrentUser?.email,
+        userId,
+        email: userEmail,
         role,
         token,
       }),
-    [authCurrentUser?.email, authCurrentUser?.id, role, token],
+    [userId, userEmail, role, token],
   );
   const defaultSettings = useMemo(
     () => createDefaultUserSettings({ user: authCurrentUser }),
@@ -129,6 +131,12 @@ export function SettingsProvider({ children }: SettingsProviderProps) {
   }, []);
 
   useEffect(() => {
+    // Only update when scope actually changes to prevent loops
+    if (hydratedStorageScopeRef.current === storageScope) {
+      return;
+    }
+    hydratedStorageScopeRef.current = storageScope;
+
     setLoadedState({
       scope: storageScope,
       settings: scopedSettingsSnapshot,
@@ -175,10 +183,14 @@ export function SettingsProvider({ children }: SettingsProviderProps) {
     settings.profile.timeZone,
   ]);
 
-  const persistSettings = (updater: (current: UserSettings) => UserSettings) => {
+  const persistSettings = (
+    updater: (current: UserSettings) => UserSettings,
+  ) => {
     setLoadedState((current) => {
       const baseSettings =
-        current.scope === storageScope ? current.settings : scopedSettingsSnapshot;
+        current.scope === storageScope
+          ? current.settings
+          : scopedSettingsSnapshot;
       const nextSettings = updater(baseSettings);
       writeUserSettings(storageScope, nextSettings);
       return {
@@ -256,7 +268,10 @@ export function SettingsProvider({ children }: SettingsProviderProps) {
     return result;
   };
 
-  const updatePassword = async ({ currentPassword, newPassword }: PasswordUpdateInput) => {
+  const updatePassword = async ({
+    currentPassword,
+    newPassword,
+  }: PasswordUpdateInput) => {
     const result = await changePassword({
       currentPassword,
       newPassword,

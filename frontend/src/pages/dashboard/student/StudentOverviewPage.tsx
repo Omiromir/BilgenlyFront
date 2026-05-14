@@ -5,6 +5,7 @@ import { useAuth } from "../../../app/providers/AuthProvider";
 import { useTeacherClasses } from "../../../app/providers/TeacherClassesProvider";
 import { useQuizLibrary } from "../../../app/providers/QuizLibraryProvider";
 import { useQuizSessions } from "../../../app/providers/QuizSessionProvider";
+import { useStudentAttempts } from "../../../app/providers/StudentAttemptsProvider";
 import logoPng from "../../../assets/logo.png";
 import { cn } from "../../../components/ui/utils";
 import { CtaPanel } from "../../../features/dashboard/components/CtaPanel";
@@ -47,9 +48,24 @@ export function StudentOverviewPage() {
     }),
     [studentViewer?.email, studentViewer?.id],
   );
+  const {
+    attempts: allAttempts,
+    isLoading: attemptsLoading,
+    error: attemptsError,
+  } = useStudentAttempts();
+
   const studentSources = useMemo(
-    () => buildStudentQuizLibrarySources(classes, quizzes, studentIdentity, sessions),
-    [classes, quizzes, sessions, studentIdentity],
+    () =>
+      buildStudentQuizLibrarySources(
+        classes,
+        quizzes,
+        studentIdentity,
+        sessions,
+        allAttempts,
+        attemptsLoading,
+        attemptsError,
+      ),
+    [allAttempts, attemptsError, attemptsLoading, classes, quizzes, sessions, studentIdentity],
   );
   const completedSessions = useMemo(
     () => getCompletedSessionsForRole("student"),
@@ -74,26 +90,6 @@ export function StudentOverviewPage() {
         .slice(0, 3),
     [studentSources.assigned],
   );
-
-  const getAssignedStatusLabel = (status: string) => {
-    if (status === "completed") {
-      return "Completed";
-    }
-
-    if (status === "in_progress") {
-      return "In Progress";
-    }
-
-    if (status === "expired") {
-      return "Expired";
-    }
-
-    if (status === "attempts_exhausted") {
-      return "No attempts left";
-    }
-
-    return "Available";
-  };
 
   const getAssignedStatusClassName = (status: string) => {
     if (status === "completed") {
@@ -141,6 +137,10 @@ export function StudentOverviewPage() {
 
   const assignedEmptyState = getAssignedEmptyState();
   const assignedCount = studentSources.assigned.length;
+  const actionableAssignedCount = studentSources.assigned.filter(
+    (assignment) =>
+      assignment.assignmentState.canStart || assignment.assignmentState.canResume,
+  ).length;
 
   return (
     <div className={dashboardPageClassName}>
@@ -152,8 +152,10 @@ export function StudentOverviewPage() {
       <CtaPanel
         title="Continue Your Learning"
         description={
-          assignedCount
-            ? `You have ${assignedCount} class-assigned ${assignedCount === 1 ? "quiz" : "quizzes"} ready. Jump back in and keep your streak going.`
+          actionableAssignedCount
+            ? `You have ${actionableAssignedCount} class-assigned ${actionableAssignedCount === 1 ? "quiz" : "quizzes"} ready. Jump back in and keep your streak going.`
+            : assignedCount
+              ? "Your assigned quiz results are synced. Open your classes or quiz library to review completed work and check which assignments still have attempts left."
             : "Jump into your quiz library, discover new practice sets, and stay ready for your next assigned quiz."
         }
         variant="gradient"
@@ -226,23 +228,32 @@ export function StudentOverviewPage() {
                           getAssignedStatusClassName(assignment.assignmentState.status),
                         )}
                       >
-                        {getAssignedStatusLabel(assignment.assignmentState.status)}
+                        {assignment.assignmentState.displayStatusLabel}
                       </span>
                     </div>
+                    <p className="mt-4 text-sm text-[var(--dashboard-text-soft)]">
+                      {assignment.practiceProgressLabel}
+                    </p>
 
                     <DashboardButton
                       type="button"
                       size="lg"
                       className="mt-5 w-full"
+                      disabled={
+                        assignment.assignmentState.isLoading ||
+                        (!assignment.assignmentState.canStart &&
+                          !assignment.assignmentState.canResume &&
+                          !assignment.assignmentState.canReview)
+                      }
                       onClick={() =>
                         openQuiz({
                           quizId: assignment.id,
                           viewerRole: "student",
                           assignmentId: assignment.assignmentContext.assignmentId,
                           preferredSession:
-                            assignment.assignmentState.status === "completed"
+                            assignment.assignmentState.canReview
                               ? "completed"
-                              : assignment.assignmentState.status === "in_progress"
+                              : assignment.assignmentState.canResume
                                 ? "in-progress"
                                 : undefined,
                           navigationState: {
@@ -254,15 +265,7 @@ export function StudentOverviewPage() {
                         })
                       }
                     >
-                        {assignment.assignmentState.status === "in_progress"
-                          ? "Continue Quiz"
-                          : assignment.assignmentState.status === "completed"
-                            ? "View Results"
-                            : assignment.assignmentState.status === "expired" ||
-                                assignment.assignmentState.status ===
-                                  "attempts_exhausted"
-                              ? "Open Assigned Quiz"
-                              : "Start Assigned Quiz"}
+                      {assignment.assignmentState.primaryActionLabel}
                     </DashboardButton>
                   </article>
                 </DashboardSurface>

@@ -71,13 +71,15 @@ builder.Services.AddScoped<IClassRepository, ClassRepository>();
 builder.Services.AddScoped<ClassService>();
 builder.Services.AddScoped<QuizGenerationService>();
 builder.Services.AddScoped<IAiService, AiServiceStub>(); // potom udalit
+builder.Services.AddScoped<IBadgeRepository, BadgeRepository>();
+builder.Services.AddScoped<AchievementsService>();
 builder.Services.AddControllers();
 
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
     {
-        policy.WithOrigins("http://localhost:5173", "https://bilgenly.vercel.app")
+        policy.WithOrigins("http://localhost:5173", "https://bilgenly.vercel.app", "http://localhost:5174")
               .AllowAnyHeader()
               .AllowAnyMethod();
     });

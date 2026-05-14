@@ -8,7 +8,7 @@ namespace Bilgenly.API.Controllers;
 
 [ApiController]
 [Route("api/quiz-generation")]
-[Authorize(Roles = "Teacher")]
+[Authorize]
 public class QuizGenerationController : ControllerBase
 {
     private readonly QuizGenerationService _generationService;

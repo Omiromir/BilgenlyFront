@@ -14,16 +14,62 @@ public class AttemptService
         _attemptRepository = attemptRepository;
         _quizRepository = quizRepository;
     }
-    public async Task<IEnumerable<object>> GetMyAttemptsAsync(Guid userId)
+    public async Task<IEnumerable<MyAttemptDto>> GetMyAttemptsAsync(Guid userId)
     {
         var attempts = await _attemptRepository.GetByUserIdAsync(userId);
-        return attempts.Select(a => new
+        return attempts
+            .OrderByDescending(a => a.DateTaken)
+            .Select(a =>
         {
-            a.Id,
-            QuizTitle = a.Quiz.Title,
-            a.Score,
-            a.DateTaken,
-            a.IsCompleted
+            var questionResults = a.IsCompleted
+                ? a.Quiz.Questions
+                    .OrderBy(q => q.Position)
+                    .Select(question =>
+                    {
+                        var selectedAttemptAnswer = a.AttemptAnswers.FirstOrDefault(
+                            attemptAnswer => attemptAnswer.QuestionId == question.Id);
+                        var selectedAnswer = selectedAttemptAnswer is null
+                            ? null
+                            : question.Answers.FirstOrDefault(answer => answer.Id == selectedAttemptAnswer.AnswerId);
+                        var correctAnswer = question.Answers.FirstOrDefault(answer => answer.IsCorrect);
+
+                        return new MyAttemptQuestionReviewDto
+                        {
+                            QuestionId = question.Id,
+                            QuestionText = question.Text,
+                            QuestionType = question.QuestionType,
+                            Position = question.Position,
+                            Explanation = question.Explanation,
+                            SelectedAnswerId = selectedAnswer?.Id,
+                            SelectedAnswerText = selectedAnswer?.Text,
+                            CorrectAnswerId = correctAnswer?.Id,
+                            CorrectAnswerText = correctAnswer?.Text,
+                            IsCorrect = selectedAttemptAnswer?.IsCorrect ?? false,
+                            AnswerOptions = question.Answers
+                                .Select(answer => new MyAttemptAnswerOptionDto
+                                {
+                                    Id = answer.Id,
+                                    Text = answer.Text,
+                                    IsCorrect = answer.IsCorrect,
+                                })
+                                .ToList(),
+                        };
+                    })
+                    .ToList()
+                : new List<MyAttemptQuestionReviewDto>();
+
+            return new MyAttemptDto
+            {
+                Id = a.Id,
+                QuizId = a.QuizId,
+                QuizTitle = a.Quiz.Title,
+                Score = a.Score,
+                DateTaken = a.DateTaken,
+                IsCompleted = a.IsCompleted,
+                TotalQuestions = a.Quiz.Questions.Count,
+                CorrectAnswers = a.AttemptAnswers.Count(attemptAnswer => attemptAnswer.IsCorrect),
+                Questions = questionResults,
+            };
         });
     }
     public async Task<(StartAttemptDto? Result, string? Error)> StartAttemptAsync(Guid quizId, Guid userId)
@@ -65,7 +111,21 @@ public class AttemptService
             }).OrderBy(q => q.Position).ToList()
         }, null);
     }
-
+    public async Task<IEnumerable<object>> GetAttemptsByQuizAsync(Guid quizId, Guid userId)
+    {
+        var attempts = (await _attemptRepository.GetByUserIdAsync(userId))
+            .Where(a => a.QuizId == quizId)
+            .OrderByDescending(a => a.DateTaken)
+            .Select(a => new
+            {
+                attemptId = a.Id,
+                quizId = a.QuizId,
+                score = a.Score,
+                isCompleted = a.IsCompleted,
+                dateTaken = a.DateTaken
+            });
+        return attempts;
+    }
     public async Task<(AttemptResultDto? Result, string? Error)> SubmitAttemptAsync(
         Guid attemptId, Guid userId, SubmitAttemptDto dto)
     {

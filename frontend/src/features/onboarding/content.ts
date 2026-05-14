@@ -28,21 +28,30 @@ export const roleOptions: ChoiceOption[] = [
     label: "Teacher",
     sub: "I want to upload materials and generate quizzes with AI",
   },
-  {
-    id: "other",
-    emoji: "✨",
-    label: "Just exploring",
-    sub: "I'm curious about what Bilgenly can do",
-  },
 ];
 
-export const goalOptions: ChoiceOption[] = [
+const studentGoalOptions: ChoiceOption[] = [
   {
     id: "ace",
     emoji: "🏆",
     label: "Ace my exams",
     sub: "Use AI quizzes to prepare and test my knowledge",
   },
+  {
+    id: "practice",
+    emoji: "🧠",
+    label: "Build a study habit",
+    sub: "Practice consistently and keep my progress visible",
+  },
+  {
+    id: "explore",
+    emoji: "🔍",
+    label: "Just exploring",
+    sub: "I want to see what Bilgenly can do",
+  },
+];
+
+const teacherGoalOptions: ChoiceOption[] = [
   {
     id: "automate",
     emoji: "⚡",
@@ -62,6 +71,10 @@ export const goalOptions: ChoiceOption[] = [
     sub: "I want to see what Bilgenly can do",
   },
 ];
+
+export function getGoalOptionsForRole(role?: string | null): ChoiceOption[] {
+  return role === "teacher" ? teacherGoalOptions : studentGoalOptions;
+}
 
 export const experienceOptions: ChoiceOption[] = [
   {

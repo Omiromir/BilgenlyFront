@@ -114,7 +114,11 @@ export function DashboardHeader({ onOpenSidebar }: DashboardHeaderProps) {
     }
   }, [dashboardViewer?.email, dashboardViewer?.fullName, dashboardViewer?.roleLabel, role]);
   const notificationsPath =
-    role === "student" ? "/dashboard/student/notifications" : userMeta.settingsPath;
+    role === "student"
+      ? "/dashboard/student/notifications"
+      : role === "teacher"
+        ? "/dashboard/teacher/notifications"
+        : userMeta.settingsPath;
 
   const initials = userMeta.name
     .split(" ")

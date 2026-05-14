@@ -2,6 +2,7 @@ import { AuthProvider } from "./providers/AuthProvider";
 import { NotificationsProvider } from "./providers/NotificationsProvider";
 import { QuizLibraryProvider } from "./providers/QuizLibraryProvider";
 import { QuizSessionProvider } from "./providers/QuizSessionProvider";
+import { StudentAttemptsProvider } from "./providers/StudentAttemptsProvider";
 import { QueryProvider } from "./providers/QueryProvider";
 import { SettingsProvider } from "./providers/SettingsProvider";
 import { TeacherClassesProvider } from "./providers/TeacherClassesProvider";
@@ -24,8 +25,10 @@ export default function App() {
             <TeacherClassesProvider>
               <QuizLibraryProvider>
                 <QuizSessionProvider>
-                  <AppRoutes />
-                  <AppToaster />
+                  <StudentAttemptsProvider>
+                    <AppRoutes />
+                    <AppToaster />
+                  </StudentAttemptsProvider>
                 </QuizSessionProvider>
               </QuizLibraryProvider>
             </TeacherClassesProvider>

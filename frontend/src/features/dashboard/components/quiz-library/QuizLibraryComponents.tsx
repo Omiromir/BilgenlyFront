@@ -324,6 +324,7 @@ function QuizCardActionButton({
       variant={action.variant ?? "secondary"}
       className={cn(isPrimaryStretch && "flex-1", isIconOnly && "shrink-0")}
       onClick={action.onClick}
+      disabled={action.disabled}
       aria-label={isIconOnly ? action.label : undefined}
       title={isIconOnly ? action.label : undefined}
     >
@@ -420,7 +421,10 @@ export function AssignedQuizCard({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex flex-wrap gap-2">
             <QuizSourceBadge label="Assigned quiz" />
-            <QuizStatusBadge status={item.assignmentState.status} />
+            <QuizStatusBadge
+              status={item.assignmentState.status}
+              label={item.assignmentState.displayStatusLabel}
+            />
             <VisibilityBadge visibility={item.visibility} />
             {badgeLabel ? (
               <DashboardBadge tone="info">
@@ -473,6 +477,7 @@ export function AssignedQuizCard({
             attemptsUsed={item.assignmentState.attemptsUsed}
             maxAttempts={item.assignmentState.maxAttempts}
             status={item.assignmentState.status}
+            isLoading={item.assignmentState.isLoading}
           />
         </div>
 

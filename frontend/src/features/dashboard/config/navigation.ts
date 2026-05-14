@@ -93,6 +93,16 @@ const dashboardRoutes: DashboardRouteMeta[] = [
     badge: "Insights",
   },
   {
+    path: "/dashboard/teacher/notifications",
+    role: "teacher",
+    label: "Notifications",
+    title: "Notifications",
+    subtitle: "Review in-app updates tied to your teacher workspace.",
+    icon: Bell,
+    navVisible: false,
+    badge: "Inbox",
+  },
+  {
     path: "/dashboard/teacher/profile",
     role: "teacher",
     label: "My Profile",

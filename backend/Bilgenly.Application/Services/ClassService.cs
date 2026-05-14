@@ -98,6 +98,25 @@ public class ClassService
         await _classRepository.SaveChangesAsync();
         return (true, null);
     }
+    public async Task<(bool Success, string? Error)> RemoveStudentAsync(
+        Guid classId, Guid studentId, Guid teacherId)
+    {
+        var classEntity = await _classRepository.GetByIdAsync(classId);
+        if (classEntity is null)
+            return (false, "Class not found");
+
+        if (classEntity.TeacherId != teacherId)
+            return (false, "You are not the teacher of this class");
+
+        var classStudent = await _classRepository.GetClassStudentAsync(classId, studentId);
+        if (classStudent is null)
+            return (false, "Student is not in this class");
+
+        _classRepository.RemoveClassStudent(classStudent);
+        await _classRepository.SaveChangesAsync();
+
+        return (true, null);
+    }
     public async Task<(ClassDto? Result, string? Error)> JoinClassAsync(
         string inviteCode, Guid studentId)
     {
@@ -129,6 +148,7 @@ public class ClassService
 
         var quiz = await _quizRepository.GetByIdAsync(dto.QuizId);
         if (quiz is null) return (null, "Quiz not found");
+        if (quiz.UserId != teacherId) return (null, "You can only assign quizzes that belong to your account.");
 
         var alreadyAssigned = classEntity.Assignments
             .Any(a => a.QuizId == dto.QuizId && a.Status == "active");
@@ -157,6 +177,20 @@ public class ClassService
         await _classRepository.SaveChangesAsync();
 
         return (MapAssignmentToDto(assignment, quiz), null);
+    }
+    public async Task<(bool Success, string? Error)> RemoveAssignmentAsync(
+        Guid classId, Guid assignmentId, Guid teacherId)
+    {
+        var classEntity = await _classRepository.GetByIdAsync(classId);
+        if (classEntity is null) return (false, "Class not found");
+        if (classEntity.TeacherId != teacherId) return (false, "Access denied");
+
+        var assignment = classEntity.Assignments.FirstOrDefault(a => a.Id == assignmentId);
+        if (assignment is null) return (false, "Assignment not found");
+
+        _classRepository.RemoveAssignment(assignment);
+        await _classRepository.SaveChangesAsync();
+        return (true, null);
     }
 
     private AssignmentDto MapAssignmentToDto(Assignment a, Quiz quiz) => new()
@@ -199,9 +233,19 @@ public class ClassService
         }).ToList(),
         Quizzes = c.Assignments.Select(a => new ClassQuizDto
         {
+            AssignmentId = a.Id,
             QuizId = a.QuizId,
             QuizTitle = a.Quiz?.Title ?? "",
-            AssignedAt = a.AssignedAt
+            Topic = a.Quiz?.Topic ?? "",
+            QuestionCount = a.Quiz?.Questions.Count ?? 0,
+            AssignedAt = a.AssignedAt,
+            Deadline = a.Deadline,
+            MaxAttempts = a.MaxAttempts,
+            AllowLateSubmissions = a.AllowLateSubmissions,
+            AssignedBy = a.AssignedBy,
+            AssignedByName = a.AssignedByName,
+            Visibility = a.Visibility,
+            Status = a.Status,
         }).ToList()
     };
 }

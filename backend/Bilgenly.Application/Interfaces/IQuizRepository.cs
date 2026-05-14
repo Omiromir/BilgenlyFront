@@ -8,4 +8,5 @@ public interface IQuizRepository
     Task<IEnumerable<Quiz>> GetByUserIdAsync(Guid userId);
     Task AddAsync(Quiz quiz);
     Task SaveChangesAsync();
+    void Remove(Quiz quiz);
 }

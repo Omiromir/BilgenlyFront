@@ -83,6 +83,8 @@ function sanitizeNotificationRecord(
     typeof notification.recipientEmail !== "string" ||
     typeof notification.relatedClassId !== "string" ||
     typeof notification.relatedClassName !== "string" ||
+    (notification.type === "class_invitation" &&
+      typeof notification.inviteCode !== "string") ||
     typeof notification.senderName !== "string" ||
     typeof notification.senderEmail !== "string" ||
     typeof notification.studentId !== "string" ||
@@ -149,6 +151,8 @@ function sanitizeNotificationRecord(
       quizId: notification.quizId,
       quizTitle: notification.quizTitle,
       assignmentId: notification.assignmentId,
+      attemptId:
+        typeof notification.attemptId === "string" ? notification.attemptId : undefined,
       followUpKind: notification.followUpKind,
     };
   }
@@ -172,6 +176,7 @@ function sanitizeNotificationRecord(
     actionType: "class_invitation",
     relatedClassId: notification.relatedClassId,
     relatedClassName: notification.relatedClassName,
+    inviteCode: notification.inviteCode,
     senderName: notification.senderName,
     senderEmail: notification.senderEmail,
     studentId: notification.studentId,
@@ -199,6 +204,7 @@ function rebuildInvitationNotification(
       recipientEmail: notification.recipientEmail,
       relatedClassId: notification.relatedClassId,
       relatedClassName: notification.relatedClassName,
+      inviteCode: notification.inviteCode,
       senderName: notification.senderName,
       senderEmail: notification.senderEmail,
       studentId: notification.studentId,
@@ -503,6 +509,7 @@ export function NotificationsProvider({
                       recipientEmail: notification.recipientEmail,
                       relatedClassId: notification.relatedClassId,
                       relatedClassName: metadata.relatedClassName,
+                      inviteCode: notification.inviteCode,
                       senderName: metadata.senderName,
                       senderEmail: metadata.senderEmail,
                       studentId: notification.studentId,

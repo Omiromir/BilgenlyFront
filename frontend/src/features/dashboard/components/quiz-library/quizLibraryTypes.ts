@@ -38,6 +38,7 @@ export interface QuizQuestionRecord {
   id: string;
   text: string;
   options: string[];
+  optionIds?: string[];
   correctIndex: number;
   correctIndexes?: number[];
   tags?: string[];
@@ -54,6 +55,7 @@ export interface QuizQuestionRecord {
 
 export interface QuizRecord {
   id: string;
+  ownerUserId?: string;
   ownerRole: QuizLibraryOwnerRole;
   ownerName: string;
   sourceQuizId?: string;
@@ -82,6 +84,7 @@ export interface QuizRecord {
 
 export interface QuizLibraryItem {
   id: string;
+  ownerUserId?: string;
   title: string;
   description: string;
   topic: string;
@@ -143,5 +146,6 @@ export interface QuizCardAction {
   icon: LucideIcon;
   variant?: "primary" | "secondary" | "soft" | "ghost";
   iconDisplay?: "both" | "icon-only" | "label-only";
+  disabled?: boolean;
   onClick?: () => void;
 }

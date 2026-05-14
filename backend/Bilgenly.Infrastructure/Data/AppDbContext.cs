@@ -13,6 +13,8 @@ public class AppDbContext : DbContext
     public DbSet<Class> Classes => Set<Class>();
     public DbSet<ClassStudent> ClassStudents => Set<ClassStudent>();
     public DbSet<Assignment> Assignments => Set<Assignment>();
+    public DbSet<Badge> Badges => Set<Badge>();
+    public DbSet<UserBadge> UserBadges => Set<UserBadge>();
     
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -70,6 +72,16 @@ public class AppDbContext : DbContext
             e.HasOne(c => c.Teacher)
                 .WithMany()
                 .HasForeignKey(c => c.TeacherId);
+        });
+        modelBuilder.Entity<UserBadge>(e =>
+        {
+            e.HasKey(ub => new { ub.UserId, ub.BadgeId });
+            e.HasOne(ub => ub.User)
+                .WithMany()
+                .HasForeignKey(ub => ub.UserId);
+            e.HasOne(ub => ub.Badge)
+                .WithMany()
+                .HasForeignKey(ub => ub.BadgeId);
         });
     }
     

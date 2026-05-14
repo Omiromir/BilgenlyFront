@@ -141,51 +141,17 @@ function getStudentStatusLabel(status: TeacherStudentQuizResultRowData["status"]
 }
 
 function buildSelectedAnswerLabel(row: TeacherStudentQuizResultRowData, questionId: string) {
-  const question = row.latestCompletedAttempt?.session.quiz.questions.find(
-    (item) => item.id === questionId,
+  return (
+    row.latestAttemptQuestions.find((item) => item.questionId === questionId)
+      ?.selectedAnswerText ?? "No submitted answer"
   );
-  const state = row.latestCompletedAttempt?.session.questionStates.find(
-    (item) => item.questionId === questionId,
-  );
-
-  if (!question || !state?.submitted) {
-    return "No submitted answer";
-  }
-
-  const indexes = state.selectedIndices.length
-    ? state.selectedIndices
-    : typeof state.selectedIndex === "number"
-      ? [state.selectedIndex]
-      : [];
-
-  if (!indexes.length) {
-    return "No submitted answer";
-  }
-
-  return indexes
-    .map((index) => question.options[index] ?? `Option ${index + 1}`)
-    .join(", ");
 }
 
 function buildCorrectAnswerLabel(row: TeacherStudentQuizResultRowData, questionId: string) {
-  const question = row.latestCompletedAttempt?.session.quiz.questions.find(
-    (item) => item.id === questionId,
+  return (
+    row.latestAttemptQuestions.find((item) => item.questionId === questionId)
+      ?.correctAnswerText ?? "Unavailable"
   );
-
-  if (!question) {
-    return "Unavailable";
-  }
-
-  const indexes =
-    question.selectionMode === "multiple"
-      ? question.correctIndexes?.length
-        ? question.correctIndexes
-        : [question.correctIndex]
-      : [question.correctIndex];
-
-  return indexes
-    .map((index) => question.options[index] ?? `Option ${index + 1}`)
-    .join(", ");
 }
 
 interface ClassQuizAnalyticsCardProps {
@@ -353,7 +319,7 @@ export function StudentQuizResultRow({
         </div>
       </TableCell>
       <TableCell className="px-3 py-4 text-sm text-[var(--dashboard-text-soft)]">
-        {row.status === "completed"
+        {row.status === "completed" || row.status === "attempts_exhausted"
           ? `${row.correctCount}/${row.totalQuestions} correct`
           : "--"}
       </TableCell>
@@ -672,30 +638,23 @@ export function StudentQuizInsightsPanel({
     setResponseFilter("incorrect");
   }, [row?.rowId]);
 
-  const latestAttempt = row?.latestCompletedAttempt ?? null;
+  const latestAttemptQuestions = row?.latestAttemptQuestions ?? [];
   const responseItems = useMemo(() => {
-    if (!latestAttempt) {
+    if (!latestAttemptQuestions.length) {
       return [];
     }
 
-    return latestAttempt.session.quiz.questions
-      .map((question, index) => {
-        const state = latestAttempt.session.questionStates.find(
-          (candidate) => candidate.questionId === question.id,
-        );
-        const isCorrect = Boolean(state?.isCorrect);
-
-        return {
-          question,
-          questionNumber: index + 1,
-          isCorrect,
-          statusLabel: isCorrect ? "Correct" : "Incorrect",
-        };
-      })
+    return latestAttemptQuestions
+      .map((question) => ({
+        question,
+        questionNumber: question.questionNumber,
+        isCorrect: question.isCorrect,
+        statusLabel: question.isCorrect ? "Correct" : "Incorrect",
+      }))
       .filter((item) =>
         responseFilter === "all" ? true : item.isCorrect === false,
       );
-  }, [latestAttempt, responseFilter]);
+  }, [latestAttemptQuestions, responseFilter]);
 
   if (!row) {
     return (
@@ -834,7 +793,7 @@ export function StudentQuizInsightsPanel({
             <div className={dashboardInsetBlockClassName}>
               <p className={dashboardMetaTextClassName}>Accuracy</p>
               <p className="mt-1 font-semibold text-[var(--dashboard-text-strong)]">
-                {row.status === "completed"
+                {row.status === "completed" || row.status === "attempts_exhausted"
                   ? `${row.correctCount}/${row.totalQuestions} correct`
                   : "--"}
               </p>
@@ -903,15 +862,25 @@ export function StudentQuizInsightsPanel({
                       </p>
                       <p className="text-sm text-[var(--dashboard-text-soft)]">
                         {attempt.correctCount}/{attempt.totalQuestions} correct
+                        {attempt.responsesCount
+                          ? ` • ${attempt.responsesCount} responses`
+                          : ""}
                       </p>
                     </div>
                     <div className="text-right text-sm text-[var(--dashboard-text-soft)]">
                       <p>{formatDateTime(attempt.finishedAt ?? attempt.updatedAt)}</p>
-                      <p>{formatDuration(attempt.durationSeconds)}</p>
+                      {attempt.durationSeconds > 0 ? (
+                        <p>{formatDuration(attempt.durationSeconds)}</p>
+                      ) : null}
                     </div>
                   </div>
                 </div>
               ))}
+              {row.attemptsUsed > row.attempts.length ? (
+                <p className="px-1 text-xs text-[var(--dashboard-text-faint)]">
+                  Showing latest attempt. {row.attemptsUsed} total attempts recorded by backend.
+                </p>
+              ) : null}
             </div>
           ) : (
             <div className="rounded-[18px] border border-dashed border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-muted)] px-4 py-5 text-sm leading-6 text-[var(--dashboard-text-soft)]">
@@ -928,7 +897,7 @@ export function StudentQuizInsightsPanel({
                 Question responses
               </p>
             </div>
-            {latestAttempt ? (
+            {latestAttemptQuestions.length ? (
               <div className="flex flex-wrap gap-2">
                 <DashboardButton
                   type="button"
@@ -950,7 +919,7 @@ export function StudentQuizInsightsPanel({
             ) : null}
           </div>
 
-          {latestAttempt ? (
+          {latestAttemptQuestions.length ? (
             responseItems.length ? (
               <Accordion type="multiple" className="space-y-3">
                 {responseItems.map(({ question, questionNumber, isCorrect, statusLabel }) => (
@@ -968,7 +937,7 @@ export function StudentQuizInsightsPanel({
                           </DashboardBadge>
                         </div>
                         <p className="mt-2 line-clamp-2 text-sm leading-6 text-[var(--dashboard-text-strong)]">
-                          {question.text}
+                          {question.questionText}
                         </p>
                       </div>
                     </AccordionTrigger>
@@ -1002,6 +971,17 @@ export function StudentQuizInsightsPanel({
                 No incorrect responses in the latest attempt. Switch to All questions to inspect the full submission.
               </div>
             )
+          ) : row.status === "completed" || row.status === "attempts_exhausted" ? (
+            <div className="rounded-[18px] border border-dashed border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-muted)] px-4 py-5">
+              <p className="text-sm font-medium text-[var(--dashboard-text-strong)]">
+                Per-question responses unavailable
+              </p>
+              <p className="mt-2 text-sm leading-6 text-[var(--dashboard-text-soft)]">
+                {row.responseCount
+                  ? `This student has submitted the quiz. The backend currently returned a summary result only (${row.latestScore !== null ? `${row.latestScore}%` : "score"}, ${row.correctCount}/${row.totalQuestions} correct, ${row.responseCount} responses).`
+                  : `This student has submitted the quiz. The backend returned the overall result only (${row.latestScore !== null ? `${row.latestScore}%` : "score"}, ${row.correctCount}/${row.totalQuestions} correct).`}
+              </p>
+            </div>
           ) : (
             <div className="rounded-[18px] border border-dashed border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-muted)] px-4 py-5 text-sm leading-6 text-[var(--dashboard-text-soft)]">
               This student has not finished the selected quiz yet, so there are no question responses to review.

@@ -1,10 +1,12 @@
 import { type ChangeEvent, type FormEvent, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { toast } from "sonner";
-import { signUp } from "../api";
-import { logout } from "../api";
 import { usePasswordVisibility } from "../hooks";
-import type { UserRole } from "../../../lib/auth";
+import {
+    buildRegistrationDraft,
+    getRegistrationDraft,
+    saveRegistrationDraft,
+} from "../registrationDraft";
 import type { SignUpFormErrors, SignUpFormValues } from "../types";
 import {
     getPasswordStrength,
@@ -14,17 +16,15 @@ import {
     validateSignUpForm,
     validateStrongPassword,
 } from "../validation";
-import { getDashboardPathByRole } from "../../../lib/auth";
-import {useAuth} from "../../../app/providers/AuthProvider";
 
 export function SignUpForm() {
     const navigate = useNavigate();
     const { inputType, isVisible, toggleVisibility } = usePasswordVisibility();
-    const { signInAsRole } = useAuth();
+    const savedDraft = getRegistrationDraft();
     const [values, setValues] = useState<SignUpFormValues>({
-        email: "",
-        fullName: "",
-        password: "",
+        email: savedDraft?.email ?? "",
+        fullName: savedDraft?.fullName ?? "",
+        password: savedDraft?.password ?? "",
     });
     const [errors, setErrors] = useState<SignUpFormErrors>({});
     const [touched, setTouched] = useState<Record<keyof SignUpFormValues, boolean>>({
@@ -38,37 +38,31 @@ export function SignUpForm() {
     const passwordStrength = getPasswordStrength(values.password);
 
     const handleChange =
-        (field: keyof SignUpFormValues) => (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+        (field: keyof SignUpFormValues) => (event: ChangeEvent<HTMLInputElement>) => {
             const nextValue = event.target.value;
             setValues((current) => ({ ...current, [field]: nextValue }));
-
-            if (field !== "role") {
-                setErrors((current) => ({
-                    ...current,
-                    [field]:
-                        field === "fullName"
-                            ? validateFullName(nextValue)
-                            : field === "email"
-                                ? validateEmail(nextValue)
-                                : validateStrongPassword(nextValue),
-                }));
-            }
-        };
-
-    const handleBlur = (field: keyof SignUpFormValues) => () => {
-        setTouched((current) => ({ ...current, [field]: true }));
-
-        if (field !== "role") {
             setErrors((current) => ({
                 ...current,
                 [field]:
                     field === "fullName"
-                        ? validateFullName(values.fullName)
+                        ? validateFullName(nextValue)
                         : field === "email"
-                            ? validateEmail(values.email)
-                            : validateStrongPassword(values.password),
+                            ? validateEmail(nextValue)
+                            : validateStrongPassword(nextValue),
             }));
-        }
+        };
+
+    const handleBlur = (field: keyof SignUpFormValues) => () => {
+        setTouched((current) => ({ ...current, [field]: true }));
+        setErrors((current) => ({
+            ...current,
+            [field]:
+                field === "fullName"
+                    ? validateFullName(values.fullName)
+                    : field === "email"
+                        ? validateEmail(values.email)
+                        : validateStrongPassword(values.password),
+        }));
     };
 
     const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -83,22 +77,18 @@ export function SignUpForm() {
 
         const nextErrors = validateSignUpForm(normalizedValues);
         setErrors(nextErrors);
-        setTouched({ email: true, fullName: true, password: true, role: true });
+        setTouched({ email: true, fullName: true, password: true });
 
-        if (Object.values(nextErrors).some(Boolean)) return;
+        if (Object.values(nextErrors).some(Boolean)) {
+            return;
+        }
 
         try {
             setIsSubmitting(true);
-            const result = await signUp(normalizedValues);
-            signInAsRole("student", result.token, {
-                userId: result.userId ?? "",
-                username: result.username,
-                email: result.email,
-                role: result.role,
-            });
-            navigate("/onboarding"); // ← вместо дашборда
+            saveRegistrationDraft(buildRegistrationDraft(normalizedValues));
+            navigate("/onboarding");
         } catch (error) {
-            const message = error instanceof Error ? error.message : "Registration failed";
+            const message = error instanceof Error ? error.message : "Unable to continue to onboarding";
             setServerError(message);
             toast.error(message);
         } finally {
@@ -117,8 +107,6 @@ export function SignUpForm() {
 
     return (
         <form className="auth-form" onSubmit={handleSubmit} noValidate>
-
-            {/* Ошибка сервера */}
             {serverError && (
                 <p className="auth-error" role="alert">
                     {serverError}
@@ -205,9 +193,8 @@ export function SignUpForm() {
                 </div>
             </div>
 
-
             <button className="auth-primary" type="submit" disabled={!canSubmit}>
-                {isSubmitting ? "Creating account..." : "Sign Up"}
+                {isSubmitting ? "Saving details..." : "Continue to onboarding"}
             </button>
 
             <div className="auth-center-row">

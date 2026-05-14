@@ -16,6 +16,7 @@ import { TeacherAnalyticsPage } from "../../pages/dashboard/teacher/TeacherAnaly
 import { TeacherClassesPage } from "../../pages/dashboard/teacher/TeacherClassesPage";
 import { TeacherGenerateQuizPage } from "../../pages/dashboard/teacher/TeacherGenerateQuizPage";
 import { TeacherOverviewPage } from "../../pages/dashboard/teacher/TeacherOverviewPage";
+import { TeacherNotificationsPage } from "../../pages/dashboard/teacher/TeacherNotificationsPage";
 import { TeacherProfilePage } from "../../pages/dashboard/teacher/TeacherProfilePage";
 import { TeacherQuizLibraryPage } from "../../pages/dashboard/teacher/TeacherQuizLibraryPage";
 import { TeacherSettingsPage } from "../../pages/dashboard/teacher/TeacherSettingsPage";
@@ -43,6 +44,10 @@ export function AppRoutes() {
             <Route path="/dashboard/teacher">
               <Route index element={<Navigate to="overview" replace />} />
               <Route path="overview" element={<TeacherOverviewPage />} />
+              <Route
+                path="notifications"
+                element={<TeacherNotificationsPage />}
+              />
               <Route
                 path="generate-quiz"
                 element={<TeacherGenerateQuizPage />}

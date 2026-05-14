@@ -1,15 +1,16 @@
 import {
-  buildAssignmentConstraintState,
   getAssignmentLevelStatus,
-  toAssignmentConstraintSource,
-  type AssignmentConstraintState,
 } from "../../../assignments/assignmentConstraints";
+import {
+  buildAssignedQuizAvailability,
+  type AssignedQuizAvailability,
+} from "../../../assignments/assignedQuizAvailability";
+import type { MyAttemptDto } from "../../../quiz-session/api/attemptsApi";
 import type { QuizSessionRecord } from "../../../quiz-session/quizSessionTypes";
 import {
   getQuizLibraryItemsForRole,
   mapQuizRecordToLibraryItem,
 } from "../../../../app/providers/QuizLibraryProvider";
-import { mockTeacherUser } from "../../mock/mockUsers";
 import type {
   TeacherClassRecord,
   TeacherClassStudent,
@@ -44,7 +45,7 @@ export interface StudentAssignedQuizLibraryItem extends QuizLibraryItem {
   sourceType: "assigned";
   isAssigned: true;
   assignmentContext: NonNullable<QuizLibraryItem["assignmentContext"]>;
-  assignmentState: AssignmentConstraintState;
+  assignmentState: AssignedQuizAvailability;
 }
 
 export interface StudentQuizLibrarySources {
@@ -104,8 +105,8 @@ function buildStudentMemberships(
           className: teacherClass.name,
           classSubject: teacherClass.subject,
           classDescription: teacherClass.description,
-          teacherName: mockTeacherUser.fullName,
-          teacherEmail: mockTeacherUser.email,
+          teacherName: teacherClass.teacherName || "Unknown teacher",
+          teacherEmail: "",
           inviteCode: teacherClass.inviteCode,
           status: matchingStudent.status,
           invitationStatus: matchingStudent.invitationStatus,
@@ -127,6 +128,9 @@ function buildAssignedQuizLibraryItems(
   quizzes: QuizRecord[],
   studentIdentity: StudentIdentity,
   sessions: QuizSessionRecord[],
+  attempts: MyAttemptDto[],
+  attemptsLoading = false,
+  attemptsError: string | null = null,
 ): StudentAssignedQuizLibraryItem[] {
   return sortTeacherClasses(classes).flatMap((teacherClass) => {
     const activeMembership = teacherClass.students.find(
@@ -146,7 +150,11 @@ function buildAssignedQuizLibraryItems(
         return [];
       }
 
-      const libraryItem = mapQuizRecordToLibraryItem(quizRecord, "student");
+      const libraryItem = mapQuizRecordToLibraryItem(
+        quizRecord,
+        "student",
+        studentIdentity.userId,
+      );
       const assignmentContext = {
         assignmentId: assignment.assignmentId,
         classId: assignment.classId,
@@ -161,15 +169,17 @@ function buildAssignedQuizLibraryItems(
         visibility: assignment.visibility,
         status: getAssignmentLevelStatus(assignment),
       } satisfies NonNullable<QuizLibraryItem["assignmentContext"]>;
-      const assignmentState = buildAssignmentConstraintState(
-        toAssignmentConstraintSource(assignmentContext),
+      const assignmentState = buildAssignedQuizAvailability({
+        quizId: assignment.quizId,
+        assignmentId: assignment.assignmentId,
+        maxAttempts: assignment.maxAttempts,
+        deadline: assignment.deadline,
+        allowLateSubmissions: assignment.allowLateSubmissions,
+        attempts,
         sessions,
-        "student",
-      );
-
-      if (!assignmentState) {
-        return [];
-      }
+        isLoading: attemptsLoading,
+        error: attemptsError,
+      });
 
       return [
         {
@@ -179,20 +189,28 @@ function buildAssignedQuizLibraryItems(
           sourceLabel: `${teacherClass.name} assigned quiz`,
           note: `Assigned quiz from ${teacherClass.name} by ${assignment.assignedByName} on ${formatTeacherClassDate(assignment.assignedAt)}.`,
           practiceState:
-            assignmentState.status === "completed"
+            assignmentState.canReview
               ? "completed"
               : assignmentState.status === "in_progress"
                 ? "in-progress"
                 : "ready",
           practiceProgressLabel:
-            assignmentState.status === "completed"
-              ? `${assignmentState.attemptsUsed} ${assignmentState.attemptsUsed === 1 ? "attempt" : "attempts"} completed`
+            assignmentState.isLoading
+              ? "Checking attempts..."
+              : assignmentState.canReview && !assignmentState.canStart
+                ? assignmentState.maxAttempts === null
+                  ? `${assignmentState.attemptsUsed} attempts used`
+                  : `${assignmentState.attemptsUsed} of ${assignmentState.maxAttempts} attempts used`
+              : assignmentState.status === "completed"
+                ? `${assignmentState.attemptsUsed} ${assignmentState.attemptsUsed === 1 ? "attempt" : "attempts"} completed`
               : assignmentState.status === "in_progress"
                 ? `Attempt ${assignmentState.activeAttempt?.attemptNumber ?? assignmentState.attemptsUsed + 1} in progress`
                 : assignmentState.status === "expired"
                   ? "Deadline passed"
                   : assignmentState.status === "attempts_exhausted"
-                    ? "No attempts remaining"
+                    ? assignmentState.maxAttempts === null
+                      ? "No attempts remaining"
+                      : `${assignmentState.attemptsUsed} of ${assignmentState.maxAttempts} attempts used`
                     : assignmentState.maxAttempts === null
                       ? `${assignmentState.attemptsUsed} attempts used`
                       : `${assignmentState.attemptsRemaining} ${assignmentState.attemptsRemaining === 1 ? "attempt" : "attempts"} left`,
@@ -209,6 +227,9 @@ export function buildStudentQuizLibrarySources(
   quizzes: QuizRecord[],
   studentIdentity: StudentIdentity,
   sessions: QuizSessionRecord[] = [],
+  attempts: MyAttemptDto[] = [],
+  attemptsLoading = false,
+  attemptsError: string | null = null,
 ): StudentQuizLibrarySources {
   if (!studentIdentity.userId && !studentIdentity.email) {
     return {
@@ -224,7 +245,11 @@ export function buildStudentQuizLibrarySources(
     };
   }
 
-  const studentLibraryItems = getQuizLibraryItemsForRole(quizzes, "student");
+  const studentLibraryItems = getQuizLibraryItemsForRole(
+    quizzes,
+    "student",
+    studentIdentity.userId,
+  );
   const memberships = buildStudentMemberships(classes, studentIdentity);
   const activeMemberships = memberships.filter(
     (membership) => membership.status === "joined",
@@ -271,6 +296,9 @@ export function buildStudentQuizLibrarySources(
     quizzes,
     studentIdentity,
     sessions,
+    attempts,
+    attemptsLoading,
+    attemptsError,
   );
 
   const personalRecent = sortQuizItemsByUpdatedAt(

@@ -133,12 +133,14 @@ export function DeadlineBadge({ deadline, expired = false }: DeadlineBadgeProps)
   return (
     <DashboardBadge tone={expired ? "danger" : "info"}>
       <CalendarDays className="h-3.5 w-3.5" />
-      {deadline ? `Due ${new Date(deadline).toLocaleString("en-US", {
-        month: "short",
-        day: "numeric",
-        hour: "numeric",
-        minute: "2-digit",
-      })}` : "No deadline"}
+      {deadline
+        ? `Due ${new Date(deadline).toLocaleString("en-US", {
+            month: "short",
+            day: "numeric",
+            hour: "numeric",
+            minute: "2-digit",
+          })}`
+        : "No deadline"}
     </DashboardBadge>
   );
 }
@@ -146,16 +148,19 @@ export function DeadlineBadge({ deadline, expired = false }: DeadlineBadgeProps)
 interface AttemptsBadgeProps {
   attemptsUsed?: number;
   maxAttempts: number | null;
+  isLoading?: boolean;
 }
 
 export function AttemptsBadge({
   attemptsUsed,
   maxAttempts,
+  isLoading = false,
 }: AttemptsBadgeProps) {
-  const label =
-    typeof attemptsUsed === "number"
+  const label = isLoading
+    ? "Checking attempts..."
+    : typeof attemptsUsed === "number"
       ? maxAttempts === null
-        ? `${attemptsUsed} used · ${formatAssignmentAttempts(maxAttempts)}`
+        ? `${attemptsUsed} used • ${formatAssignmentAttempts(maxAttempts)}`
         : `${attemptsUsed}/${maxAttempts} attempts used`
       : formatAssignmentAttempts(maxAttempts);
 
@@ -169,12 +174,13 @@ export function AttemptsBadge({
 
 interface QuizStatusBadgeProps {
   status: AssignmentProgressStatus;
+  label?: string;
 }
 
-export function QuizStatusBadge({ status }: QuizStatusBadgeProps) {
+export function QuizStatusBadge({ status, label }: QuizStatusBadgeProps) {
   return (
     <DashboardBadge tone={getAssignmentStatusTone(status)}>
-      {getAssignmentStatusLabel(status)}
+      {label ?? getAssignmentStatusLabel(status)}
     </DashboardBadge>
   );
 }
@@ -183,6 +189,7 @@ interface AttemptProgressIndicatorProps {
   attemptsUsed: number;
   maxAttempts: number | null;
   status?: AssignmentProgressStatus;
+  isLoading?: boolean;
   className?: string;
 }
 
@@ -190,6 +197,7 @@ export function AttemptProgressIndicator({
   attemptsUsed,
   maxAttempts,
   status,
+  isLoading = false,
   className,
 }: AttemptProgressIndicatorProps) {
   const width =
@@ -205,9 +213,11 @@ export function AttemptProgressIndicator({
           Attempts
         </span>
         <span className="text-[var(--dashboard-text-soft)]">
-          {maxAttempts === null
-            ? `${attemptsUsed} used · unlimited`
-            : `${attemptsUsed} of ${maxAttempts}`}
+          {isLoading
+            ? "Checking attempts..."
+            : maxAttempts === null
+              ? `${attemptsUsed} used • unlimited`
+              : `${attemptsUsed} of ${maxAttempts}`}
         </span>
       </div>
       <div className="h-2 overflow-hidden rounded-full bg-[var(--dashboard-surface-muted)]">

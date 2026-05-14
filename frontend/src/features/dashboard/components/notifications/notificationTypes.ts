@@ -31,6 +31,7 @@ interface DashboardNotificationBase {
 export interface ClassInvitationNotification extends DashboardNotificationBase {
   type: "class_invitation";
   actionType: "class_invitation";
+  inviteCode: string;
   status: ClassInvitationNotificationStatus;
 }
 
@@ -41,6 +42,7 @@ export interface QuizFollowUpNotification extends DashboardNotificationBase {
   quizId: string;
   quizTitle: string;
   assignmentId: string;
+  attemptId?: string;
   followUpKind: QuizFollowUpKind;
 }
 
@@ -53,6 +55,7 @@ export interface ClassInvitationNotificationInput {
   recipientEmail: string;
   relatedClassId: string;
   relatedClassName: string;
+  inviteCode: string;
   senderName: string;
   senderEmail: string;
   studentId: string;
@@ -73,5 +76,6 @@ export interface QuizFollowUpNotificationInput {
   quizId: string;
   quizTitle: string;
   assignmentId: string;
+  attemptId?: string;
   followUpKind: QuizFollowUpKind;
 }

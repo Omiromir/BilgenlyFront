@@ -5,11 +5,11 @@ import { useAuth } from "../../../app/providers/AuthProvider";
 import { useTeacherClasses } from "../../../app/providers/TeacherClassesProvider";
 import { useQuizLibrary } from "../../../app/providers/QuizLibraryProvider";
 import { useQuizSessions } from "../../../app/providers/QuizSessionProvider";
+import { useStudentAttempts } from "../../../app/providers/StudentAttemptsProvider";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "../../../components/ui/input-otp";
 import { cn } from "../../../components/ui/utils";
 import { DashboardPageHeader } from "../../../features/dashboard/components/DashboardPageHeader";
 import {
-  getAssignmentStatusLabel,
   getAssignmentStatusTone,
 } from "../../../features/assignments/assignmentConstraints";
 import { formatTeacherClassDate } from "../../../features/dashboard/components/classes/teacherClassesUtils";
@@ -40,22 +40,6 @@ type JoinableAssignment = {
   joinCode: string;
 };
 
-function getAssignedActionLabel(status: string) {
-  if (status === "completed") {
-    return "View Results";
-  }
-
-  if (status === "in_progress") {
-    return "Continue Quiz";
-  }
-
-  if (status === "expired" || status === "attempts_exhausted") {
-    return "Open Assigned Quiz";
-  }
-
-  return "Start Assigned Quiz";
-}
-
 function getAssignedPriority(status: string) {
   if (status === "in_progress") {
     return 0;
@@ -82,6 +66,11 @@ export function StudentJoinQuizPage() {
   const { classes } = useTeacherClasses();
   const { quizzes } = useQuizLibrary();
   const { sessions } = useQuizSessions();
+  const {
+    attempts: allAttempts,
+    isLoading: attemptsLoading,
+    error: attemptsError,
+  } = useStudentAttempts();
   const { openQuiz } = useQuizLauncher();
   const [joinCode, setJoinCode] = useState("");
   const [joinError, setJoinError] = useState("");
@@ -94,8 +83,17 @@ export function StudentJoinQuizPage() {
     [studentViewer?.email, studentViewer?.id],
   );
   const studentSources = useMemo(
-    () => buildStudentQuizLibrarySources(classes, quizzes, studentIdentity, sessions),
-    [classes, quizzes, sessions, studentIdentity],
+    () =>
+      buildStudentQuizLibrarySources(
+        classes,
+        quizzes,
+        studentIdentity,
+        sessions,
+        allAttempts,
+        attemptsLoading,
+        attemptsError,
+      ),
+    [allAttempts, attemptsError, attemptsLoading, classes, quizzes, sessions, studentIdentity],
   );
   const joinableAssignments = useMemo(
     () =>
@@ -139,9 +137,9 @@ export function StudentJoinQuizPage() {
       viewerRole: "student",
       assignmentId: target.assignment.assignmentContext.assignmentId,
       preferredSession:
-        target.assignment.assignmentState.status === "completed"
+        target.assignment.assignmentState.canReview
           ? "completed"
-          : target.assignment.assignmentState.status === "in_progress"
+          : target.assignment.assignmentState.canResume
             ? "in-progress"
             : undefined,
       navigationState: {
@@ -172,6 +170,16 @@ export function StudentJoinQuizPage() {
 
     if (!matchedJoinTarget) {
       setJoinError("That code does not match any quiz from your joined classes.");
+      return;
+    }
+
+    if (
+      matchedJoinTarget.assignment.assignmentState.isLoading ||
+      (!matchedJoinTarget.assignment.assignmentState.canStart &&
+        !matchedJoinTarget.assignment.assignmentState.canResume &&
+        !matchedJoinTarget.assignment.assignmentState.canReview)
+    ) {
+      setJoinError("Attempt status is still loading for this assigned quiz.");
       return;
     }
 
@@ -280,10 +288,18 @@ export function StudentJoinQuizPage() {
               <DashboardButton
                 type="submit"
                 size="lg"
-                disabled={!joinableAssignments.length}
+                disabled={
+                  !joinableAssignments.length ||
+                  (matchedJoinTarget
+                    ? matchedJoinTarget.assignment.assignmentState.isLoading ||
+                      (!matchedJoinTarget.assignment.assignmentState.canStart &&
+                        !matchedJoinTarget.assignment.assignmentState.canResume &&
+                        !matchedJoinTarget.assignment.assignmentState.canReview)
+                    : false)
+                }
               >
                 {matchedJoinTarget
-                  ? getAssignedActionLabel(matchedJoinTarget.assignment.assignmentState.status)
+                  ? matchedJoinTarget.assignment.assignmentState.primaryActionLabel
                   : "Open Assigned Quiz"}
               </DashboardButton>
 
@@ -312,9 +328,7 @@ export function StudentJoinQuizPage() {
                   matchedJoinTarget.assignment.assignmentState.status,
                 )}
               >
-                {getAssignmentStatusLabel(
-                  matchedJoinTarget.assignment.assignmentState.status,
-                )}
+                {matchedJoinTarget.assignment.assignmentState.displayStatusLabel}
               </DashboardBadge>
               <DashboardBadge tone="brand">
                 Code {formatQuizJoinCode(matchedJoinTarget.joinCode)}
@@ -349,9 +363,15 @@ export function StudentJoinQuizPage() {
               <DashboardButton
                 type="button"
                 size="lg"
+                disabled={
+                  matchedJoinTarget.assignment.assignmentState.isLoading ||
+                  (!matchedJoinTarget.assignment.assignmentState.canStart &&
+                    !matchedJoinTarget.assignment.assignmentState.canResume &&
+                    !matchedJoinTarget.assignment.assignmentState.canReview)
+                }
                 onClick={() => launchAssignment(matchedJoinTarget)}
               >
-                {getAssignedActionLabel(matchedJoinTarget.assignment.assignmentState.status)}
+                {matchedJoinTarget.assignment.assignmentState.primaryActionLabel}
               </DashboardButton>
               <DashboardButton asChild type="button" size="lg" variant="ghost">
                 <Link
@@ -427,7 +447,7 @@ export function StudentJoinQuizPage() {
                         <DashboardBadge
                           tone={getAssignmentStatusTone(assignment.assignmentState.status)}
                         >
-                          {getAssignmentStatusLabel(assignment.assignmentState.status)}
+                          {assignment.assignmentState.displayStatusLabel}
                         </DashboardBadge>
                       </div>
 
@@ -470,6 +490,12 @@ export function StudentJoinQuizPage() {
                     <DashboardButton
                       type="button"
                       size="md"
+                      disabled={
+                        assignment.assignmentState.isLoading ||
+                        (!assignment.assignmentState.canStart &&
+                          !assignment.assignmentState.canResume &&
+                          !assignment.assignmentState.canReview)
+                      }
                       onClick={() =>
                         launchAssignment(
                           target,
@@ -477,7 +503,7 @@ export function StudentJoinQuizPage() {
                         )
                       }
                     >
-                      {getAssignedActionLabel(assignment.assignmentState.status)}
+                      {assignment.assignmentState.primaryActionLabel}
                     </DashboardButton>
                     <DashboardButton
                       type="button"

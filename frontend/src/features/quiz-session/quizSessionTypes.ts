@@ -4,6 +4,7 @@ import type {
   QuizQuestionRecord,
   QuizRecord,
 } from "../dashboard/components/quiz-library/quizLibraryTypes";
+import type { SubmitAttemptResponseDto } from "./api/attemptsApi";
 
 export type QuizSessionSourceType =
   | "quiz-library"
@@ -54,6 +55,8 @@ export interface QuizSessionRecord {
   id: string;
   quizId: string;
   viewerRole: "teacher" | "student";
+  syncMode: "local" | "backend";
+  backendAttemptId?: string;
   status: QuizSessionStatus;
   attemptNumber: number;
   startedAt: string;
@@ -68,6 +71,7 @@ export interface QuizSessionRecord {
   questionStates: QuizSessionQuestionState[];
   correctCount: number;
   earnedPoints: number;
+  backendSubmitResult?: SubmitAttemptResponseDto;
 }
 
 export interface QuizPlaybackSummary {

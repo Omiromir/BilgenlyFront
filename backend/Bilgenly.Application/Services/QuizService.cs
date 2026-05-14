@@ -61,7 +61,16 @@ public class QuizService
         var quizzes = await _quizRepository.GetByUserIdAsync(userId);
         return quizzes.Select(q => MapToDto(q, ""));
     }
+    public async Task<(bool Success, string? Error)> DeleteQuizAsync(Guid quizId, Guid userId)
+    {
+        var quiz = await _quizRepository.GetByIdAsync(quizId);
+        if (quiz is null) return (false, "Quiz not found");
+        if (quiz.UserId != userId) return (false, "Access denied");
 
+        _quizRepository.Remove(quiz);
+        await _quizRepository.SaveChangesAsync();
+        return (true, null);
+    }
     private QuizDto MapToDto(Quiz quiz, string username) => new()
     {
         Id = quiz.Id,

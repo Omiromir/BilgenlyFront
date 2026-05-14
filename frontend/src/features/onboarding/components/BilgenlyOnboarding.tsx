@@ -1,9 +1,17 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router";
 import { useAuth } from "../../../app/providers/AuthProvider";
+import {
+  buildOnboardingDraftOwnerKey,
+  clearOnboardingDraft,
+  getOnboardingDraft,
+  getRegistrationDraft,
+  saveOnboardingDraft,
+} from "../../auth/registrationDraft";
 import { BilgenlyLogo } from "../../../components/shared/BilgenlyLogo";
+import { getDashboardPathByRole } from "../../../lib/auth";
 import { progressMap, totalSteps } from "../content";
 import { onboardingStyles } from "../styles";
-import { updateRole } from "../../../features/auth/api";
 import {
   ExperienceStep,
   GoalStep,
@@ -14,16 +22,61 @@ import {
   RoleStep,
   WelcomeStep,
 } from "./Steps";
-import type { SelectedAnswers, StepKey } from "../types";
+import type { OnboardingAnswers } from "../../auth/types";
+import type { StepKey } from "../types";
+
+function getSafeInitialStep(step?: StepKey): StepKey {
+  if (!step || step === "signup" || step === "email") {
+    return "welcome";
+  }
+
+  return step === "loading" ? "recommendations" : step;
+}
+
+function hasRequiredAnswers(answers: OnboardingAnswers): answers is OnboardingAnswers & {
+  experience: string;
+  goal: string;
+  pace: string;
+  role: "teacher" | "student";
+} {
+  return Boolean(
+    answers.role &&
+      answers.goal &&
+      answers.experience &&
+      answers.pace,
+  );
+}
 
 export function BilgenlyOnboarding() {
-  const [step, setStep] = useState<StepKey>("welcome");
-  const [selected, setSelected] = useState<SelectedAnswers>({});
-  const [reminderTime, setReminderTime] = useState("12:00 PM");
+  const navigate = useNavigate();
+  const registrationDraft = getRegistrationDraft();
+  const {
+    completeOnboardingForAuthenticatedUser,
+    completeRegistration,
+    currentUser,
+    isAuthenticated,
+    onboardingCompleted,
+  } = useAuth();
+  const draftOwnerKey = buildOnboardingDraftOwnerKey({
+    registrationEmail: registrationDraft?.email,
+    userEmail: currentUser?.email,
+    userId: currentUser?.id,
+  });
+  const persistedDraft = getOnboardingDraft();
+  const isDraftOwnerValid =
+    !persistedDraft?.ownerKey || persistedDraft.ownerKey === draftOwnerKey;
+  const safePersistedDraft = isDraftOwnerValid ? persistedDraft : null;
+  const [step, setStep] = useState<StepKey>(() => getSafeInitialStep(safePersistedDraft?.step));
+  const [selected, setSelected] = useState<OnboardingAnswers>(() => safePersistedDraft?.answers ?? {});
+  const [reminderTime, setReminderTime] = useState(
+    () => safePersistedDraft?.reminderTime ?? "12:00 PM",
+  );
   const [loadingPct, setLoadingPct] = useState(0);
   const [fadeIn, setFadeIn] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const { signInAsRole } = useAuth();
+  const isAuthenticatedIncompleteUser = isAuthenticated && !onboardingCompleted;
 
   const go = (next: StepKey) => {
     setFadeIn(false);
@@ -32,6 +85,26 @@ export function BilgenlyOnboarding() {
       setFadeIn(true);
     }, 220);
   };
+
+  useEffect(() => {
+    if (persistedDraft && !isDraftOwnerValid) {
+      clearOnboardingDraft();
+      setStep("welcome");
+      setSelected({});
+      setReminderTime("12:00 PM");
+      setSubmitError(null);
+    }
+  }, [isDraftOwnerValid, persistedDraft]);
+
+  useEffect(() => {
+    saveOnboardingDraft({
+      answers: selected,
+      ownerKey: draftOwnerKey ?? undefined,
+      reminderTime,
+      step,
+      updatedAt: new Date().toISOString(),
+    });
+  }, [draftOwnerKey, reminderTime, selected, step]);
 
   useEffect(() => {
     if (step !== "loading") {
@@ -55,30 +128,60 @@ export function BilgenlyOnboarding() {
     return () => clearInterval(interval);
   }, [step]);
 
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    const [submitError, setSubmitError] = useState<string | null>(null);
+  const handleReminderContinue = () => {
+    setSelected((current) => ({
+      ...current,
+      reminderTime,
+    }));
+    go("loading");
+  };
 
-    const handleFinishOnboarding = async () => {
-        if (!selected.role) return;
+  const handleReminderSkip = () => {
+    setSelected((current) => ({
+      ...current,
+      reminderTime: null,
+    }));
+    go("loading");
+  };
 
-        setIsSubmitting(true);
-        setSubmitError(null);
+  const handleFinishOnboarding = async () => {
+    if (!hasRequiredAnswers(selected)) {
+      setSubmitError("Choose your role and complete the required onboarding steps to continue.");
+      return;
+    }
 
-        try {
-            const result = await updateRole(
-                selected.role.charAt(0).toUpperCase() + selected.role.slice(1)
-            );
-            signInAsRole(selected.role, result.token, {
-                userId: result.userId,
-                username: result.username,
-                email: result.email,
-                role: result.role,
-            });
-        } catch (err) {
-            setSubmitError(err instanceof Error ? err.message : "Something went wrong");
-            setIsSubmitting(false);
-        }
+    const finalAnswers = {
+      experience: selected.experience,
+      goal: selected.goal,
+      pace: selected.pace,
+      reminderTime: selected.reminderTime ?? null,
+      role: selected.role,
     };
+
+    setIsSubmitting(true);
+    setSubmitError(null);
+
+    try {
+      const completedUser = registrationDraft
+        ? await completeRegistration({
+            onboarding: finalAnswers,
+            registration: registrationDraft,
+          })
+        : isAuthenticatedIncompleteUser
+          ? await completeOnboardingForAuthenticatedUser(finalAnswers)
+          : null;
+
+      if (!completedUser) {
+        throw new Error("Your registration draft is missing. Please start from sign up again.");
+      }
+
+      clearOnboardingDraft();
+      navigate(getDashboardPathByRole(finalAnswers.role), { replace: true });
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : "Something went wrong");
+      setIsSubmitting(false);
+    }
+  };
 
   const progress = progressMap[step] || 0;
   const isWelcomeStep = step === "welcome";
@@ -214,16 +317,18 @@ export function BilgenlyOnboarding() {
                   go={go}
                   reminderTime={reminderTime}
                   setReminderTime={setReminderTime}
+                  onContinue={handleReminderContinue}
+                  onSkip={handleReminderSkip}
                 />
               )}
               {step === "loading" && <LoadingStep loadingPct={loadingPct} />}
-                {step === "recommendations" && (
-                    <RecommendationsStep
-                        onContinue={handleFinishOnboarding}
-                        isLoading={isSubmitting}
-                        error={submitError}
-                    />
-                )}
+              {step === "recommendations" && (
+                <RecommendationsStep
+                  onContinue={handleFinishOnboarding}
+                  isLoading={isSubmitting}
+                  error={submitError}
+                />
+              )}
             </div>
           </div>
         </>

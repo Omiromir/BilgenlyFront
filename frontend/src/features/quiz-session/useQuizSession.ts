@@ -32,7 +32,7 @@ export function useQuizSession(sessionId?: string | null) {
         submitAnswer: (_questionId: string) => undefined,
         setCurrentQuestion: (_questionIndex: number) => undefined,
         goToNextQuestion: () => undefined,
-        completeSession: () => undefined,
+        completeSession: async () => undefined,
       };
     }
 

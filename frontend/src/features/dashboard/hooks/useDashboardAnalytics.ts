@@ -268,7 +268,12 @@ function toTeacherAssignmentAnalytics(
     const status = mapStudentResultStatus(studentResult.status);
     const latestScore = studentResult.latestScore;
     const totalQuestions = studentResult.totalQuestions ?? assignmentAnalytics.questionCount;
-    const correctCount = studentResult.correctAnswers ?? 0;
+    const correctCount =
+      studentResult.correctAnswers !== null && studentResult.correctAnswers !== undefined
+        ? studentResult.correctAnswers
+        : latestScore !== null
+          ? Math.round((latestScore / 100) * totalQuestions)
+          : 0;
     const incorrectCount =
       studentResult.incorrectAnswers ?? Math.max(totalQuestions - correctCount, 0);
     const exhaustedAttempts = status === "attempts_exhausted";
@@ -434,11 +439,19 @@ export function useMyAnalytics(enabled = true) {
   );
 }
 
+export interface AssignmentInsightData {
+  attemptedStudentsCount: number;
+  exhaustedStudentsCount: number;
+  missedDeadlineCount: number;
+  completedCount: number;
+  totalStudents: number;
+  averageScore: number | null;
+  completionRate: number;
+  inProgressCount: number;
+}
+
 export function useAssignmentInsights(assignments: TeacherClassAssignedQuiz[]) {
-  const [data, setData] = useState<Record<
-    string,
-    { attemptedStudentsCount: number; exhaustedStudentsCount: number; missedDeadlineCount: number }
-  >>({});
+  const [data, setData] = useState<Record<string, AssignmentInsightData>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -474,7 +487,12 @@ export function useAssignmentInsights(assignments: TeacherClassAssignedQuiz[]) {
               (student) => student.status === "attempts_exhausted",
             ).length,
             missedDeadlineCount: analytics.missedDeadlineCount,
-          },
+            completedCount: analytics.completedCount,
+            totalStudents: analytics.totalStudents,
+            averageScore: analytics.averageScore,
+            completionRate: analytics.completionRate,
+            inProgressCount: analytics.inProgressCount,
+          } satisfies AssignmentInsightData,
         ] as const;
       }),
     )

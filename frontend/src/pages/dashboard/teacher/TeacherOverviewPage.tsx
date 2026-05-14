@@ -7,6 +7,7 @@ import { useAuth } from "../../../app/providers/AuthProvider";
 import { useQuizLibrary } from "../../../app/providers/QuizLibraryProvider";
 import { useQuizSessions } from "../../../app/providers/QuizSessionProvider";
 import { useTeacherClasses } from "../../../app/providers/TeacherClassesProvider";
+import { useAssignmentInsights } from "../../../features/dashboard/hooks/useDashboardAnalytics";
 import { AssignmentSettingsForm } from "../../../features/assignments/AssignmentControls";
 import {
   DEFAULT_ASSIGNMENT_SETTINGS_VALUES,
@@ -18,6 +19,7 @@ import { DashboardPageHeader } from "../../../features/dashboard/components/Dash
 import {
   DashboardBadge,
   DashboardButton,
+  DashboardSurface,
   dashboardPageClassName,
   dashboardSplitGridClassName,
   dashboardStatsGridClassName,
@@ -44,6 +46,20 @@ export function TeacherOverviewPage() {
   const { quizzes } = useQuizLibrary();
   const { classes, assignQuizToClasses } = useTeacherClasses();
   const { sharedAssignedSessions } = useQuizSessions();
+
+  // All assignments across active teacher classes — used to batch-fetch backend insights.
+  const allAssignments = useMemo(
+    () =>
+      classes
+        .filter((teacherClass) => teacherClass.status === "active")
+        .flatMap((teacherClass) => teacherClass.assignedQuizzes),
+    [classes],
+  );
+  const {
+    data: backendInsights,
+    isLoading: insightsLoading,
+  } = useAssignmentInsights(allAssignments);
+
   const [quizPendingAssignment, setQuizPendingAssignment] =
     useState<RecentQuizOverviewItem | null>(null);
   const [selectedClassIds, setSelectedClassIds] = useState<string[]>([]);
@@ -64,8 +80,9 @@ export function TeacherOverviewPage() {
         quizzes,
         sharedAssignedSessions,
         currentTeacherName: currentUser?.fullName,
+        backendInsights,
       }),
-    [classes, currentUser?.fullName, quizzes, sharedAssignedSessions],
+    [backendInsights, classes, currentUser?.fullName, quizzes, sharedAssignedSessions],
   );
 
   const getAssignedClassIdsForQuiz = (quizId: string) =>
@@ -210,9 +227,24 @@ export function TeacherOverviewPage() {
       />
 
       <div className={dashboardStatsGridClassName}>
-        {overview.stats.map((stat) => (
-          <StatCard key={stat.title} {...stat} />
-        ))}
+        {insightsLoading && allAssignments.length > 0
+          ? [0, 1, 2, 3].map((i) => (
+              <DashboardSurface key={i} asChild radius="xl" padding="md">
+                <article>
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="space-y-2">
+                      <div className="h-4 w-28 animate-pulse rounded-lg bg-[var(--dashboard-surface-muted)]" />
+                      <div className="h-9 w-20 animate-pulse rounded-lg bg-[var(--dashboard-surface-muted)]" />
+                      <div className="h-4 w-36 animate-pulse rounded-lg bg-[var(--dashboard-surface-muted)]" />
+                    </div>
+                    <div className="h-11 w-11 animate-pulse rounded-[14px] bg-[var(--dashboard-surface-muted)]" />
+                  </div>
+                </article>
+              </DashboardSurface>
+            ))
+          : overview.stats.map((stat) => (
+              <StatCard key={stat.title} {...stat} />
+            ))}
       </div>
 
       <div className={dashboardSplitGridClassName}>
@@ -220,12 +252,46 @@ export function TeacherOverviewPage() {
           title="Recent Quizzes"
           description="The latest quizzes you've created or turned into assigned quizzes, with live completion and intervention signals from real class activity."
         >
-          <RecentQuizzesList
-            quizzes={overview.recentQuizzes}
-            onViewDetails={handleViewQuizDetails}
-            onEdit={handleEditQuiz}
-            onAssign={handleOpenAssignQuiz}
-          />
+          {insightsLoading && allAssignments.length > 0 ? (
+            <div className="space-y-4">
+              {[0, 1].map((i) => (
+                <DashboardSurface key={i} asChild radius="md" padding="sm">
+                  <article className="space-y-5">
+                    <div className="space-y-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div className="h-5 w-48 animate-pulse rounded-lg bg-[var(--dashboard-surface-muted)]" />
+                        <div className="h-5 w-24 animate-pulse rounded-full bg-[var(--dashboard-surface-muted)]" />
+                      </div>
+                      <div className="flex gap-5">
+                        <div className="h-4 w-28 animate-pulse rounded-lg bg-[var(--dashboard-surface-muted)]" />
+                        <div className="h-4 w-24 animate-pulse rounded-lg bg-[var(--dashboard-surface-muted)]" />
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-3">
+                      {[0, 1, 2].map((j) => (
+                        <div
+                          key={j}
+                          className="h-16 w-32 animate-pulse rounded-[16px] bg-[var(--dashboard-surface-muted)]"
+                        />
+                      ))}
+                    </div>
+                    <div className="flex gap-2.5 border-t border-[var(--dashboard-border-soft)] pt-4">
+                      <div className="h-10 flex-1 animate-pulse rounded-[14px] bg-[var(--dashboard-surface-muted)]" />
+                      <div className="h-10 w-10 animate-pulse rounded-[14px] bg-[var(--dashboard-surface-muted)]" />
+                      <div className="h-10 w-28 animate-pulse rounded-[14px] bg-[var(--dashboard-surface-muted)]" />
+                    </div>
+                  </article>
+                </DashboardSurface>
+              ))}
+            </div>
+          ) : (
+            <RecentQuizzesList
+              quizzes={overview.recentQuizzes}
+              onViewDetails={handleViewQuizDetails}
+              onEdit={handleEditQuiz}
+              onAssign={handleOpenAssignQuiz}
+            />
+          )}
         </SectionCard>
 
         <SectionCard

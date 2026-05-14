@@ -18,6 +18,7 @@ import {
 } from "../teacher-analytics/teacherQuizAnalyticsUtils";
 import { normalizeEmail } from "../../../auth/validation";
 import { formatCurrentShortDate } from "../../settings/settingsPreferences";
+import type { AssignmentInsightData } from "../../hooks/useDashboardAnalytics";
 
 export interface TeacherOverviewStatItem {
   title: string;
@@ -67,6 +68,9 @@ interface TeacherOverviewInput {
   sharedAssignedSessions: SharedAssignedQuizSessionRecord[];
   currentTeacherName?: string | null;
   threshold?: number;
+  /** Backend analytics keyed by assignmentId. When provided, used as source of
+   *  truth for completion counts, average score, and completion rate. */
+  backendInsights?: Record<string, AssignmentInsightData>;
 }
 
 interface AssignmentAnalyticsSnapshot {
@@ -256,6 +260,7 @@ function buildOverviewStats(
   teacherOwnedQuizzes: QuizRecord[],
   activeClasses: TeacherClassRecord[],
   assignmentSnapshots: AssignmentAnalyticsSnapshot[],
+  backendInsights?: Record<string, AssignmentInsightData>,
 ) {
   const draftQuizCount = teacherOwnedQuizzes.filter((quiz) =>
     isDraftLikeQuizStatus(quiz.status),
@@ -270,11 +275,18 @@ function buildOverviewStats(
       teacherClass.students.filter((student) => student.status === "joined").length,
     0,
   );
-  const latestScores = assignmentSnapshots.flatMap((snapshot) =>
-    snapshot.analytics.rows
-      .filter((row) => row.latestScore !== null)
-      .map((row) => row.latestScore as number),
-  );
+
+  // Prefer backend analytics scores (source of truth) over local session scores.
+  const latestScores = backendInsights
+    ? Object.values(backendInsights)
+        .map((insight) => insight.averageScore)
+        .filter((score): score is number => score !== null)
+    : assignmentSnapshots.flatMap((snapshot) =>
+        snapshot.analytics.rows
+          .filter((row) => row.latestScore !== null)
+          .map((row) => row.latestScore as number),
+      );
+
   const averageStudentAccuracy = latestScores.length
     ? Math.round(
         latestScores.reduce((total, score) => total + score, 0) /
@@ -329,6 +341,7 @@ function buildOverviewStats(
 function buildRecentQuizzes(
   teacherOwnedQuizzes: QuizRecord[],
   assignmentSnapshots: AssignmentAnalyticsSnapshot[],
+  backendInsights?: Record<string, AssignmentInsightData>,
   limit = 4,
 ) {
   const recentQuizzes = new Map<string, RecentQuizAccumulator>();
@@ -386,24 +399,36 @@ function buildRecentQuizzes(
       accumulator.questionCount,
       assignment.questionCount,
     );
+    // Prefer backend insight for this assignment when available.
+    const insight = backendInsights?.[assignment.assignmentId];
     accumulator.assignmentCount += 1;
-    accumulator.assignedStudentsCount += analytics.assignedStudentsCount;
-    accumulator.completedCount += analytics.completedStudentsCount;
-    accumulator.inProgressCount += analytics.rows.filter(
-      (row) => row.status === "in-progress",
-    ).length;
-    accumulator.notStartedCount += analytics.rows.filter(
-      (row) => row.status === "not-started",
-    ).length;
-    analytics.rows.forEach((row) => {
-      if (
-        row.status !== "completed" ||
-        row.flags.length > 0 ||
-        (row.latestScore ?? 100) < DEFAULT_INTERVENTION_THRESHOLD
-      ) {
-        accumulator.needsReviewStudents.add(getStudentKey(row.student));
-      }
-    });
+    if (insight) {
+      accumulator.assignedStudentsCount += insight.totalStudents;
+      accumulator.completedCount += insight.completedCount;
+      accumulator.inProgressCount += insight.inProgressCount;
+      accumulator.notStartedCount += Math.max(
+        0,
+        insight.totalStudents - insight.completedCount - insight.inProgressCount,
+      );
+    } else {
+      accumulator.assignedStudentsCount += analytics.assignedStudentsCount;
+      accumulator.completedCount += analytics.completedStudentsCount;
+      accumulator.inProgressCount += analytics.rows.filter(
+        (row) => row.status === "in-progress",
+      ).length;
+      accumulator.notStartedCount += analytics.rows.filter(
+        (row) => row.status === "not-started",
+      ).length;
+      analytics.rows.forEach((row) => {
+        if (
+          row.status !== "completed" ||
+          row.flags.length > 0 ||
+          (row.latestScore ?? 100) < DEFAULT_INTERVENTION_THRESHOLD
+        ) {
+          accumulator.needsReviewStudents.add(getStudentKey(row.student));
+        }
+      });
+    }
 
     if (assignedAtTimestamp >= accumulator.latestActivityAt) {
       accumulator.latestActivityAt = assignedAtTimestamp;
@@ -578,9 +603,12 @@ export function buildTeacherOverviewData({
   sharedAssignedSessions,
   currentTeacherName,
   threshold = DEFAULT_INTERVENTION_THRESHOLD,
+  backendInsights,
 }: TeacherOverviewInput) {
   const activeClasses = classes.filter((teacherClass) => teacherClass.status === "active");
   const teacherOwnedQuizzes = getTeacherOwnedQuizzes(quizzes, currentTeacherName);
+  // Local session snapshots are still used for struggling-topic analysis (per-question tag data
+  // is not yet exposed by the backend). Completion/score fields are overridden by backendInsights.
   const assignmentSnapshots = buildAssignmentAnalyticsSnapshots(
     activeClasses,
     sharedAssignedSessions,
@@ -588,8 +616,8 @@ export function buildTeacherOverviewData({
   );
 
   return {
-    stats: buildOverviewStats(teacherOwnedQuizzes, activeClasses, assignmentSnapshots),
-    recentQuizzes: buildRecentQuizzes(teacherOwnedQuizzes, assignmentSnapshots),
+    stats: buildOverviewStats(teacherOwnedQuizzes, activeClasses, assignmentSnapshots, backendInsights),
+    recentQuizzes: buildRecentQuizzes(teacherOwnedQuizzes, assignmentSnapshots, backendInsights),
     strugglingTopics: buildStrugglingTopics(assignmentSnapshots, threshold),
   };
 }

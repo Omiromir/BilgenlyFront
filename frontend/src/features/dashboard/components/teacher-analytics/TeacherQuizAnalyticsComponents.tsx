@@ -924,8 +924,8 @@ export function StudentQuizInsightsPanel({
               <Accordion type="multiple" className="space-y-3">
                 {responseItems.map(({ question, questionNumber, isCorrect, statusLabel }) => (
                   <AccordionItem
-                    key={question.id}
-                    value={question.id}
+                    key={question.questionId}
+                    value={question.questionId}
                     className="rounded-[18px] border border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-muted)] px-4"
                   >
                     <AccordionTrigger className="py-4 hover:no-underline">
@@ -945,13 +945,13 @@ export function StudentQuizInsightsPanel({
                       <div className={dashboardInsetBlockClassName}>
                         <p className={dashboardMetaTextClassName}>Student answer</p>
                         <p className="mt-1 text-sm leading-6 text-[var(--dashboard-text-strong)]">
-                          {buildSelectedAnswerLabel(row, question.id)}
+                          {buildSelectedAnswerLabel(row, question.questionId)}
                         </p>
                       </div>
                       <div className={dashboardInsetBlockClassName}>
                         <p className={dashboardMetaTextClassName}>Correct answer</p>
                         <p className="mt-1 text-sm leading-6 text-[var(--dashboard-text-strong)]">
-                          {buildCorrectAnswerLabel(row, question.id)}
+                          {buildCorrectAnswerLabel(row, question.questionId)}
                         </p>
                       </div>
                       {question.explanation ? (
@@ -977,9 +977,7 @@ export function StudentQuizInsightsPanel({
                 Per-question responses unavailable
               </p>
               <p className="mt-2 text-sm leading-6 text-[var(--dashboard-text-soft)]">
-                {row.responseCount
-                  ? `This student has submitted the quiz. The backend currently returned a summary result only (${row.latestScore !== null ? `${row.latestScore}%` : "score"}, ${row.correctCount}/${row.totalQuestions} correct, ${row.responseCount} responses).`
-                  : `This student has submitted the quiz. The backend returned the overall result only (${row.latestScore !== null ? `${row.latestScore}%` : "score"}, ${row.correctCount}/${row.totalQuestions} correct).`}
+                {`Per-question breakdown is not available for this submission${row.latestScore !== null ? ` (${row.latestScore}%, ${row.correctCount}/${row.totalQuestions} correct)` : ""}.`}
               </p>
             </div>
           ) : (

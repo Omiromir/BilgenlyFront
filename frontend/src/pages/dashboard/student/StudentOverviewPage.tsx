@@ -38,7 +38,7 @@ export function StudentOverviewPage() {
   const { currentUser } = useAuth();
   const { classes } = useTeacherClasses();
   const { quizzes } = useQuizLibrary();
-  const { getCompletedSessionsForRole, sessions } = useQuizSessions();
+  const { sessions } = useQuizSessions();
   const { openQuiz } = useQuizLauncher();
   const studentViewer = currentUser?.role === "student" ? currentUser : null;
   const studentIdentity = useMemo(
@@ -54,6 +54,19 @@ export function StudentOverviewPage() {
     error: attemptsError,
   } = useStudentAttempts();
 
+  // Completed attempts from backend, sorted newest first. This is the
+  // single source of truth for overview stats — no localStorage dependency.
+  const completedAttempts = useMemo(
+    () =>
+      allAttempts
+        .filter((attempt) => attempt.isCompleted)
+        .sort(
+          (left, right) =>
+            new Date(right.dateTaken).getTime() - new Date(left.dateTaken).getTime(),
+        ),
+    [allAttempts],
+  );
+
   const studentSources = useMemo(
     () =>
       buildStudentQuizLibrarySources(
@@ -67,17 +80,14 @@ export function StudentOverviewPage() {
       ),
     [allAttempts, attemptsError, attemptsLoading, classes, quizzes, sessions, studentIdentity],
   );
-  const completedSessions = useMemo(
-    () => getCompletedSessionsForRole("student"),
-    [getCompletedSessionsForRole],
-  );
   const overview = useMemo(
     () =>
       buildStudentOverviewData({
         studentSources,
-        completedSessions,
+        completedAttempts,
+        attemptsLoading,
       }),
-    [completedSessions, studentSources],
+    [attemptsLoading, completedAttempts, studentSources],
   );
   const assignedPreview = useMemo(
     () =>
@@ -185,15 +195,50 @@ export function StudentOverviewPage() {
       />
 
       <div className={dashboardStatsGridClassName}>
-        {overview.stats.map((stat) => (
-          <StatCard key={stat.title} {...stat} />
-        ))}
+        {attemptsLoading
+          ? [0, 1, 2, 3].map((i) => (
+              <DashboardSurface key={i} asChild radius="xl" padding="md">
+                <article>
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="space-y-2">
+                      <div className="h-4 w-28 animate-pulse rounded-lg bg-[var(--dashboard-surface-muted)]" />
+                      <div className="h-9 w-20 animate-pulse rounded-lg bg-[var(--dashboard-surface-muted)]" />
+                      <div className="h-4 w-36 animate-pulse rounded-lg bg-[var(--dashboard-surface-muted)]" />
+                    </div>
+                    <div className="h-11 w-11 animate-pulse rounded-[14px] bg-[var(--dashboard-surface-muted)]" />
+                  </div>
+                </article>
+              </DashboardSurface>
+            ))
+          : overview.stats.map((stat) => (
+              <StatCard key={stat.title} {...stat} />
+            ))}
       </div>
 
       <div className={dashboardSplitGridClassName}>
         <SectionCard title="Assigned Quizzes">
           <div className={dashboardSectionStackClassName}>
-            {assignedPreview.length ? (
+            {attemptsLoading ? (
+              [0, 1].map((i) => (
+                <DashboardSurface key={i} asChild radius="md" padding="sm">
+                  <article>
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1 space-y-2">
+                        <div className="h-5 w-48 animate-pulse rounded-lg bg-[var(--dashboard-surface-muted)]" />
+                        <div className="h-4 w-32 animate-pulse rounded-lg bg-[var(--dashboard-surface-muted)]" />
+                        <div className="mt-1 flex gap-5">
+                          <div className="h-4 w-20 animate-pulse rounded-lg bg-[var(--dashboard-surface-muted)]" />
+                          <div className="h-4 w-16 animate-pulse rounded-lg bg-[var(--dashboard-surface-muted)]" />
+                        </div>
+                      </div>
+                      <div className="h-4 w-16 animate-pulse rounded-lg bg-[var(--dashboard-surface-muted)]" />
+                    </div>
+                    <div className="mt-4 h-4 w-36 animate-pulse rounded-lg bg-[var(--dashboard-surface-muted)]" />
+                    <div className="mt-5 h-10 w-full animate-pulse rounded-[14px] bg-[var(--dashboard-surface-muted)]" />
+                  </article>
+                </DashboardSurface>
+              ))
+            ) : assignedPreview.length ? (
               assignedPreview.map((assignment) => (
                 <DashboardSurface
                   asChild
@@ -281,7 +326,24 @@ export function StudentOverviewPage() {
 
         <SectionCard title="Recent Results">
           <div className={dashboardSectionStackClassName}>
-            {overview.recentResults.length ? (
+            {attemptsLoading ? (
+              [0, 1, 2].map((i) => (
+                <article
+                  key={i}
+                  className="flex items-start justify-between gap-4 rounded-[18px] px-3 py-4"
+                >
+                  <div className="flex items-start gap-4">
+                    <div className="mt-1 h-5 w-5 animate-pulse rounded-full bg-[var(--dashboard-surface-muted)]" />
+                    <div className="space-y-2">
+                      <div className="h-5 w-40 animate-pulse rounded-lg bg-[var(--dashboard-surface-muted)]" />
+                      <div className="h-4 w-24 animate-pulse rounded-lg bg-[var(--dashboard-surface-muted)]" />
+                      <div className="h-4 w-32 animate-pulse rounded-lg bg-[var(--dashboard-surface-muted)]" />
+                    </div>
+                  </div>
+                  <div className="h-9 w-14 animate-pulse rounded-lg bg-[var(--dashboard-surface-muted)]" />
+                </article>
+              ))
+            ) : overview.recentResults.length ? (
               overview.recentResults.map((result, index) => (
                 <article
                   key={`${result.title}-${result.date}`}

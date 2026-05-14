@@ -5,12 +5,8 @@ import {
   TrendingUp,
   type LucideIcon,
 } from "../../../../components/icons/AppIcons";
-import type { QuizSessionRecord } from "../../../quiz-session/quizSessionTypes";
-import {
-  formatQuizAttemptDate,
-  formatQuizPoints,
-  getQuizSessionResultSummary,
-} from "../../../quiz-session/quizSessionUtils";
+import type { MyAttemptDto } from "../../../quiz-session/api/attemptsApi";
+import { formatQuizAttemptDate } from "../../../quiz-session/quizSessionUtils";
 import type { StudentQuizLibrarySources } from "../quiz-library/studentQuizLibrarySources";
 
 export interface StudentOverviewStatItem {
@@ -31,7 +27,9 @@ export interface StudentOverviewRecentResultItem {
 
 interface StudentOverviewDataInput {
   studentSources: StudentQuizLibrarySources;
-  completedSessions: QuizSessionRecord[];
+  /** Completed attempts from backend /api/attempts/my — sorted newest first. */
+  completedAttempts: MyAttemptDto[];
+  attemptsLoading: boolean;
 }
 
 function getLocalDayStart(value: string) {
@@ -53,11 +51,12 @@ function pluralize(value: number, noun: string) {
   return `${value} ${noun}${value === 1 ? "" : "s"}`;
 }
 
-function getStreaks(completedSessions: QuizSessionRecord[]) {
+/** Derive current and best streak from backend attempt dates (no localStorage dependency). */
+function getStreaksFromAttempts(completedAttempts: MyAttemptDto[]) {
   const uniqueDayStarts = Array.from(
     new Set(
-      completedSessions
-        .map((session) => session.finishedAt ?? session.updatedAt)
+      completedAttempts
+        .map((attempt) => attempt.dateTaken)
         .map((value) => getLocalDayStart(value))
         .filter((date): date is Date => date !== null)
         .map((date) => date.getTime()),
@@ -119,50 +118,43 @@ function getStreaks(completedSessions: QuizSessionRecord[]) {
   return { current, best };
 }
 
-function getCompletedThisWeek(completedSessions: QuizSessionRecord[]) {
+function getCompletedThisWeek(completedAttempts: MyAttemptDto[]) {
   const sevenDaysAgo = Date.now() - 6 * 24 * 60 * 60 * 1000;
 
-  return completedSessions.filter((session) => {
-    const completedAt = getTimestamp(session.finishedAt ?? session.updatedAt);
-    return completedAt >= sevenDaysAgo;
+  return completedAttempts.filter((attempt) => {
+    return getTimestamp(attempt.dateTaken) >= sevenDaysAgo;
   }).length;
 }
 
+/**
+ * Badge unlock rules derived entirely from backend attempt data.
+ * No localStorage dependency. "Fast finish" rule is omitted because
+ * MyAttemptDto only has dateTaken (submit time), not a separate start time.
+ */
 function getUnlockedBadgeCount(
   studentSources: StudentQuizLibrarySources,
-  completedSessions: QuizSessionRecord[],
+  completedAttempts: MyAttemptDto[],
   averageScore: number | null,
   perfectScores: number,
   currentStreak: number,
   completedThisWeek: number,
 ) {
-  const assignmentCompletions = completedSessions.filter((session) =>
-    Boolean(session.assignmentContext),
+  const assignmentCompletions = completedAttempts.filter((attempt) =>
+    Boolean(attempt.assignmentId),
   ).length;
-  const fastFinishes = completedSessions.filter((session) => {
-    const startedAt = getTimestamp(session.startedAt);
-    const finishedAt = getTimestamp(session.finishedAt ?? session.updatedAt);
-
-    if (!startedAt || !finishedAt) {
-      return false;
-    }
-
-    return finishedAt - startedAt <= 15 * 60 * 1000;
-  }).length;
 
   const unlockedRules = [
-    completedSessions.length >= 1,
-    completedSessions.length >= 5,
-    completedSessions.length >= 10,
+    completedAttempts.length >= 1,
+    completedAttempts.length >= 5,
+    completedAttempts.length >= 10,
     perfectScores >= 1,
     currentStreak >= 3,
     currentStreak >= 7,
     completedThisWeek >= 3,
     studentSources.activeMemberships.length >= 2,
     assignmentCompletions >= 3,
-    averageScore !== null && averageScore >= 85 && completedSessions.length >= 3,
-    averageScore !== null && averageScore >= 90 && completedSessions.length >= 5,
-    fastFinishes >= 1,
+    averageScore !== null && averageScore >= 85 && completedAttempts.length >= 3,
+    averageScore !== null && averageScore >= 90 && completedAttempts.length >= 5,
   ];
 
   return unlockedRules.filter(Boolean).length;
@@ -170,34 +162,36 @@ function getUnlockedBadgeCount(
 
 function buildOverviewStats(
   studentSources: StudentQuizLibrarySources,
-  completedSessions: QuizSessionRecord[],
+  completedAttempts: MyAttemptDto[],
+  attemptsLoading: boolean,
 ) {
-  const scores = completedSessions.map(
-    (session) => getQuizSessionResultSummary(session).percentage,
-  );
-  const latestResult = completedSessions[0]
-    ? getQuizSessionResultSummary(completedSessions[0])
-    : null;
+  const scores = completedAttempts.map((attempt) => attempt.score);
+  const latestAttempt = completedAttempts[0] ?? null;
   const latestScore = scores[0] ?? null;
   const averageScore = scores.length
     ? Math.round(scores.reduce((total, score) => total + score, 0) / scores.length)
     : null;
   const perfectScores = scores.filter((score) => score === 100).length;
-  const { current, best } = getStreaks(completedSessions);
-  const completedThisWeek = getCompletedThisWeek(completedSessions);
+  const { current, best } = getStreaksFromAttempts(completedAttempts);
+  const completedThisWeek = getCompletedThisWeek(completedAttempts);
   const badgeCount = getUnlockedBadgeCount(
     studentSources,
-    completedSessions,
+    completedAttempts,
     averageScore,
     perfectScores,
     current,
     completedThisWeek,
   );
 
+  const latestDetailText =
+    latestAttempt !== null
+      ? `Latest result ${latestAttempt.correctAnswers}/${latestAttempt.totalQuestions} correct · ${latestAttempt.score}%`
+      : "Complete a quiz to track your progress";
+
   return [
     {
       title: "Current Streak",
-      value: pluralize(current, "day"),
+      value: attemptsLoading ? "..." : pluralize(current, "day"),
       change:
         best > 0
           ? `Best: ${pluralize(best, "day")}`
@@ -208,7 +202,7 @@ function buildOverviewStats(
     },
     {
       title: "Quizzes Completed",
-      value: String(completedSessions.length),
+      value: attemptsLoading ? "..." : String(completedAttempts.length),
       change: completedThisWeek
         ? `+${completedThisWeek} this week`
         : "No finished quizzes this week yet",
@@ -218,21 +212,15 @@ function buildOverviewStats(
     },
     {
       title: "Average Score",
-      value: averageScore === null ? "--" : `${averageScore}%`,
-      change:
-        latestScore === null
-          ? "Complete a quiz to track your progress"
-          : `Latest result ${formatQuizPoints(
-              latestResult?.earnedPoints ?? 0,
-              latestResult?.totalPoints ?? 0,
-            )} · ${latestScore}%`,
+      value: attemptsLoading ? "..." : averageScore === null ? "--" : `${averageScore}%`,
+      change: attemptsLoading ? "Loading your results..." : latestDetailText,
       icon: TrendingUp,
       iconClassName:
         "bg-[var(--dashboard-brand-soft)] text-[var(--dashboard-brand-strong)]",
     },
     {
       title: "Badges Earned",
-      value: String(badgeCount),
+      value: attemptsLoading ? "..." : String(badgeCount),
       change:
         perfectScores > 0
           ? `${perfectScores} perfect score${perfectScores === 1 ? "" : "s"} unlocked`
@@ -244,16 +232,15 @@ function buildOverviewStats(
   ] satisfies StudentOverviewStatItem[];
 }
 
-function buildRecentResults(completedSessions: QuizSessionRecord[]) {
-  return completedSessions.slice(0, 3).map((session) => {
-    const result = getQuizSessionResultSummary(session);
-    const score = result.percentage;
+function buildRecentResults(completedAttempts: MyAttemptDto[]) {
+  return completedAttempts.slice(0, 3).map((attempt) => {
+    const score = attempt.score;
 
     return {
-      title: session.quiz.title,
-      date: formatQuizAttemptDate(session.finishedAt ?? session.updatedAt),
+      title: attempt.quizTitle,
+      date: formatQuizAttemptDate(attempt.dateTaken),
       score: `${score}%`,
-      detail: formatQuizPoints(result.earnedPoints, result.totalPoints),
+      detail: `${attempt.correctAnswers}/${attempt.totalQuestions} correct`,
       scoreTone: score >= 90 ? "emerald" : "blue",
     } satisfies StudentOverviewRecentResultItem;
   });
@@ -261,10 +248,11 @@ function buildRecentResults(completedSessions: QuizSessionRecord[]) {
 
 export function buildStudentOverviewData({
   studentSources,
-  completedSessions,
+  completedAttempts,
+  attemptsLoading,
 }: StudentOverviewDataInput) {
   return {
-    stats: buildOverviewStats(studentSources, completedSessions),
-    recentResults: buildRecentResults(completedSessions),
+    stats: buildOverviewStats(studentSources, completedAttempts, attemptsLoading),
+    recentResults: buildRecentResults(completedAttempts),
   };
 }

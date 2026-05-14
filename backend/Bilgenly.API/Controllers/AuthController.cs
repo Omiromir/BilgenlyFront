@@ -37,14 +37,21 @@ public class AuthController  : ControllerBase
 
     [HttpGet("me")]
     [Authorize]
-    public IActionResult Me()
+    public async Task<IActionResult> Me()
     {
-        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        var email = User.FindFirst(ClaimTypes.Email)?.Value;
-        var username = User.FindFirst(ClaimTypes.Name)?.Value;
-        var role  = User.FindFirst(ClaimTypes.Role)?.Value;
+        var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+        var user = await _authService.GetUserByIdAsync(userId);
+        if (user is null) return Unauthorized();
 
-        return Ok(new { userId, email, username, role, onboardingCompleted = true });
+        return Ok(new {
+            userId = user.Id.ToString(),
+            email = user.Email,
+            username = user.Username,
+            role = user.Role.ToString(),
+            bio = user.Bio,
+            avatarUrl = user.AvatarUrl,
+            onboardingCompleted = true
+        });
     }
     [HttpPatch("role")]
     [Authorize]
@@ -52,6 +59,15 @@ public class AuthController  : ControllerBase
     {
         var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
         var (result, error) = await _authService.UpdateRoleAsync(userId, dto);
+        if (result is null) return BadRequest(new { message = error });
+        return Ok(result);
+    }
+    [HttpPatch("profile")]
+    [Authorize]
+    public async Task<IActionResult> UpdateProfile([FromBody] UpdateProfileDto dto)
+    {
+        var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+        var (result, error) = await _authService.UpdateProfileAsync(userId, dto);
         if (result is null) return BadRequest(new { message = error });
         return Ok(result);
     }

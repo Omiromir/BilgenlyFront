@@ -14,12 +14,17 @@ public class AuthService
 {
     private readonly IUserRepository _userRepository;
     private readonly IConfiguration _configuration;
-
+    private static readonly HashSet<string> AllowedAvatars = new()
+    {
+        "avatar_1", "avatar_2", "avatar_3", "avatar_4"
+    };
     public AuthService(IUserRepository userRepository, IConfiguration configuration)
     {
         _userRepository = userRepository;
         _configuration = configuration;
     }
+    public async Task<User?> GetUserByIdAsync(Guid userId)
+        => await _userRepository.GetByIdAsync(userId);
 
     public async Task<(AuthResponseDto? Response, string? Error)> RegisterAsync(RegisterDto dto)
     {
@@ -91,6 +96,37 @@ public class AuthService
             );
             return new JwtSecurityTokenHandler().WriteToken(token);
         }
+    public async Task<(AuthResponseDto? Response, string? Error)> UpdateProfileAsync(
+        Guid userId, UpdateProfileDto dto)
+    {
+        var user = await _userRepository.GetByIdAsync(userId);
+        if (user is null) return (null, "User not found");
+
+        if (!string.IsNullOrWhiteSpace(dto.Username))
+            user.Username = dto.Username.Trim();
+
+        if (dto.Bio is not null)
+            user.Bio = dto.Bio.Trim();
+
+        if (dto.AvatarUrl is not null)
+        {
+            if (!AllowedAvatars.Contains(dto.AvatarUrl))
+                return (null, "Invalid avatar selection");
+
+            user.AvatarUrl = dto.AvatarUrl;
+        }
+
+        await _userRepository.SaveChangesAsync();
+
+        return (new AuthResponseDto
+        {
+            UserId = user.Id.ToString(),
+            Token = GenerateToken(user),
+            Username = user.Username,
+            Email = user.Email,
+            Role = user.Role.ToString()
+        }, null);
+    }
     public async Task<(bool Success, string? Error)> ChangePasswordAsync(
         Guid userId, ChangePasswordDto dto)
     {

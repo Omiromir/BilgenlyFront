@@ -6,7 +6,6 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
-using Bilgenly.Infrastructure.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -70,7 +69,14 @@ builder.Services.AddScoped<AnalyticsService>();
 builder.Services.AddScoped<IClassRepository, ClassRepository>();
 builder.Services.AddScoped<ClassService>();
 builder.Services.AddScoped<QuizGenerationService>();
-builder.Services.AddScoped<IAiService, AiServiceStub>(); // potom udalit
+builder.Services.AddHttpClient<IAiService, AiService>(client =>
+{
+    var baseUrl = builder.Configuration["AiService:BaseUrl"]
+                  ?? throw new InvalidOperationException(
+                      "AiService:BaseUrl is not configured in appsettings.");
+    client.BaseAddress = new Uri(baseUrl);
+    client.Timeout     = TimeSpan.FromMinutes(5);
+});
 builder.Services.AddScoped<IBadgeRepository, BadgeRepository>();
 builder.Services.AddScoped<AchievementsService>();
 builder.Services.AddControllers();

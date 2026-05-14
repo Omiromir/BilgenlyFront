@@ -7,6 +7,8 @@ public class User
     public string Email { get; set; } = string.Empty;
     public string PasswordHash { get; set; } = string.Empty;
     public UserRole Role { get; set; }
+    public string? Bio { get; set; }
+    public string? AvatarUrl { get; set; }
     public ICollection<Quiz> Quizzes { get; set; } = new List<Quiz>();
     public ICollection<Attempt> Attempts { get; set; } = new List<Attempt>();
 }

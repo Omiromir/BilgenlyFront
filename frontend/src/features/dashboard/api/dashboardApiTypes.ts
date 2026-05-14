@@ -83,8 +83,47 @@ export interface StudentAssignmentResultDto {
   attemptsRemaining: number | null;
   latestScore: number | null;
   bestScore: number | null;
+  averageScore: number | null;
+  latestAttemptId: string | null;
   lastAttemptAt: string | null;
+  totalQuestions: number | null;
+  correctAnswers: number | null;
+  incorrectAnswers: number | null;
+  responsesCount: number | null;
+  hasDetailedResponses: boolean;
+  attempts: StudentAttemptAnalyticsDto[];
+  latestAttemptQuestions: StudentAttemptQuestionResponseDto[];
   missedDeadline: boolean;
+}
+
+export interface StudentAttemptAnalyticsDto {
+  attemptId: string;
+  score: number;
+  submittedAt: string;
+  totalQuestions: number;
+  correctAnswers: number;
+  incorrectAnswers: number;
+  responsesCount: number;
+}
+
+export interface StudentAttemptQuestionResponseOptionDto {
+  id: string;
+  text: string;
+  isCorrect: boolean;
+}
+
+export interface StudentAttemptQuestionResponseDto {
+  questionId: string;
+  questionText: string;
+  questionType: string;
+  position: number;
+  explanation: string;
+  selectedAnswerId?: string | null;
+  selectedAnswerText?: string | null;
+  correctAnswerId?: string | null;
+  correctAnswerText?: string | null;
+  isCorrect: boolean;
+  answerOptions: StudentAttemptQuestionResponseOptionDto[];
 }
 
 export interface QuestionAnalyticsDto {

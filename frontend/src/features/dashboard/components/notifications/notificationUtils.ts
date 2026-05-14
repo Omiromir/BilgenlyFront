@@ -112,6 +112,7 @@ export function buildQuizFollowUpNotification(
     quizId: input.quizId,
     quizTitle: input.quizTitle,
     assignmentId: input.assignmentId,
+    attemptId: input.attemptId,
     followUpKind: input.followUpKind,
   };
 }

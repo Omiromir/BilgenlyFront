@@ -31,6 +31,12 @@ import { AnimatePresence, motion } from "motion/react";
 import { useLocation, useNavigate } from "react-router";
 import { useQuizLibrary } from "../../app/providers/QuizLibraryProvider";
 import { useQuizLauncher } from "../quiz-session/useQuizLauncher";
+import {
+  generateQuizFromPdf,
+  generateQuizFromText,
+  saveGeneratedQuizReview,
+  type GeneratedQuizResultDto,
+} from "./api/quizGenerationApi";
 import { cn } from "../../components/ui/utils";
 import { DashboardPageHeader } from "../dashboard/components/DashboardPageHeader";
 import {
@@ -194,6 +200,41 @@ function buildMoodleQuizXml(payload: {
   ].join("\n\n");
 }
 
+function mapGeneratedResultToQuestions(
+  result: GeneratedQuizResultDto,
+): GeneratedQuestion[] {
+  return result.questions
+    .slice()
+    .sort((left, right) => left.position - right.position)
+    .map((question, index) => {
+      const correctIndexes = question.answers
+        .map((answer, answerIndex) => (answer.isCorrect ? answerIndex : -1))
+        .filter((answerIndex) => answerIndex >= 0);
+      const questionType =
+        question.questionType === "TrueFalse" ? "True/False" : "Multiple choice";
+      const selectionMode = correctIndexes.length > 1 ? "multiple" : "single";
+
+      return {
+        id: question.id,
+        questionType,
+        selectionMode,
+        text: question.text,
+        options: question.answers.map((answer) => answer.text),
+        correctIndex: correctIndexes[0] ?? 0,
+        correctIndexes: correctIndexes.length ? correctIndexes : [0],
+        explanation:
+          question.explanation ||
+          "Add a short explanation so quiz takers get immediate learning feedback after submission.",
+        imageEnabled: false,
+        points: 1,
+        estimatedMinutes: 1,
+        answerOrder: "fixed",
+        required: true,
+        status: index < 2 ? "unreviewed" : "needs attention",
+      } satisfies GeneratedQuestion;
+    });
+}
+
 export function QuizBuilderWorkspace({
   mode,
   title,
@@ -240,6 +281,9 @@ export function QuizBuilderWorkspace({
     string | null
   >(null);
   const [questionSeed, setQuestionSeed] = useState(0);
+  const [generatedBackendQuizId, setGeneratedBackendQuizId] = useState<string | null>(
+    null,
+  );
   const [reviewSearch, setReviewSearch] = useState("");
   const [publishVisibility, setPublishVisibility] =
     useState<QuizLibraryVisibility>("private");
@@ -376,6 +420,13 @@ export function QuizBuilderWorkspace({
     setGenerationState("success");
     setHasEnteredReview(true);
     setGenerationError(null);
+    setGeneratedBackendQuizId(
+      mode === "teacher" &&
+        editingQuiz.status === "generated" &&
+        /^[0-9a-f-]{36}$/i.test(editingQuiz.id)
+        ? editingQuiz.id
+        : null,
+    );
   }, [editingQuiz, mode]);
 
   useEffect(() => {
@@ -432,42 +483,118 @@ export function QuizBuilderWorkspace({
     }
 
     const startedAt = Date.now();
+    let isCancelled = false;
     setElapsedSeconds(0);
     const intervalId = window.setInterval(() => {
       setElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000));
     }, 1000);
 
-    const timeoutId = window.setTimeout(() => {
-      const shouldFail = parseStatus === "warning" && questionCount > 12;
+    const runGeneration = async () => {
+      if (mode !== "teacher") {
+        window.setTimeout(() => {
+          if (isCancelled) {
+            return;
+          }
 
-      if (shouldFail) {
-        setGenerationState("failed");
-        setGenerationError(
-          "Bilgenly could not assemble a reliable quiz draft from the current source. Your material and settings are still here, so you can adjust them and retry.",
-        );
+          const shouldFail = parseStatus === "warning" && questionCount > 12;
+
+          if (shouldFail) {
+            setGenerationState("failed");
+            setGenerationError(
+              "Bilgenly could not assemble a reliable quiz draft from the current source. Your material and settings are still here, so you can adjust them and retry.",
+            );
+            return;
+          }
+
+          const generated = buildGeneratedQuestions(
+            resolvedQuizTitle,
+            focus,
+            questionCount,
+          );
+          setQuestions(generated);
+          setSelectedQuestionId(generated[0]?.id ?? null);
+          setGenerationState("success");
+          setHasEnteredReview(false);
+          setGenerationDurationLabel(
+            `${Math.max(12, Math.floor((Date.now() - startedAt) / 1000) + 12)} sec`,
+          );
+          setQuestionSeed((value) => value + 1);
+        }, 4200);
         return;
       }
 
-      const generated = buildGeneratedQuestions(
-        resolvedQuizTitle,
-        focus,
-        questionCount,
-      );
-      setQuestions(generated);
-      setSelectedQuestionId(generated[0]?.id ?? null);
-      setGenerationState("success");
-      setHasEnteredReview(false);
-      setGenerationDurationLabel(
-        `${Math.max(12, Math.floor((Date.now() - startedAt) / 1000) + 12)} sec`,
-      );
-      setQuestionSeed((value) => value + 1);
-    }, 4200);
+      try {
+        const questionType =
+          questionTypes.includes("True/False") && !questionTypes.includes("Multiple choice")
+            ? "TrueFalse"
+            : "MCQ";
+        const request = {
+          title: resolvedQuizTitle,
+          topic: focus || resolvedQuizTitle,
+          topicFocus: contextValue,
+          questionCount,
+          questionType,
+          additionalInstructions: instructions,
+          text: activeInput === "paste" ? parsedSource?.extractedText ?? "" : undefined,
+        } as const;
+        const result =
+          activeInput === "upload" && selectedFile
+            ? await generateQuizFromPdf(selectedFile, {
+                title: request.title,
+                topic: request.topic,
+                topicFocus: request.topicFocus,
+                questionCount: request.questionCount,
+                questionType: request.questionType,
+                additionalInstructions: request.additionalInstructions,
+              })
+            : await generateQuizFromText(request);
+
+        if (isCancelled) {
+          return;
+        }
+
+        const generated = mapGeneratedResultToQuestions(result);
+        setGeneratedBackendQuizId(result.quizId);
+        setQuestions(generated);
+        setSelectedQuestionId(generated[0]?.id ?? null);
+        setGenerationState("success");
+        setHasEnteredReview(false);
+        setGenerationDurationLabel(`${Math.max(result.generationTimeSeconds, 1)} sec`);
+        setQuestionSeed((value) => value + 1);
+      } catch (error) {
+        if (isCancelled) {
+          return;
+        }
+
+        setGenerationState("failed");
+        setGenerationError(
+          error instanceof Error
+            ? error.message
+            : "Bilgenly could not generate a backend-backed quiz draft.",
+        );
+      }
+    };
+
+    void runGeneration();
 
     return () => {
+      isCancelled = true;
       window.clearInterval(intervalId);
-      window.clearTimeout(timeoutId);
     };
-  }, [focus, generationState, parseStatus, questionCount, resolvedQuizTitle]);
+  }, [
+    activeInput,
+    contextValue,
+    focus,
+    generationState,
+    instructions,
+    mode,
+    parseStatus,
+    parsedSource?.extractedText,
+    questionCount,
+    questionTypes,
+    resolvedQuizTitle,
+    selectedFile,
+  ]);
 
   useEffect(() => {
     setDraggingOptionIndex(null);
@@ -601,6 +728,7 @@ export function QuizBuilderWorkspace({
     setGenerationState("idle");
     setParseStatus("idle");
     setParsedSource(null);
+    setGeneratedBackendQuizId(null);
   }
 
   function handleStartParsing() {
@@ -614,6 +742,7 @@ export function QuizBuilderWorkspace({
     setQuestions([]);
     setGenerationError(null);
     setHasEnteredReview(false);
+    setGeneratedBackendQuizId(null);
   }
 
   function handleReplaceSource() {
@@ -626,6 +755,7 @@ export function QuizBuilderWorkspace({
     setGenerationError(null);
     setSelectedQuestionId(null);
     setHasEnteredReview(false);
+    setGeneratedBackendQuizId(null);
   }
 
   function toggleQuestionType(type: QuestionType) {
@@ -929,7 +1059,7 @@ export function QuizBuilderWorkspace({
       targetStatus === "published-public" ? "public" : "private";
 
     return {
-      existingQuizId: editingQuiz?.id,
+      existingQuizId: generatedBackendQuizId ?? editingQuiz?.id,
       ownerRole: mode,
       title: resolvedQuizTitle,
       description: buildQuizDescription(parsedSource.extractedText, topic),
@@ -966,68 +1096,112 @@ export function QuizBuilderWorkspace({
     };
   }
 
-  function saveQuizRecord(targetStatus: QuizLibraryStatus) {
+  async function saveQuizRecord(targetStatus: QuizLibraryStatus) {
     const payload = buildQuizSavePayload(targetStatus);
 
     if (!payload) {
       return null;
     }
 
+    if (
+      mode === "teacher" &&
+      payload.questions.some(
+        (question) =>
+          question.selectionMode === "multiple" &&
+          getQuestionCorrectIndexes(question as GeneratedQuestion).length > 1,
+      )
+    ) {
+      throw new Error(
+        "The backend attempt flow does not support multiple-answer questions yet.",
+      );
+    }
+
+    if (mode === "teacher" && generatedBackendQuizId) {
+      await saveGeneratedQuizReview(generatedBackendQuizId, {
+        title: payload.title,
+        description: payload.description,
+        isPublic: payload.visibility === "public",
+        questions: payload.questions.map((question, index) => ({
+          id: question.id,
+          text: question.text,
+          questionType: question.questionType === "True/False" ? "TrueFalse" : "MCQ",
+          explanation: question.explanation ?? "",
+          position: index + 1,
+          answers: question.options.map((option, optionIndex) => ({
+            text: option,
+            isCorrect: getQuestionCorrectIndexes(question).includes(optionIndex),
+          })),
+        })),
+      });
+    }
+
     return saveGeneratedQuiz(payload);
   }
 
-  function handleSaveQuiz(targetStatus: QuizLibraryStatus) {
-    const savedQuiz = saveQuizRecord(targetStatus);
+  async function handleSaveQuiz(targetStatus: QuizLibraryStatus) {
+    try {
+      const savedQuiz = await saveQuizRecord(targetStatus);
 
-    if (!savedQuiz) {
-      return;
-    }
+      if (!savedQuiz) {
+        return;
+      }
 
-    navigate(
-      mode === "teacher"
-        ? "/dashboard/teacher/quiz-library"
-        : "/dashboard/student/quiz-library",
-      {
-        state: {
-          libraryTab:
-            mode === "teacher"
-              ? targetStatus === "draft"
-                ? "drafts"
-                : "my-quizzes"
-              : targetStatus === "draft"
-                ? "drafts"
-                : "my-quizzes",
+      navigate(
+        mode === "teacher"
+          ? "/dashboard/teacher/quiz-library"
+          : "/dashboard/student/quiz-library",
+        {
+          state: {
+            libraryTab:
+              mode === "teacher"
+                ? targetStatus === "draft"
+                  ? "drafts"
+                  : "my-quizzes"
+                : targetStatus === "draft"
+                  ? "drafts"
+                  : "my-quizzes",
+          },
         },
-      },
-    );
+      );
+    } catch (error) {
+      setGenerationError(
+        error instanceof Error ? error.message : "Unable to save this quiz.",
+      );
+    }
   }
 
-  function handleOpenQuizFlow(targetStatus: QuizLibraryStatus) {
-    const savedQuiz = saveQuizRecord(targetStatus);
+  async function handleOpenQuizFlow(targetStatus: QuizLibraryStatus) {
+    try {
+      const savedQuiz = await saveQuizRecord(targetStatus);
 
-    if (!savedQuiz) {
-      return;
+      if (!savedQuiz) {
+        return;
+      }
+
+      openQuiz({
+        quizId: savedQuiz.id,
+        viewerRole: mode,
+        navigationState: {
+          launchSourceType: "generate-quiz",
+          launchSourceLabel:
+            mode === "teacher"
+              ? "Teacher quiz generator"
+              : "Self-study quiz generator",
+          returnToPath:
+            mode === "teacher"
+              ? "/dashboard/teacher/generate-quiz"
+              : "/dashboard/student/generate-quiz",
+          returnToLabel: "Back to quiz builder",
+          returnToState: editingQuiz?.id
+            ? { editQuizId: editingQuiz.id }
+            : undefined,
+        },
+      });
+    } catch (error) {
+      setGenerationError(
+        error instanceof Error ? error.message : "Unable to open this quiz.",
+      );
     }
-
-    openQuiz({
-      quizId: savedQuiz.id,
-      viewerRole: mode,
-      navigationState: {
-        launchSourceType: "generate-quiz",
-        launchSourceLabel:
-          mode === "teacher"
-            ? "Teacher quiz generator"
-            : "Self-study quiz generator",
-        returnToPath:
-          mode === "teacher"
-            ? "/dashboard/teacher/generate-quiz"
-            : "/dashboard/student/generate-quiz",
-        returnToLabel: "Back to quiz builder",
-        returnToState: editingQuiz?.id
-          ? { editQuizId: editingQuiz.id }
-          : undefined,
-      },
-    });
   }
 
   function handleCancelCreation() {

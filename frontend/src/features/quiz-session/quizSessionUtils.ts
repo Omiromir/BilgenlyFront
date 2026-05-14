@@ -44,6 +44,7 @@ function shuffleQuestionOptions(question: QuizRecord["questions"][number]) {
     return {
       ...question,
       options: [...question.options],
+      optionIds: question.optionIds ? [...question.optionIds] : undefined,
       correctIndexes: question.correctIndexes ? [...question.correctIndexes] : undefined,
     };
   }
@@ -73,6 +74,9 @@ function shuffleQuestionOptions(question: QuizRecord["questions"][number]) {
   return {
     ...question,
     options: indexedOptions.map((item) => item.label),
+    optionIds: question.optionIds
+      ? indexedOptions.map((item) => question.optionIds?.[item.index] ?? "")
+      : undefined,
     correctIndex: nextCorrectIndexes[0] ?? 0,
     correctIndexes:
       question.selectionMode === "multiple" ? nextCorrectIndexes : undefined,
@@ -102,24 +106,30 @@ export function createQuizSessionRecord(
   context: QuizSessionLaunchContext,
   options?: {
     attemptNumber?: number;
+    syncMode?: QuizSessionRecord["syncMode"];
+    backendAttemptId?: string;
+    quizOverride?: QuizRecord;
   },
 ): QuizSessionRecord {
   const timestamp = new Date().toISOString();
+  const sourceQuiz = options?.quizOverride ?? quiz;
 
   return {
-    id: createQuizSessionId(),
-    quizId: quiz.id,
+    id: options?.backendAttemptId ?? createQuizSessionId(),
+    quizId: sourceQuiz.id,
     viewerRole: context.viewerRole,
+    syncMode: options?.syncMode ?? "local",
+    backendAttemptId: options?.backendAttemptId,
     status: "in-progress",
     attemptNumber: Math.max(1, options?.attemptNumber ?? 1),
     startedAt: timestamp,
     updatedAt: timestamp,
     sourceType: context.sourceType,
-    sourceLabel: context.sourceLabel ?? quiz.sourceLabel,
+    sourceLabel: context.sourceLabel ?? sourceQuiz.sourceLabel,
     assignmentContext: context.assignmentContext,
-    quiz: createQuizSessionSnapshot(quiz),
+    quiz: createQuizSessionSnapshot(sourceQuiz),
     currentQuestionIndex: 0,
-    questionStates: quiz.questions.map((question) => ({
+    questionStates: sourceQuiz.questions.map((question) => ({
       questionId: question.id,
       selectedIndex: null,
       selectedIndices: [],
@@ -233,6 +243,9 @@ export function formatQuizAttemptDate(value: string) {
 export function formatQuizAttemptDuration(session: QuizSessionRecord) {
   const endTimestamp = getSessionTimestamp(session.finishedAt ?? session.updatedAt);
   const startTimestamp = getSessionTimestamp(session.startedAt);
+  if (endTimestamp === startTimestamp || startTimestamp === 0) {
+    return "--";
+  }
   const durationInSeconds = Math.max(
     0,
     Math.round((endTimestamp - startTimestamp) / 1000),

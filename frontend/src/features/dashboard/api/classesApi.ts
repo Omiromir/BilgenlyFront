@@ -61,6 +61,16 @@ export function getClassAssignments(classId: string) {
   });
 }
 
+export function removeClassAssignment(classId: string, assignmentId: string) {
+  return apiRequest<{ message: string }>(
+    `/api/classes/${classId}/assignments/${assignmentId}`,
+    {
+      method: "DELETE",
+      fallbackErrorMessage: "Unable to remove assigned quiz.",
+    },
+  );
+}
+
 export function getStudentClasses() {
   return apiRequest<ClassDto[]>("/api/classes/student", {
     fallbackErrorMessage: "Unable to load student classes.",

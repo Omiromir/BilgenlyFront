@@ -37,24 +37,22 @@ import {
   getStudentClasses,
   getTeacherClasses,
   joinClassByInviteCode as joinClassByInviteCodeRequest,
+  removeClassAssignment as removeClassAssignmentRequest,
   updateClass as updateClassRequest,
 } from "../../features/dashboard/api/classesApi";
 import {
   mapAssignmentDtoToTeacherAssignedQuiz,
   mapClassDtoToTeacherClassRecord,
-  mergeRemoteClassesWithLocalCache,
   toCreateClassRequest,
 } from "../../features/dashboard/api/classesAdapters";
 import { getRequestErrorMessage, isGuidString } from "../../lib/apiClient";
 import type { UserRole } from "../../features/auth/api";
 import { useAuth } from "./AuthProvider";
 import {
-  getScopedStorageValue,
   getUserScopedStorageKey,
   getUserStorageScope,
 } from "./userScopedStorage";
 
-const TEACHER_CLASSES_STORAGE_KEY = "bilgenly_teacher_classes";
 const HIDDEN_ASSIGNMENTS_STORAGE_KEY = "bilgenly_hidden_class_assignments";
 
 export interface StudentClassMembershipRecord {
@@ -103,7 +101,7 @@ interface TeacherClassesContextValue {
     quizId: string,
     values: Pick<TeacherClassAssignedQuiz, "title" | "topic" | "questionCount">,
   ) => void;
-  removeQuizFromClass: (classId: string, quizId: string) => void;
+  removeQuizFromClass: (classId: string, assignmentId: string) => Promise<void>;
   deleteClass: (classId: string) => Promise<void>;
   getClassById: (classId: string) => TeacherClassRecord | undefined;
   getStudentMemberships: (
@@ -129,7 +127,9 @@ function getInitials(name: string) {
     .slice(0, 2);
 }
 
-function buildFallbackDashboardUser(role: UserRole | null): MockDashboardUser | null {
+function buildFallbackDashboardUser(
+  role: UserRole | null,
+): MockDashboardUser | null {
   if (role !== "teacher" && role !== "student") {
     return null;
   }
@@ -284,7 +284,8 @@ function sanitizeTeacherClassRecord(
     subject:
       typeof teacherClass.subject === "string" ? teacherClass.subject : "",
     teacherName:
-      typeof (teacherClass as { teacherName?: unknown }).teacherName === "string"
+      typeof (teacherClass as { teacherName?: unknown }).teacherName ===
+      "string"
         ? (teacherClass as { teacherName: string }).teacherName
         : undefined,
     inviteCode:
@@ -315,35 +316,10 @@ function sanitizeTeacherClassRecord(
   };
 }
 
-function loadStoredClasses(scope: string) {
-  const storedValue = getScopedStorageValue(TEACHER_CLASSES_STORAGE_KEY, scope);
-
-  if (!storedValue) {
-    return [];
-  }
-
-  try {
-    const parsed = JSON.parse(storedValue) as Partial<TeacherClassRecord>[];
-
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-
-    return sortTeacherClasses(
-      parsed
-        .map((teacherClass) => sanitizeTeacherClassRecord(teacherClass))
-        .filter(
-          (teacherClass): teacherClass is TeacherClassRecord =>
-            teacherClass !== null,
-        ),
-    );
-  } catch {
-    return [];
-  }
-}
-
 function loadHiddenAssignments(scope: string) {
-  const storedValue = getScopedStorageValue(HIDDEN_ASSIGNMENTS_STORAGE_KEY, scope);
+  const storedValue = localStorage.getItem(
+    getUserScopedStorageKey(HIDDEN_ASSIGNMENTS_STORAGE_KEY, scope),
+  );
 
   if (!storedValue) {
     return {} as Record<string, string[]>;
@@ -378,7 +354,7 @@ function updateTeacherClassStudents(
 }
 
 async function loadTeacherClassesFromApi(
-  localClasses: TeacherClassRecord[],
+  currentClasses: TeacherClassRecord[],
   hiddenAssignmentIdsByClass: Record<string, string[]>,
 ) {
   const teacherClasses = await getTeacherClasses();
@@ -387,7 +363,7 @@ async function loadTeacherClassesFromApi(
     mapClassDtoToTeacherClassRecord(
       teacherClass,
       null,
-      localClasses.find((candidate) => candidate.id === teacherClass.id) ??
+      currentClasses.find((candidate) => candidate.id === teacherClass.id) ??
         null,
       new Set(hiddenAssignmentIdsByClass[teacherClass.id] ?? []),
     ),
@@ -395,7 +371,7 @@ async function loadTeacherClassesFromApi(
 }
 
 async function loadStudentClassesFromApi(
-  localClasses: TeacherClassRecord[],
+  currentClasses: TeacherClassRecord[],
   hiddenAssignmentIdsByClass: Record<string, string[]>,
 ) {
   const studentClasses = await getStudentClasses();
@@ -404,7 +380,7 @@ async function loadStudentClassesFromApi(
     mapClassDtoToTeacherClassRecord(
       teacherClass,
       null,
-      localClasses.find((candidate) => candidate.id === teacherClass.id) ??
+      currentClasses.find((candidate) => candidate.id === teacherClass.id) ??
         null,
       new Set(hiddenAssignmentIdsByClass[teacherClass.id] ?? []),
     ),
@@ -415,19 +391,17 @@ export function TeacherClassesProvider({
   children,
 }: TeacherClassesProviderProps) {
   const { currentUser, role, token } = useAuth();
+  const userId = currentUser?.id ?? null;
+  const userEmail = currentUser?.email ?? null;
   const storageScope = useMemo(
     () =>
       getUserStorageScope({
-        userId: currentUser?.id,
-        email: currentUser?.email,
+        userId,
+        email: userEmail,
         role,
         token,
       }),
-    [currentUser?.email, currentUser?.id, role, token],
-  );
-  const classesStorageKey = useMemo(
-    () => getUserScopedStorageKey(TEACHER_CLASSES_STORAGE_KEY, storageScope),
-    [storageScope],
+    [userId, userEmail, role, token],
   );
   const hiddenAssignmentsStorageKey = useMemo(
     () => getUserScopedStorageKey(HIDDEN_ASSIGNMENTS_STORAGE_KEY, storageScope),
@@ -439,7 +413,6 @@ export function TeacherClassesProvider({
   const [hiddenAssignmentIdsByClass, setHiddenAssignmentIdsByClass] = useState<
     Record<string, string[]>
   >({});
-  const [hydratedScope, setHydratedScope] = useState<string | null>(null);
   const {
     notifications,
     removeClassInvitationNotification,
@@ -455,6 +428,8 @@ export function TeacherClassesProvider({
   const studentUserId = currentUser?.role === "student" ? currentUser.id : null;
   const studentEmail =
     currentUser?.role === "student" ? currentUser.email : null;
+  const classesRef = useRef(classes);
+  const hiddenAssignmentsRef = useRef(hiddenAssignmentIdsByClass);
 
   // Keep teacherActor values up-to-date via ref
   const teacherActorRef = useRef(teacherActor);
@@ -463,41 +438,80 @@ export function TeacherClassesProvider({
   }, [teacherActor]);
 
   useEffect(() => {
-    setClasses(loadStoredClasses(storageScope));
+    classesRef.current = classes;
+  }, [classes]);
+
+  useEffect(() => {
+    hiddenAssignmentsRef.current = hiddenAssignmentIdsByClass;
+  }, [hiddenAssignmentIdsByClass]);
+
+  useEffect(() => {
     setHiddenAssignmentIdsByClass(loadHiddenAssignments(storageScope));
-    setHydratedScope(storageScope);
   }, [storageScope]);
 
   useEffect(() => {
-    if (hydratedScope !== storageScope) {
-      return;
-    }
-
-    localStorage.setItem(classesStorageKey, JSON.stringify(classes));
-  }, [classes, classesStorageKey, hydratedScope, storageScope]);
-
-  useEffect(() => {
-    if (hydratedScope !== storageScope) {
-      return;
-    }
-
     localStorage.setItem(
       hiddenAssignmentsStorageKey,
       JSON.stringify(hiddenAssignmentIdsByClass),
     );
-  }, [
-    hiddenAssignmentIdsByClass,
-    hiddenAssignmentsStorageKey,
-    hydratedScope,
-    storageScope,
-  ]);
+  }, [hiddenAssignmentIdsByClass, hiddenAssignmentsStorageKey]);
 
+  // Auto-refresh classes when authentication is ready
   useEffect(() => {
-    if (role !== "student" || (!studentUserId && !studentEmail) || !notifications.length) {
+    if (!token || (role !== "teacher" && role !== "student")) {
+      setClasses([]);
+      setError(null);
+      setIsLoading(false);
       return;
     }
 
-    const normalizedStudentEmail = studentEmail ? normalizeEmail(studentEmail) : "";
+    setIsLoading(true);
+    setError(null);
+
+    const fetchClasses = async () => {
+      try {
+        const remoteClasses =
+          role === "teacher"
+            ? await loadTeacherClassesFromApi(
+                classesRef.current,
+                hiddenAssignmentsRef.current,
+              )
+            : await loadStudentClassesFromApi(
+                classesRef.current,
+                hiddenAssignmentsRef.current,
+              );
+
+        setClasses(sortTeacherClasses(remoteClasses));
+        setError(null);
+      } catch (nextError) {
+        setError(
+          getRequestErrorMessage(
+            nextError,
+            role === "teacher"
+              ? "Unable to load teacher classes."
+              : "Unable to load student classes.",
+          ),
+        );
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    void fetchClasses();
+  }, [token, role]);
+
+  useEffect(() => {
+    if (
+      role !== "student" ||
+      (!studentUserId && !studentEmail) ||
+      !notifications.length
+    ) {
+      return;
+    }
+
+    const normalizedStudentEmail = studentEmail
+      ? normalizeEmail(studentEmail)
+      : "";
     const teacherNameByClassId = notifications.reduce<Record<string, string>>(
       (accumulator, notification) => {
         if (notification.type !== "class_invitation") {
@@ -507,7 +521,8 @@ export function TeacherClassesProvider({
         const matchesStudent =
           (studentUserId && notification.recipientUserId === studentUserId) ||
           (normalizedStudentEmail &&
-            normalizeEmail(notification.recipientEmail) === normalizedStudentEmail);
+            normalizeEmail(notification.recipientEmail) ===
+              normalizedStudentEmail);
 
         if (!matchesStudent) {
           return accumulator;
@@ -534,7 +549,10 @@ export function TeacherClassesProvider({
       const nextClasses = current.map((teacherClass) => {
         const nextTeacherName = teacherNameByClassId[teacherClass.id]?.trim();
 
-        if (!nextTeacherName || teacherClass.teacherName?.trim() === nextTeacherName) {
+        if (
+          !nextTeacherName ||
+          teacherClass.teacherName?.trim() === nextTeacherName
+        ) {
           return teacherClass;
         }
 
@@ -561,29 +579,18 @@ export function TeacherClassesProvider({
     setError(null);
 
     try {
-      const localClasses = loadStoredClasses(storageScope);
-      const studentIdentity = {
-        userId: studentUserId,
-        email: studentEmail,
-      };
       const remoteClasses =
         role === "teacher"
           ? await loadTeacherClassesFromApi(
-              localClasses,
-              hiddenAssignmentIdsByClass,
+              classesRef.current,
+              hiddenAssignmentsRef.current,
             )
           : await loadStudentClassesFromApi(
-              localClasses,
-              hiddenAssignmentIdsByClass,
+              classesRef.current,
+              hiddenAssignmentsRef.current,
             );
-      const mergedClasses = mergeRemoteClassesWithLocalCache(
-        remoteClasses,
-        localClasses,
-        role,
-        studentIdentity,
-      );
 
-      setClasses(mergedClasses);
+      setClasses(sortTeacherClasses(remoteClasses));
     } catch (nextError) {
       setError(
         getRequestErrorMessage(
@@ -596,18 +603,7 @@ export function TeacherClassesProvider({
     } finally {
       setIsLoading(false);
     }
-  }, [
-    hiddenAssignmentIdsByClass,
-    role,
-    storageScope,
-    studentUserId,
-    studentEmail,
-    token,
-  ]);
-
-  useEffect(() => {
-    void refreshClasses();
-  }, [refreshClasses]);
+  }, [role, token]);
 
   const value = useMemo<TeacherClassesContextValue>(
     () => ({
@@ -626,7 +622,7 @@ export function TeacherClassesProvider({
           new Set(),
         );
 
-        setClasses((current) => sortTeacherClasses([mappedClass, ...current]));
+        await refreshClasses();
         setError(null);
 
         return mappedClass;
@@ -665,11 +661,7 @@ export function TeacherClassesProvider({
           new Set(hiddenAssignmentIdsByClass[classId] ?? []),
         );
 
-        setClasses((current) =>
-          sortTeacherClasses(
-            current.map((item) => (item.id === classId ? mappedClass : item)),
-          ),
-        );
+        await refreshClasses();
         syncClassInvitationMetadata(classId, {
           relatedClassName: mappedClass.name,
           senderName: teacherActorRef.current.fullName,
@@ -687,19 +679,7 @@ export function TeacherClassesProvider({
         }
 
         await archiveClassRequest(classId);
-        setClasses((current) =>
-          sortTeacherClasses(
-            current.map((item) =>
-              item.id === classId
-                ? {
-                    ...item,
-                    status: item.status === "active" ? "archived" : "active",
-                    updatedAt: new Date().toISOString(),
-                  }
-                : item,
-            ),
-          ),
-        );
+        await refreshClasses();
         setError(null);
       },
       addStudentsToClass: (classId, emails) => {
@@ -967,34 +947,6 @@ export function TeacherClassesProvider({
                   ),
                 };
               });
-              setClasses((current) =>
-                sortTeacherClasses(
-                  current.map((teacherClass) => {
-                    if (teacherClass.id !== classId) {
-                      return teacherClass;
-                    }
-
-                    const assignedQuizzes = [
-                      mappedAssignment,
-                      ...teacherClass.assignedQuizzes.filter(
-                        (existingAssignment) =>
-                          existingAssignment.assignmentId !==
-                          mappedAssignment.assignmentId,
-                      ),
-                    ];
-
-                    return {
-                      ...teacherClass,
-                      assignedQuizzes,
-                      quizCount: Math.max(
-                        teacherClass.quizCount,
-                        assignedQuizzes.length,
-                      ),
-                      updatedAt: new Date().toISOString(),
-                    };
-                  }),
-                ),
-              );
               assignedClassIds.push(classId);
             } catch (nextError) {
               const message = getRequestErrorMessage(
@@ -1018,6 +970,8 @@ export function TeacherClassesProvider({
         } else {
           setError(null);
         }
+
+        await refreshClasses();
 
         return assignedClassIds;
       },
@@ -1070,23 +1024,30 @@ export function TeacherClassesProvider({
           return hasChanges ? sortTeacherClasses(nextClasses) : current;
         });
       },
-      removeQuizFromClass: (classId, quizId) => {
-        const removedAssignmentIds =
-          classes
-            .find((teacherClass) => teacherClass.id === classId)
-            ?.assignedQuizzes.filter(
-              (assignment) => assignment.quizId === quizId,
-            )
-            .map((assignment) => assignment.assignmentId) ?? [];
+      removeQuizFromClass: async (classId, assignmentId) => {
+        const targetClass = classes.find((teacherClass) => teacherClass.id === classId);
+        const targetAssignment =
+          targetClass?.assignedQuizzes.find(
+            (assignment) => assignment.assignmentId === assignmentId,
+          ) ?? null;
 
-        if (removedAssignmentIds.length) {
-          setHiddenAssignmentIdsByClass((previous) => ({
-            ...previous,
-            [classId]: Array.from(
-              new Set([...(previous[classId] ?? []), ...removedAssignmentIds]),
-            ),
-          }));
+        if (!targetClass || !targetAssignment) {
+          return;
         }
+
+        if (isGuidString(classId) && isGuidString(assignmentId)) {
+          await removeClassAssignmentRequest(classId, assignmentId);
+          await refreshClasses();
+          setError(null);
+          return;
+        }
+
+        setHiddenAssignmentIdsByClass((previous) => ({
+          ...previous,
+          [classId]: Array.from(
+            new Set([...(previous[classId] ?? []), assignmentId]),
+          ),
+        }));
 
         setClasses((current) =>
           sortTeacherClasses(
@@ -1096,7 +1057,7 @@ export function TeacherClassesProvider({
               }
 
               const assignedQuizzes = item.assignedQuizzes.filter(
-                (assignment) => assignment.quizId !== quizId,
+                (assignment) => assignment.assignmentId !== assignmentId,
               );
 
               return {
@@ -1108,11 +1069,12 @@ export function TeacherClassesProvider({
             }),
           ),
         );
+        setError(null);
       },
       deleteClass: async (classId) => {
         await deleteClassRequest(classId);
         removeNotificationsForClass(classId);
-        setClasses((current) => current.filter((item) => item.id !== classId));
+        await refreshClasses();
         setHiddenAssignmentIdsByClass((current) => {
           if (!(classId in current)) {
             return current;
@@ -1160,22 +1122,15 @@ export function TeacherClassesProvider({
           }),
       joinClassByInviteCode: async (inviteCode) => {
         const joinedClass = await joinClassByInviteCodeRequest(inviteCode);
-        const existingClass =
-          classes.find((teacherClass) => teacherClass.id === joinedClass.id) ??
-          null;
         const mappedClass = mapClassDtoToTeacherClassRecord(
           joinedClass,
           null,
-          existingClass,
+          classes.find((teacherClass) => teacherClass.id === joinedClass.id) ??
+            null,
           new Set(hiddenAssignmentIdsByClass[joinedClass.id] ?? []),
         );
 
-        setClasses((current) => {
-          const withoutPrevious = current.filter(
-            (teacherClass) => teacherClass.id !== mappedClass.id,
-          );
-          return sortTeacherClasses([mappedClass, ...withoutPrevious]);
-        });
+        await refreshClasses();
         setError(null);
 
         return mappedClass;

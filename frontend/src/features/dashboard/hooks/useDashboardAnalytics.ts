@@ -8,12 +8,16 @@ import type {
   AssignmentAnalyticsDto,
   MyAnalyticsDto,
   QuizAnalyticsDto,
+  StudentAttemptAnalyticsDto,
+  StudentAttemptQuestionResponseDto,
 } from "../api/dashboardApiTypes";
 import type { TeacherClassAssignedQuiz, TeacherClassRecord, TeacherClassStudent } from "../components/classes/teacherClassesTypes";
 import {
   DEFAULT_INTERVENTION_THRESHOLD,
   type TeacherAssignedQuizAnalytics,
+  type TeacherAttemptQuestionResponse,
   type TeacherQuestionAnalyticsItem,
+  type TeacherQuizAttemptHistoryItem,
   type TeacherStudentQuizResultRowData,
   type TeacherInsightFlag,
 } from "../components/teacher-analytics/teacherQuizAnalyticsUtils";
@@ -186,6 +190,51 @@ function buildScoreDistribution(rows: TeacherStudentQuizResultRowData[]) {
   return buckets;
 }
 
+function mapAttemptHistory(
+  attempts: StudentAttemptAnalyticsDto[],
+): TeacherQuizAttemptHistoryItem[] {
+  return [...attempts]
+    .sort(
+      (left, right) =>
+        new Date(right.submittedAt).getTime() - new Date(left.submittedAt).getTime(),
+    )
+    .map((attempt) => ({
+      id: attempt.attemptId,
+      finishedAt: attempt.submittedAt,
+      updatedAt: attempt.submittedAt,
+      percentage: attempt.score,
+      correctCount: attempt.correctAnswers,
+      incorrectCount: attempt.incorrectAnswers,
+      totalQuestions: attempt.totalQuestions,
+      responsesCount: attempt.responsesCount,
+      durationSeconds: 0,
+    }));
+}
+
+function mapQuestionResponses(
+  questions: StudentAttemptQuestionResponseDto[],
+): TeacherAttemptQuestionResponse[] {
+  return [...questions]
+    .sort((left, right) => left.position - right.position)
+    .map((question, index) => ({
+      questionId: question.questionId,
+      questionText: question.questionText,
+      questionType: question.questionType,
+      questionNumber: question.position > 0 ? question.position : index + 1,
+      explanation: question.explanation,
+      selectedAnswerId: question.selectedAnswerId,
+      selectedAnswerText: question.selectedAnswerText,
+      correctAnswerId: question.correctAnswerId,
+      correctAnswerText: question.correctAnswerText,
+      isCorrect: question.isCorrect,
+      answerOptions: question.answerOptions.map((option) => ({
+        id: option.id,
+        text: option.text,
+        isCorrect: option.isCorrect,
+      })),
+    }));
+}
+
 function toTeacherAssignmentAnalytics(
   assignmentAnalytics: AssignmentAnalyticsDto,
   teacherClass: TeacherClassRecord,
@@ -218,27 +267,42 @@ function toTeacherAssignmentAnalytics(
       } satisfies TeacherClassStudent);
     const status = mapStudentResultStatus(studentResult.status);
     const latestScore = studentResult.latestScore;
-    const estimatedCorrectCount =
-      latestScore === null
-        ? 0
-        : Math.round((latestScore / 100) * assignmentAnalytics.questionCount);
+    const totalQuestions = studentResult.totalQuestions ?? assignmentAnalytics.questionCount;
+    const correctCount = studentResult.correctAnswers ?? 0;
+    const incorrectCount =
+      studentResult.incorrectAnswers ?? Math.max(totalQuestions - correctCount, 0);
     const exhaustedAttempts = status === "attempts_exhausted";
     const missedDeadline = studentResult.missedDeadline;
+    const attemptHistory = mapAttemptHistory(studentResult.attempts ?? []);
+    const latestAttemptQuestions = mapQuestionResponses(
+      studentResult.latestAttemptQuestions ?? [],
+    );
+    const hasCompletedAttempt = studentResult.attemptsUsed > 0 && latestScore !== null;
+    const responseCount =
+      hasCompletedAttempt
+        ? studentResult.responsesCount ?? correctCount + incorrectCount
+        : null;
+
     const rowBase = {
       rowId: `${assignment.assignmentId}-${matchedStudent.id}`,
       student: matchedStudent,
       status,
       latestAttempt: null,
       latestCompletedAttempt: null,
-      attempts: [],
+      latestAttemptId: studentResult.latestAttemptId,
+      attempts: attemptHistory,
       attemptsUsed: studentResult.attemptsUsed,
       attemptsRemaining: studentResult.attemptsRemaining,
       latestScore,
       bestScore: studentResult.bestScore,
-      averageScore: latestScore,
-      correctCount: estimatedCorrectCount,
-      incorrectCount: Math.max(assignmentAnalytics.questionCount - estimatedCorrectCount, 0),
-      totalQuestions: assignmentAnalytics.questionCount,
+      averageScore: studentResult.averageScore,
+      correctCount,
+      incorrectCount,
+      totalQuestions,
+      responseCount,
+      responseDetailsAvailable:
+        Boolean(studentResult.hasDetailedResponses) && latestAttemptQuestions.length > 0,
+      latestAttemptQuestions,
       completionTimestamp: studentResult.lastAttemptAt ?? undefined,
       recentCompletionTimestamp: studentResult.lastAttemptAt ?? undefined,
       weakTopics: [],

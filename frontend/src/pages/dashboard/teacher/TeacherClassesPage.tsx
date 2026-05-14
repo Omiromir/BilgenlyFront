@@ -37,6 +37,7 @@ import {
   TeacherClassesSearchEmptyState,
 } from "../../../features/dashboard/components/classes/TeacherClassesComponents";
 import type {
+  TeacherClassAssignedQuiz,
   TeacherClassFormValues,
   TeacherClassRecord,
   TeacherClassStatus,
@@ -192,15 +193,23 @@ export function TeacherClassesPage() {
     );
   };
 
-  const handleRemoveAssignedQuiz = (quiz: { quizId: string; title: string }) => {
+  const handleRemoveAssignedQuiz = async (quiz: TeacherClassAssignedQuiz) => {
     if (!selectedClass || selectedClass.status !== "active") {
       return;
     }
 
-    removeQuizFromClass(selectedClass.id, quiz.quizId);
-    setMembershipFeedback(
-      `${quiz.title} is no longer visible to joined members of ${selectedClass.name}.`,
-    );
+    try {
+      await removeQuizFromClass(selectedClass.id, quiz.assignmentId);
+      setMembershipFeedback(
+        `${quiz.title} is no longer visible to joined members of ${selectedClass.name}.`,
+      );
+    } catch (nextError) {
+      toast.error(
+        nextError instanceof Error
+          ? nextError.message
+          : "Unable to remove assigned quiz.",
+      );
+    }
   };
 
   const selectedClass =

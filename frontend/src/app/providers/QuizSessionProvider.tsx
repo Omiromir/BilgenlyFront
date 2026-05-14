@@ -1,4 +1,18 @@
 import {
+  applyBackendAttemptResult,
+  buildSubmitAttemptPayload,
+  canSubmitSessionToBackend,
+  mergeQuizWithStartedAttempt,
+} from "../../features/quiz-session/api/attemptAdapters";
+import {
+  getAttemptsByQuiz,
+  startAttempt,
+  submitAttempt,
+} from "../../features/quiz-session/api/attemptsApi";
+import { getMyAnalytics } from "../../features/dashboard/api/analyticsApi";
+import type { AttemptSummaryDto } from "../../features/dashboard/api/dashboardApiTypes";
+import { getRequestErrorMessage, isGuidString } from "../../lib/apiClient";
+import {
   createContext,
   type ReactNode,
   useContext,
@@ -22,7 +36,10 @@ import {
   sortQuizSessionsByUpdatedAt,
 } from "../../features/quiz-session/quizSessionUtils";
 import { useAuth } from "./AuthProvider";
-import type { TeacherClassAssignedQuiz, TeacherClassRecord } from "../../features/dashboard/components/classes/teacherClassesTypes";
+import type {
+  TeacherClassAssignedQuiz,
+  TeacherClassRecord,
+} from "../../features/dashboard/components/classes/teacherClassesTypes";
 import { useQuizLibrary } from "./QuizLibraryProvider";
 import { useTeacherClasses } from "./TeacherClassesProvider";
 import {
@@ -55,7 +72,7 @@ interface QuizSessionContextValue {
   createSession: (
     quiz: QuizRecord,
     context: QuizSessionLaunchContext,
-  ) => QuizSessionRecord;
+  ) => Promise<QuizSessionRecord>;
   selectAnswer: (
     sessionId: string,
     questionId: string,
@@ -70,7 +87,7 @@ interface QuizSessionContextValue {
       completionReason?: QuizSessionRecord["completionReason"];
       finishedAt?: string;
     },
-  ) => void;
+  ) => Promise<void>;
 }
 
 const QuizSessionContext = createContext<QuizSessionContextValue | undefined>(
@@ -105,6 +122,11 @@ function sanitizeQuizSessionRecord(
     id: value.id,
     quizId: value.quizId,
     viewerRole: value.viewerRole,
+    syncMode: value.syncMode === "backend" ? "backend" : "local",
+    backendAttemptId:
+      typeof value.backendAttemptId === "string"
+        ? value.backendAttemptId
+        : undefined,
     status: value.status,
     attemptNumber:
       typeof value.attemptNumber === "number" && value.attemptNumber > 0
@@ -138,6 +160,9 @@ function sanitizeQuizSessionRecord(
       questions: value.quiz.questions.map((question) => ({
         ...question,
         options: Array.isArray(question.options) ? [...question.options] : [],
+        optionIds: Array.isArray(question.optionIds)
+          ? [...question.optionIds]
+          : undefined,
       })),
     },
     currentQuestionIndex: Math.min(
@@ -215,7 +240,9 @@ function sanitizeSharedAssignedQuizSessionRecord(
       fullName: value.student.fullName,
       email: value.student.email,
       avatar:
-        typeof value.student.avatar === "string" ? value.student.avatar : undefined,
+        typeof value.student.avatar === "string"
+          ? value.student.avatar
+          : undefined,
     },
     session,
   };
@@ -265,7 +292,9 @@ function syncAssignmentContext(
     return assignmentContext;
   }
 
-  const assignmentStatus = getAssignmentLevelStatus(latestAssignment.assignment);
+  const assignmentStatus = getAssignmentLevelStatus(
+    latestAssignment.assignment,
+  );
   const nextAssignmentContext = {
     ...assignmentContext,
     classId: latestAssignment.teacherClass.id,
@@ -281,8 +310,7 @@ function syncAssignmentContext(
     status: assignmentStatus,
   };
 
-  return (
-    nextAssignmentContext.classId === assignmentContext.classId &&
+  return nextAssignmentContext.classId === assignmentContext.classId &&
     nextAssignmentContext.className === assignmentContext.className &&
     nextAssignmentContext.classSubject === assignmentContext.classSubject &&
     nextAssignmentContext.assignedAt === assignmentContext.assignedAt &&
@@ -294,7 +322,6 @@ function syncAssignmentContext(
     nextAssignmentContext.assignedByName === assignmentContext.assignedByName &&
     nextAssignmentContext.visibility === assignmentContext.visibility &&
     nextAssignmentContext.status === assignmentContext.status
-  )
     ? assignmentContext
     : nextAssignmentContext;
 }
@@ -383,9 +410,11 @@ function finalizeExpiredAssignedSessions(
       return session;
     }
 
-    const latestAssignment =
-      assignmentLookup.get(session.assignmentContext.assignmentId)?.assignment;
-    const deadline = latestAssignment?.deadline ?? session.assignmentContext.deadline;
+    const latestAssignment = assignmentLookup.get(
+      session.assignmentContext.assignmentId,
+    )?.assignment;
+    const deadline =
+      latestAssignment?.deadline ?? session.assignmentContext.deadline;
     const allowLateSubmissions =
       latestAssignment?.allowLateSubmissions ??
       session.assignmentContext.allowLateSubmissions;
@@ -403,7 +432,8 @@ function finalizeExpiredAssignedSessions(
       if (
         deadline === session.assignmentContext.deadline &&
         maxAttempts === session.assignmentContext.maxAttempts &&
-        allowLateSubmissions === session.assignmentContext.allowLateSubmissions &&
+        allowLateSubmissions ===
+          session.assignmentContext.allowLateSubmissions &&
         session.assignmentContext.status === assignmentStatus
       ) {
         return session;
@@ -444,28 +474,37 @@ function finalizeExpiredAssignedSessions(
   return hasChanges ? sortQuizSessionsByUpdatedAt(nextSessions) : current;
 }
 
-export function QuizSessionProvider({
-  children,
-}: QuizSessionProviderProps) {
+export function QuizSessionProvider({ children }: QuizSessionProviderProps) {
   const { currentUser, role, token } = useAuth();
   const { quizzes, syncQuizPracticeState } = useQuizLibrary();
   const { classes } = useTeacherClasses();
   const [sessions, setSessions] = useState<QuizSessionRecord[]>([]);
+  const [remoteCompletedAttempts, setRemoteCompletedAttempts] = useState<
+    AttemptSummaryDto[]
+  >([]);
+  const [attemptRefreshKey, setAttemptRefreshKey] = useState(0);
   const [sharedAssignedSessions, setSharedAssignedSessions] = useState<
     SharedAssignedQuizSessionRecord[]
   >([]);
   const [isHydrated, setIsHydrated] = useState(false);
-  const [isSharedAssignedHydrated, setIsSharedAssignedHydrated] = useState(false);
-  const [hydratedStorageKey, setHydratedStorageKey] = useState<string | null>(null);
+  const [isSharedAssignedHydrated, setIsSharedAssignedHydrated] =
+    useState(false);
+  const [hydratedStorageKey, setHydratedStorageKey] = useState<string | null>(
+    null,
+  );
+  const hydratedStorageScopeRef = useRef<string | null>(null);
+  const syncedPracticeSummaryRef = useRef<Record<string, string>>({});
+  const userId = currentUser?.id ?? null;
+  const userEmail = currentUser?.email ?? null;
   const storageScope = useMemo(
     () =>
       getUserStorageScope({
-        userId: currentUser?.id,
-        email: currentUser?.email,
+        userId,
+        email: userEmail,
         role,
         token,
       }),
-    [currentUser?.email, currentUser?.id, role, token],
+    [userId, userEmail, role, token],
   );
   const storageKey = useMemo(
     () => getUserScopedStorageKey(QUIZ_SESSIONS_STORAGE_KEY, storageScope),
@@ -475,7 +514,10 @@ export function QuizSessionProvider({
     () => new Map(quizzes.map((quiz) => [quiz.id, quiz])),
     [quizzes],
   );
-  const assignmentLookup = useMemo(() => buildAssignmentLookup(classes), [classes]);
+  const assignmentLookup = useMemo(
+    () => buildAssignmentLookup(classes),
+    [classes],
+  );
   const syncQuizPracticeStateRef = useRef(syncQuizPracticeState);
 
   useEffect(() => {
@@ -483,11 +525,49 @@ export function QuizSessionProvider({
   }, [syncQuizPracticeState]);
 
   useEffect(() => {
+    if (!token || role !== "student") {
+      setRemoteCompletedAttempts([]);
+      return;
+    }
+
+    let isCancelled = false;
+
+    getMyAnalytics()
+      .then((analytics) => {
+        if (isCancelled) {
+          return;
+        }
+
+        setRemoteCompletedAttempts(
+          analytics.attempts.filter((attempt) => attempt.isCompleted),
+        );
+      })
+      .catch(() => {
+        if (!isCancelled) {
+          setRemoteCompletedAttempts([]);
+        }
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [attemptRefreshKey, role, token]);
+
+  useEffect(() => {
+    // Only hydrate when storageScope actually changes to prevent loops
+    if (hydratedStorageScopeRef.current === storageScope) {
+      return;
+    }
+    hydratedStorageScopeRef.current = storageScope;
+
     setSessions([]);
     setIsHydrated(false);
     setHydratedStorageKey(null);
 
-    const savedValue = getScopedStorageValue(QUIZ_SESSIONS_STORAGE_KEY, storageScope);
+    const savedValue = getScopedStorageValue(
+      QUIZ_SESSIONS_STORAGE_KEY,
+      storageScope,
+    );
 
     if (!savedValue) {
       setIsHydrated(true);
@@ -496,13 +576,31 @@ export function QuizSessionProvider({
 
     try {
       const parsed = JSON.parse(savedValue) as Partial<QuizSessionRecord>[];
+      const now = Date.now();
+      const oneWeekMs = 7 * 24 * 60 * 60 * 1000;
+
       setSessions(
         Array.isArray(parsed)
           ? sortQuizSessionsByUpdatedAt(
               parsed
                 .map((session) => sanitizeQuizSessionRecord(session))
                 .filter(
-                  (session): session is QuizSessionRecord => session !== null,
+                  (session): session is QuizSessionRecord => {
+                    if (session === null) {
+                      return false;
+                    }
+
+                    if (session.status === "in-progress") {
+                      return true;
+                    }
+
+                    if (session.status === "completed" && session.finishedAt) {
+                      const finishedTime = new Date(session.finishedAt).getTime();
+                      return now - finishedTime < oneWeekMs;
+                    }
+
+                    return false;
+                  },
                 ),
             )
           : [],
@@ -513,13 +611,15 @@ export function QuizSessionProvider({
       setHydratedStorageKey(storageKey);
       setIsHydrated(true);
     }
-  }, [storageKey, storageScope]);
+  }, [storageScope, storageKey]);
 
   useEffect(() => {
     setSharedAssignedSessions([]);
     setIsSharedAssignedHydrated(false);
 
-    const savedValue = localStorage.getItem(SHARED_ASSIGNED_QUIZ_SESSIONS_STORAGE_KEY);
+    const savedValue = localStorage.getItem(
+      SHARED_ASSIGNED_QUIZ_SESSIONS_STORAGE_KEY,
+    );
 
     if (!savedValue) {
       setIsSharedAssignedHydrated(true);
@@ -527,7 +627,9 @@ export function QuizSessionProvider({
     }
 
     try {
-      const parsed = JSON.parse(savedValue) as Partial<SharedAssignedQuizSessionRecord>[];
+      const parsed = JSON.parse(
+        savedValue,
+      ) as Partial<SharedAssignedQuizSessionRecord>[];
       setSharedAssignedSessions(
         Array.isArray(parsed)
           ? sortSharedAssignedQuizSessions(
@@ -536,9 +638,9 @@ export function QuizSessionProvider({
                   sanitizeSharedAssignedQuizSessionRecord(session),
                 )
                 .filter(
-                  (
-                    session,
-                  ): session is SharedAssignedQuizSessionRecord => session !== null,
+                  (session): session is SharedAssignedQuizSessionRecord =>
+                    session !== null &&
+                    session.session.status === "in-progress",
                 ),
             )
           : [],
@@ -555,7 +657,22 @@ export function QuizSessionProvider({
       return;
     }
 
-    localStorage.setItem(storageKey, JSON.stringify(sessions));
+    const sessionsPersistable = sessions.filter((session) => {
+      if (session.status === "in-progress") {
+        return true;
+      }
+
+      if (session.status === "completed" && session.finishedAt) {
+        const finishedTime = new Date(session.finishedAt).getTime();
+        const now = Date.now();
+        const oneWeekMs = 7 * 24 * 60 * 60 * 1000;
+        return now - finishedTime < oneWeekMs;
+      }
+
+      return false;
+    });
+
+    localStorage.setItem(storageKey, JSON.stringify(sessionsPersistable));
   }, [hydratedStorageKey, isHydrated, sessions, storageKey]);
 
   useEffect(() => {
@@ -565,9 +682,21 @@ export function QuizSessionProvider({
 
     localStorage.setItem(
       SHARED_ASSIGNED_QUIZ_SESSIONS_STORAGE_KEY,
-      JSON.stringify(sharedAssignedSessions),
+      JSON.stringify(
+        sharedAssignedSessions.filter(
+          (session) => session.session.status === "in-progress",
+        ),
+      ),
     );
   }, [isSharedAssignedHydrated, sharedAssignedSessions]);
+
+  const quizLookupRef = useRef(quizLookup);
+  const assignmentLookupRef = useRef(assignmentLookup);
+
+  useEffect(() => {
+    quizLookupRef.current = quizLookup;
+    assignmentLookupRef.current = assignmentLookup;
+  }, [quizLookup, assignmentLookup]);
 
   useEffect(() => {
     if (!isHydrated) {
@@ -580,8 +709,8 @@ export function QuizSessionProvider({
       const nextSessions = current.map((session) => {
         const syncedSession = syncSessionWithLatestMetadata(
           session,
-          quizLookup,
-          assignmentLookup,
+          quizLookupRef.current,
+          assignmentLookupRef.current,
         );
 
         if (syncedSession !== session) {
@@ -593,7 +722,7 @@ export function QuizSessionProvider({
 
       return hasChanges ? sortQuizSessionsByUpdatedAt(nextSessions) : current;
     });
-  }, [assignmentLookup, isHydrated, quizLookup]);
+  }, [isHydrated]);
 
   useEffect(() => {
     if (!isHydrated) {
@@ -609,7 +738,8 @@ export function QuizSessionProvider({
     syncExpiredSessions();
 
     const hasTrackedAssignedAttempt = sessions.some(
-      (session) => session.status === "in-progress" && Boolean(session.assignmentContext),
+      (session) =>
+        session.status === "in-progress" && Boolean(session.assignmentContext),
     );
 
     if (!hasTrackedAssignedAttempt) {
@@ -634,11 +764,12 @@ export function QuizSessionProvider({
       const nextSessions = current.map((entry) => {
         const syncedSession = syncSessionWithLatestMetadata(
           entry.session,
-          quizLookup,
-          assignmentLookup,
+          quizLookupRef.current,
+          assignmentLookupRef.current,
         );
         const latestAssignmentContext = syncedSession.assignmentContext;
-        const nextClassName = latestAssignmentContext?.className ?? entry.className;
+        const nextClassName =
+          latestAssignmentContext?.className ?? entry.className;
 
         if (
           syncedSession === entry.session &&
@@ -655,7 +786,9 @@ export function QuizSessionProvider({
         };
       });
 
-      return hasChanges ? sortSharedAssignedQuizSessions(nextSessions) : current;
+      return hasChanges
+        ? sortSharedAssignedQuizSessions(nextSessions)
+        : current;
     });
   }, [assignmentLookup, isSharedAssignedHydrated, quizLookup]);
 
@@ -682,9 +815,9 @@ export function QuizSessionProvider({
                     sanitizeSharedAssignedQuizSessionRecord(session),
                   )
                   .filter(
-                    (
-                      session,
-                    ): session is SharedAssignedQuizSessionRecord => session !== null,
+                    (session): session is SharedAssignedQuizSessionRecord =>
+                      session !== null &&
+                      session.session.status === "in-progress",
                   ),
               )
             : [],
@@ -706,8 +839,71 @@ export function QuizSessionProvider({
       return;
     }
 
+    const nextSyncedPracticeSummaries: Record<string, string> = {};
+
+    const remoteSummariesByQuizId = remoteCompletedAttempts.reduce<
+      Record<
+        string,
+        {
+          latestDateTaken: string;
+          latestScore: number;
+          scores: number[];
+        }
+      >
+    >((accumulator, attempt) => {
+      const existing = accumulator[attempt.quizId];
+
+      if (!existing) {
+        accumulator[attempt.quizId] = {
+          latestDateTaken: attempt.dateTaken,
+          latestScore: attempt.score,
+          scores: [attempt.score],
+        };
+        return accumulator;
+      }
+
+      const nextLatest =
+        new Date(attempt.dateTaken).getTime() >
+        new Date(existing.latestDateTaken).getTime()
+          ? {
+              latestDateTaken: attempt.dateTaken,
+              latestScore: attempt.score,
+            }
+          : existing;
+
+      accumulator[attempt.quizId] = {
+        latestDateTaken: nextLatest.latestDateTaken,
+        latestScore: nextLatest.latestScore,
+        scores: [...existing.scores, attempt.score],
+      };
+      return accumulator;
+    }, {});
+
+    Object.entries(remoteSummariesByQuizId).forEach(([quizId, summary]) => {
+      const practiceState = {
+        practiceState: "completed",
+        practiceProgressLabel: `Last score ${summary.latestScore}%`,
+        attemptCount: summary.scores.length,
+        averageScore: `${Math.round(
+          summary.scores.reduce((total, score) => total + score, 0) /
+            summary.scores.length,
+        )}%`,
+      } as const;
+      const syncKey = `student:${quizId}`;
+      const signature = JSON.stringify(practiceState);
+      nextSyncedPracticeSummaries[syncKey] = signature;
+
+      if (syncedPracticeSummaryRef.current[syncKey] === signature) {
+        return;
+      }
+
+      syncQuizPracticeStateRef.current(quizId, practiceState);
+    });
+
     const quizPairs = Array.from(
-      new Set(sessions.map((session) => `${session.viewerRole}:${session.quizId}`)),
+      new Set(
+        sessions.map((session) => `${session.viewerRole}:${session.quizId}`),
+      ),
     );
 
     quizPairs.forEach((pair) => {
@@ -721,9 +917,19 @@ export function QuizSessionProvider({
         return;
       }
 
+      const syncKey = `${viewerRole}:${quizId}`;
+      const signature = JSON.stringify(summary);
+      nextSyncedPracticeSummaries[syncKey] = signature;
+
+      if (syncedPracticeSummaryRef.current[syncKey] === signature) {
+        return;
+      }
+
       syncQuizPracticeStateRef.current(quizId, summary);
     });
-  }, [isHydrated, sessions]);
+
+    syncedPracticeSummaryRef.current = nextSyncedPracticeSummaries;
+  }, [isHydrated, remoteCompletedAttempts, sessions]);
 
   useEffect(() => {
     if (
@@ -738,7 +944,8 @@ export function QuizSessionProvider({
     const mirroredSessions = sessions
       .filter(
         (session) =>
-          session.viewerRole === "student" && Boolean(session.assignmentContext),
+          session.viewerRole === "student" &&
+          Boolean(session.assignmentContext),
       )
       .map((session) => {
         const assignmentContext = session.assignmentContext;
@@ -762,13 +969,15 @@ export function QuizSessionProvider({
         } satisfies SharedAssignedQuizSessionRecord;
       })
       .filter(
-        (
-          session,
-        ): session is SharedAssignedQuizSessionRecord => session !== null,
+        (session): session is SharedAssignedQuizSessionRecord =>
+          session !== null,
       );
 
     setSharedAssignedSessions((current) => {
-      const nextBySessionId = new Map<string, SharedAssignedQuizSessionRecord>();
+      const nextBySessionId = new Map<
+        string,
+        SharedAssignedQuizSessionRecord
+      >();
 
       current
         .filter(
@@ -785,7 +994,9 @@ export function QuizSessionProvider({
         nextBySessionId.set(entry.id, entry);
       });
 
-      return sortSharedAssignedQuizSessions(Array.from(nextBySessionId.values()));
+      return sortSharedAssignedQuizSessions(
+        Array.from(nextBySessionId.values()),
+      );
     });
   }, [
     currentUser?.email,
@@ -822,19 +1033,54 @@ export function QuizSessionProvider({
         sortQuizSessionsByUpdatedAt(
           sessions.filter(
             (session) =>
-              session.viewerRole === viewerRole && session.status === "completed",
+              session.viewerRole === viewerRole &&
+              session.status === "completed",
           ),
         ),
-      createSession: (quiz, context) => {
-        const attemptNumber =
+      createSession: async (quiz, context) => {
+        const existingSession = getLatestQuizSession(sessions, {
+          quizId: quiz.id,
+          viewerRole: context.viewerRole,
+          assignmentId: context.assignmentContext?.assignmentId,
+          status: "in-progress",
+        });
+
+        if (existingSession) {
+          return existingSession;
+        }
+
+        let nextQuiz = quiz;
+        let attemptNumber =
           countSessionAttempts(
             sessions,
             quiz.id,
             context.viewerRole,
             context.assignmentContext?.assignmentId,
           ) + 1;
+        let syncMode: QuizSessionRecord["syncMode"] = "local";
+        let backendAttemptId: string | undefined;
+
+        if (isGuidString(quiz.id)) {
+          try {
+            const quizAttempts = await getAttemptsByQuiz(quiz.id);
+            const startedAttempt = await startAttempt(quiz.id);
+
+            attemptNumber = quizAttempts.length + 1;
+            syncMode = "backend";
+            backendAttemptId = startedAttempt.attemptId;
+            nextQuiz = mergeQuizWithStartedAttempt(quiz, startedAttempt);
+          } catch (error) {
+            throw new Error(
+              getRequestErrorMessage(error, "Unable to start quiz attempt."),
+            );
+          }
+        }
+
         const nextSession = createQuizSessionRecord(quiz, context, {
           attemptNumber,
+          syncMode,
+          backendAttemptId,
+          quizOverride: nextQuiz,
         });
 
         setSessions((current) => [
@@ -877,9 +1123,8 @@ export function QuizSessionProvider({
                       );
 
                       if (question?.selectionMode === "multiple") {
-                        const alreadySelected = candidate.selectedIndices.includes(
-                          selectedIndex,
-                        );
+                        const alreadySelected =
+                          candidate.selectedIndices.includes(selectedIndex);
                         const selectedIndices = alreadySelected
                           ? candidate.selectedIndices.filter(
                               (item) => item !== selectedIndex,
@@ -932,16 +1177,27 @@ export function QuizSessionProvider({
             const correctIndexes =
               question.selectionMode === "multiple"
                 ? question.correctIndexes?.length
-                  ? [...question.correctIndexes].sort((left, right) => left - right)
+                  ? [...question.correctIndexes].sort(
+                      (left, right) => left - right,
+                    )
                   : [question.correctIndex]
                 : [question.correctIndex];
             const selectedIndexes =
               question.selectionMode === "multiple"
-                ? [...questionState.selectedIndices].sort((left, right) => left - right)
-                : [questionState.selectedIndex ?? questionState.selectedIndices[0] ?? -1];
+                ? [...questionState.selectedIndices].sort(
+                    (left, right) => left - right,
+                  )
+                : [
+                    questionState.selectedIndex ??
+                      questionState.selectedIndices[0] ??
+                      -1,
+                  ];
             const isCorrect =
               selectedIndexes.length === correctIndexes.length &&
-              selectedIndexes.every((index, indexPosition) => index === correctIndexes[indexPosition]);
+              selectedIndexes.every(
+                (index, indexPosition) =>
+                  index === correctIndexes[indexPosition],
+              );
             const awardedPoints = isCorrect
               ? Math.max(1, Math.round(question.points ?? 1))
               : 0;
@@ -996,7 +1252,10 @@ export function QuizSessionProvider({
               return session;
             }
 
-            if (session.currentQuestionIndex >= session.quiz.questions.length - 1) {
+            if (
+              session.currentQuestionIndex >=
+              session.quiz.questions.length - 1
+            ) {
               return session;
             }
 
@@ -1008,23 +1267,67 @@ export function QuizSessionProvider({
           }),
         );
       },
-      completeSession: (sessionId, options) => {
+      completeSession: async (sessionId, options) => {
+        const targetSession = sessions.find(
+          (session) => session.id === sessionId,
+        );
+
+        if (!targetSession || targetSession.status === "completed") {
+          return;
+        }
+
+        const timestamp = options?.finishedAt ?? new Date().toISOString();
+
+        if (
+          targetSession.syncMode === "backend" &&
+          options?.completionReason !== "deadline-expired"
+        ) {
+          if (!canSubmitSessionToBackend(targetSession)) {
+            throw new Error(
+              "This quiz uses answer settings that the backend attempt API does not support yet.",
+            );
+          }
+
+          try {
+            const result = await submitAttempt(
+              targetSession.backendAttemptId!,
+              buildSubmitAttemptPayload(targetSession),
+            );
+
+            setSessions((current) =>
+              sortQuizSessionsByUpdatedAt(
+                current.map((session) =>
+                  session.id === sessionId
+                    ? applyBackendAttemptResult(session, result, timestamp)
+                    : session,
+                ),
+              ),
+            );
+            setAttemptRefreshKey((current) => current + 1);
+            return;
+          } catch (error) {
+            throw new Error(
+              getRequestErrorMessage(error, "Unable to submit quiz attempt."),
+            );
+          }
+        }
+
         setSessions((current) =>
-          current.map((session) => {
-            if (session.id !== sessionId || session.status === "completed") {
-              return session;
-            }
+          sortQuizSessionsByUpdatedAt(
+            current.map((session) => {
+              if (session.id !== sessionId || session.status === "completed") {
+                return session;
+              }
 
-            const timestamp = options?.finishedAt ?? new Date().toISOString();
-
-            return {
-              ...session,
-              status: "completed",
-              updatedAt: timestamp,
-              finishedAt: timestamp,
-              completionReason: options?.completionReason ?? "submitted",
-            };
-          }),
+              return {
+                ...session,
+                status: "completed",
+                updatedAt: timestamp,
+                finishedAt: timestamp,
+                completionReason: options?.completionReason ?? "submitted",
+              };
+            }),
+          ),
         );
       },
     }),
@@ -1042,9 +1345,7 @@ export function useQuizSessions() {
   const context = useContext(QuizSessionContext);
 
   if (!context) {
-    throw new Error(
-      "useQuizSessions must be used within QuizSessionProvider.",
-    );
+    throw new Error("useQuizSessions must be used within QuizSessionProvider.");
   }
 
   return context;

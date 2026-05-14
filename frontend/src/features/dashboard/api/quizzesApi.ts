@@ -8,3 +8,22 @@ export function createQuiz(payload: CreateQuizRequest) {
     fallbackErrorMessage: "Unable to save quiz to backend.",
   });
 }
+
+export function getMyQuizzes() {
+  return apiRequest<QuizDto[]>("/api/Quiz/My", {
+    fallbackErrorMessage: "Unable to load your quizzes.",
+  });
+}
+
+export function getQuizById(quizId: string) {
+  return apiRequest<QuizDto>(`/api/Quiz/${quizId}`, {
+    fallbackErrorMessage: "Unable to load quiz details.",
+  });
+}
+
+export function deleteQuiz(quizId: string) {
+  return apiRequest<{ message: string }>(`/api/Quiz/${quizId}`, {
+    method: "DELETE",
+    fallbackErrorMessage: "Unable to delete quiz.",
+  });
+}

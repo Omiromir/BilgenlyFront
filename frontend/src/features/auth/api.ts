@@ -105,10 +105,23 @@ export async function getMe() {
   });
 }
 
-export async function changePassword(_: ChangePasswordInput): Promise<SecurityActionResult> {
-  return new Promise((resolve) => {
-    window.setTimeout(() => resolve({ mode: "local-only" }), 450);
-  });
+export async function changePassword(
+  input: ChangePasswordInput,
+): Promise<SecurityActionResult> {
+  try {
+    await apiRequest<{ message: string }>("/api/auth/password", {
+      method: "PATCH",
+      body: {
+        currentPassword: input.currentPassword,
+        newPassword: input.newPassword,
+      },
+      fallbackErrorMessage: "Unable to update password.",
+    });
+
+    return { mode: "remote" };
+  } catch (error) {
+    throw new Error(getRequestErrorMessage(error, "Unable to update password."));
+  }
 }
 
 export async function revokeSessionById(_: string): Promise<SecurityActionResult> {

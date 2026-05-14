@@ -46,7 +46,6 @@ import {
 } from "../../../features/dashboard/components/teacher-analytics/teacherQuizAnalyticsUtils";
 import { LoadingCard } from "../../../features/dashboard/components/LoadingCard";
 import { useAssignmentAnalytics } from "../../../features/dashboard/hooks/useDashboardAnalytics";
-import { getNotificationRecipientUserIdByEmail } from "../../../features/dashboard/mock/mockUsers";
 import { useDashboardPageMeta } from "../../../features/dashboard/hooks/useDashboardPageMeta";
 import { formatCurrentShortDate } from "../../../features/dashboard/settings/settingsPreferences";
 
@@ -242,9 +241,14 @@ export function TeacherAnalyticsPage() {
       return;
     }
 
+    const recipientUserId = row.student.linkedUserId ?? row.student.id;
+    if (!recipientUserId) {
+      toast.error("This student is missing a linked account, so no in-app notification was created.");
+      return;
+    }
+
     const notification = sendQuizFollowUpNotification({
-      recipientUserId:
-        row.student.linkedUserId ?? getNotificationRecipientUserIdByEmail(row.student.email),
+      recipientUserId,
       recipientEmail: row.student.email,
       relatedClassId: selectedClass.id,
       relatedClassName: selectedClass.name,
@@ -255,7 +259,8 @@ export function TeacherAnalyticsPage() {
       studentEmail: row.student.email,
       quizId: selectedAssignment.quizId,
       quizTitle: selectedAssignment.title,
-      assignmentId: selectedAssignment.id,
+      assignmentId: selectedAssignment.assignmentId,
+      attemptId: row.latestAttemptId ?? undefined,
       followUpKind,
     });
 

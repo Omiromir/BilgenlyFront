@@ -1,4 +1,5 @@
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import {
   BookMarked,
   BookOpen,
@@ -17,6 +18,7 @@ import { useAuth } from "../../../app/providers/AuthProvider";
 import { useTeacherClasses } from "../../../app/providers/TeacherClassesProvider";
 import { useQuizLibrary } from "../../../app/providers/QuizLibraryProvider";
 import { useQuizSessions } from "../../../app/providers/QuizSessionProvider";
+import { useStudentAttempts } from "../../../app/providers/StudentAttemptsProvider";
 import { DashboardPageHeader } from "../../../features/dashboard/components/DashboardPageHeader";
 import {
   DashboardButton,
@@ -72,9 +74,24 @@ export function StudentQuizLibraryPage() {
     }),
     [studentViewer?.email, studentViewer?.id],
   );
+  const {
+    attempts: allAttempts,
+    isLoading: attemptsLoading,
+    error: attemptsError,
+  } = useStudentAttempts();
+
   const studentSources = useMemo(
-    () => buildStudentQuizLibrarySources(classes, quizzes, studentIdentity, sessions),
-    [classes, quizzes, sessions, studentIdentity],
+    () =>
+      buildStudentQuizLibrarySources(
+        classes,
+        quizzes,
+        studentIdentity,
+        sessions,
+        allAttempts,
+        attemptsLoading,
+        attemptsError,
+      ),
+    [allAttempts, attemptsError, attemptsLoading, classes, quizzes, sessions, studentIdentity],
   );
   const initialTab = location.state?.libraryTab as StudentLibraryTab | undefined;
   const [activeTab, setActiveTab] = useState<StudentLibraryTab>(
@@ -102,6 +119,16 @@ export function StudentQuizLibraryPage() {
       setPracticeState("all");
     }
   }, [practiceState, shouldShowPracticeFilter]);
+
+  const handleDeleteQuiz = async (quizId: string) => {
+    try {
+      await deleteQuiz(quizId, "student");
+    } catch (nextError) {
+      toast.error(
+        nextError instanceof Error ? nextError.message : "Unable to delete quiz.",
+      );
+    }
+  };
 
   const getStudentItemsForTab = (tab: StudentLibraryTab) => {
     switch (tab) {
@@ -306,23 +333,7 @@ export function StudentQuizLibraryPage() {
   const getPracticeLabel = (item: QuizLibraryItem) => {
     if (item.sourceType === "assigned" || item.isAssigned) {
       const assignedItem = item as StudentAssignedQuizLibraryItem;
-
-      if (assignedItem.assignmentState.status === "completed") {
-        return "View Results";
-      }
-
-      if (assignedItem.assignmentState.status === "in_progress") {
-        return "Continue Quiz";
-      }
-
-      if (
-        assignedItem.assignmentState.status === "expired" ||
-        assignedItem.assignmentState.status === "attempts_exhausted"
-      ) {
-        return "Open Assigned Quiz";
-      }
-
-      return "Start Assigned Quiz";
+      return assignedItem.assignmentState.primaryActionLabel;
     }
 
     if (item.practiceState === "completed") {
@@ -346,9 +357,9 @@ export function StudentQuizLibraryPage() {
           ? (() => {
               const assignedItem = item as StudentAssignedQuizLibraryItem;
 
-              return assignedItem.assignmentState.status === "completed"
+              return assignedItem.assignmentState.canReview
                 ? "completed"
-                : assignedItem.assignmentState.status === "in_progress"
+                : assignedItem.assignmentState.canResume
                   ? "in-progress"
                   : undefined;
             })()
@@ -371,11 +382,18 @@ export function StudentQuizLibraryPage() {
 
   const getStudentActions = (item: QuizLibraryItem): QuizCardAction[] => {
     if (item.sourceType === "assigned" || item.isAssigned) {
+      const assignedItem = item as StudentAssignedQuizLibraryItem;
+
       return [
         {
           label: getPracticeLabel(item),
           icon: Play,
           iconDisplay: "label-only",
+          disabled:
+            assignedItem.assignmentState.isLoading ||
+            (!assignedItem.assignmentState.canStart &&
+              !assignedItem.assignmentState.canResume &&
+              !assignedItem.assignmentState.canReview),
           onClick: () => openStudentQuiz(item),
         },
       ];
@@ -407,7 +425,7 @@ export function StudentQuizLibraryPage() {
           icon: Trash2,
           variant: "ghost",
           iconDisplay: "icon-only",
-          onClick: () => deleteQuiz(item.id, "student"),
+          onClick: () => void handleDeleteQuiz(item.id),
         },
       ];
     }

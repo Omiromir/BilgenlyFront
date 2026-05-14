@@ -25,6 +25,26 @@ export interface TeacherStudentTopicPerformance {
   percentage: number;
 }
 
+export interface TeacherAttemptAnswerOption {
+  id: string;
+  text: string;
+  isCorrect: boolean;
+}
+
+export interface TeacherAttemptQuestionResponse {
+  questionId: string;
+  questionText: string;
+  questionType: string;
+  questionNumber: number;
+  explanation: string;
+  selectedAnswerId?: string | null;
+  selectedAnswerText?: string | null;
+  correctAnswerId?: string | null;
+  correctAnswerText?: string | null;
+  isCorrect: boolean;
+  answerOptions: TeacherAttemptAnswerOption[];
+}
+
 export interface TeacherQuizAttemptHistoryItem {
   id: string;
   finishedAt?: string;
@@ -33,8 +53,10 @@ export interface TeacherQuizAttemptHistoryItem {
   correctCount: number;
   incorrectCount: number;
   totalQuestions: number;
+  responsesCount: number;
   durationSeconds: number;
-  session: SharedAssignedQuizSessionRecord;
+  /** Present only when attempt was recorded from a local quiz session. Absent for backend-derived entries. */
+  session?: SharedAssignedQuizSessionRecord;
 }
 
 export interface TeacherStudentQuizResultRowData {
@@ -43,6 +65,7 @@ export interface TeacherStudentQuizResultRowData {
   status: TeacherQuizCompletionStatus;
   latestAttempt: SharedAssignedQuizSessionRecord | null;
   latestCompletedAttempt: SharedAssignedQuizSessionRecord | null;
+  latestAttemptId?: string | null;
   attempts: TeacherQuizAttemptHistoryItem[];
   attemptsUsed: number;
   attemptsRemaining: number | null;
@@ -52,6 +75,9 @@ export interface TeacherStudentQuizResultRowData {
   correctCount: number;
   incorrectCount: number;
   totalQuestions: number;
+  responseCount: number | null;
+  responseDetailsAvailable: boolean;
+  latestAttemptQuestions: TeacherAttemptQuestionResponse[];
   completionTimestamp?: string;
   recentCompletionTimestamp?: string;
   weakTopics: string[];
@@ -153,6 +179,7 @@ function buildAttemptHistory(attempts: SharedAssignedQuizSessionRecord[]) {
         correctCount: result.correctCount,
         incorrectCount: result.incorrectCount,
         totalQuestions: result.totalQuestions,
+        responsesCount: result.correctCount + result.incorrectCount,
         durationSeconds: getAttemptDurationSeconds(attempt),
         session: attempt,
       } satisfies TeacherQuizAttemptHistoryItem;
@@ -215,6 +242,53 @@ function buildTopicPerformance(attempts: SharedAssignedQuizSessionRecord[]) {
         : 0,
     }))
     .sort((left, right) => left.percentage - right.percentage);
+}
+
+function buildLatestAttemptQuestions(
+  latestCompletedAttempt: SharedAssignedQuizSessionRecord | null,
+) {
+  if (!latestCompletedAttempt) {
+    return [] as TeacherAttemptQuestionResponse[];
+  }
+
+  return latestCompletedAttempt.session.quiz.questions.map((question, index) => {
+    const state = latestCompletedAttempt.session.questionStates.find(
+      (questionState) => questionState.questionId === question.id,
+    );
+    const selectedIndexes = state?.selectedIndices?.length
+      ? state.selectedIndices
+      : typeof state?.selectedIndex === "number"
+        ? [state.selectedIndex]
+        : [];
+    const selectedAnswerIndex = selectedIndexes[0];
+    const correctAnswerIndexes =
+      question.selectionMode === "multiple"
+        ? question.correctIndexes?.length
+          ? question.correctIndexes
+          : [question.correctIndex]
+        : [question.correctIndex];
+
+    return {
+      questionId: question.id,
+      questionText: question.text,
+      questionType: question.selectionMode === "multiple" ? "MCQ" : "MCQ",
+      questionNumber: index + 1,
+      explanation: question.explanation ?? "",
+      selectedAnswerText:
+        typeof selectedAnswerIndex === "number"
+          ? question.options[selectedAnswerIndex] ?? null
+          : null,
+      correctAnswerText: correctAnswerIndexes
+        .map((answerIndex) => question.options[answerIndex] ?? `Option ${answerIndex + 1}`)
+        .join(", "),
+      isCorrect: Boolean(state?.isCorrect),
+      answerOptions: question.options.map((option, optionIndex) => ({
+        id: `${question.id}-${optionIndex}`,
+        text: option,
+        isCorrect: correctAnswerIndexes.includes(optionIndex),
+      })),
+    } satisfies TeacherAttemptQuestionResponse;
+  });
 }
 
 function buildFlags(
@@ -434,6 +508,7 @@ export function buildTeacherAssignedQuizAnalytics(
         status: constraintState?.status ?? "active",
         latestAttempt,
         latestCompletedAttempt,
+        latestAttemptId: latestCompletedAttempt?.session.id ?? null,
         attempts: attemptHistory,
         attemptsUsed: constraintState?.attemptsUsed ?? attemptHistory.length,
         attemptsRemaining: constraintState?.attemptsRemaining ?? assignment.maxAttempts,
@@ -443,6 +518,11 @@ export function buildTeacherAssignedQuizAnalytics(
         correctCount: latestResult?.correctCount ?? 0,
         incorrectCount: latestResult?.incorrectCount ?? 0,
         totalQuestions: latestResult?.totalQuestions ?? assignment.questionCount,
+        responseCount: latestResult
+          ? latestResult.correctCount + latestResult.incorrectCount
+          : null,
+        responseDetailsAvailable: latestCompletedAttempt !== null,
+        latestAttemptQuestions: buildLatestAttemptQuestions(latestCompletedAttempt),
         completionTimestamp:
           latestCompletedAttempt?.session.finishedAt ??
           latestCompletedAttempt?.session.updatedAt,

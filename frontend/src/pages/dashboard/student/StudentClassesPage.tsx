@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { useAuth } from "../../../app/providers/AuthProvider";
 import { useNotifications } from "../../../app/providers/NotificationsProvider";
 import { useTeacherClasses } from "../../../app/providers/TeacherClassesProvider";
+import { useStudentAttempts } from "../../../app/providers/StudentAttemptsProvider";
 import { Dialog } from "../../../components/ui/dialog";
 import { DashboardPageHeader } from "../../../features/dashboard/components/DashboardPageHeader";
 import {
@@ -40,22 +41,7 @@ import { useDashboardPageMeta } from "../../../features/dashboard/hooks/useDashb
 import { useQuizLauncher } from "../../../features/quiz-session/useQuizLauncher";
 
 function getAssignedQuizActionLabel(item: StudentAssignedQuizLibraryItem) {
-  if (item.assignmentState.status === "completed") {
-    return "View Results";
-  }
-
-  if (item.assignmentState.status === "in_progress") {
-    return "Continue Quiz";
-  }
-
-  if (
-    item.assignmentState.status === "expired" ||
-    item.assignmentState.status === "attempts_exhausted"
-  ) {
-    return "Open Assigned Quiz";
-  }
-
-  return "Start Assigned Quiz";
+  return item.assignmentState.primaryActionLabel;
 }
 
 export function StudentClassesPage() {
@@ -82,6 +68,12 @@ export function StudentClassesPage() {
     }),
     [studentViewer?.email, studentViewer?.id],
   );
+  const {
+    attempts: allAttempts,
+    isLoading: attemptsLoading,
+    error: attemptsError,
+  } = useStudentAttempts();
+
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [inviteCode, setInviteCode] = useState("");
@@ -90,8 +82,17 @@ export function StudentClassesPage() {
   const [isJoiningClass, setIsJoiningClass] = useState(false);
   const deferredSearch = useDeferredValue(search);
   const studentSources = useMemo(
-    () => buildStudentQuizLibrarySources(classes, quizzes, studentIdentity, sessions),
-    [classes, quizzes, sessions, studentIdentity],
+    () =>
+      buildStudentQuizLibrarySources(
+        classes,
+        quizzes,
+        studentIdentity,
+        sessions,
+        allAttempts,
+        attemptsLoading,
+        attemptsError,
+      ),
+    [allAttempts, attemptsError, attemptsLoading, classes, quizzes, sessions, studentIdentity],
   );
   const notificationTeacherNameByClassId = useMemo(() => {
     if (!studentViewer) {
@@ -209,15 +210,20 @@ export function StudentClassesPage() {
       label: getAssignedQuizActionLabel(item),
       icon: Play,
       iconDisplay: "label-only",
+      disabled:
+        item.assignmentState.isLoading ||
+        (!item.assignmentState.canStart &&
+          !item.assignmentState.canResume &&
+          !item.assignmentState.canReview),
       onClick: () =>
         openQuiz({
           quizId: item.id,
           viewerRole: "student",
           assignmentId: item.assignmentContext.assignmentId,
           preferredSession:
-            item.assignmentState.status === "completed"
+            item.assignmentState.canReview
               ? "completed"
-              : item.assignmentState.status === "in_progress"
+              : item.assignmentState.canResume
                 ? "in-progress"
                 : undefined,
           navigationState: {

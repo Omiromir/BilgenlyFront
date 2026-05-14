@@ -9,6 +9,13 @@ interface QuizReviewListProps {
 }
 
 export function QuizReviewList({ session }: QuizReviewListProps) {
+  const backendReviewByQuestionId = new Map(
+    (session.backendSubmitResult?.questions ?? []).map((question) => [
+      question.questionId,
+      question,
+    ]),
+  );
+
   return (
     <SectionCard
       title="Answer Review"
@@ -17,8 +24,10 @@ export function QuizReviewList({ session }: QuizReviewListProps) {
     >
       {session.quiz.questions.map((question, questionIndex) => {
         const questionState = getQuestionState(session, question.id);
-        const selectedAnswer =
-          questionState?.selectedIndices?.length
+        const backendReview = backendReviewByQuestionId.get(question.id);
+        const selectedAnswer = backendReview
+          ? backendReview.selectedAnswer || "No answer selected"
+          : questionState?.selectedIndices?.length
             ? questionState.selectedIndices
                 .map((selectedIndex) => question.options[selectedIndex])
                 .filter(Boolean)
@@ -30,11 +39,13 @@ export function QuizReviewList({ session }: QuizReviewListProps) {
               ? question.correctIndexes
               : [question.correctIndex]
             : [question.correctIndex];
-        const correctAnswer = correctIndexes
-          .map((correctIndex) => question.options[correctIndex])
-          .filter(Boolean)
-          .join(", ");
-        const isCorrect = Boolean(questionState?.isCorrect);
+        const correctAnswer = backendReview
+          ? backendReview.correctAnswer
+          : correctIndexes
+              .map((correctIndex) => question.options[correctIndex])
+              .filter(Boolean)
+              .join(", ");
+        const isCorrect = backendReview?.isCorrect ?? Boolean(questionState?.isCorrect);
 
         return (
           <article

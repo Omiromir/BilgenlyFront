@@ -38,6 +38,7 @@ export interface QuizQuestionRecord {
   id: string;
   text: string;
   options: string[];
+  optionIds?: string[];
   correctIndex: number;
   correctIndexes?: number[];
   tags?: string[];
@@ -145,5 +146,6 @@ export interface QuizCardAction {
   icon: LucideIcon;
   variant?: "primary" | "secondary" | "soft" | "ghost";
   iconDisplay?: "both" | "icon-only" | "label-only";
+  disabled?: boolean;
   onClick?: () => void;
 }

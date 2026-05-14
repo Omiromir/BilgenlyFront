@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { toast } from "sonner";
 import { useQuizSessions } from "../../../app/providers/QuizSessionProvider";
 import { toAssignmentConstraintSource } from "../../assignments/assignmentConstraints";
 import { useAssignmentConstraints } from "../../assignments/useAssignmentConstraints";
@@ -74,7 +75,13 @@ export function QuizPlayer({ sessionId }: QuizPlayerProps) {
           onSubmit={() => submitAnswer(currentQuestion.id)}
           onContinue={() => {
             if (isLastQuestion) {
-              completeSession();
+              void completeSession().catch((error: unknown) => {
+                toast.error(
+                  error instanceof Error
+                    ? error.message
+                    : "Unable to submit that quiz attempt.",
+                );
+              });
               return;
             }
 

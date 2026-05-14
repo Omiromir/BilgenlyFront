@@ -151,6 +151,8 @@ function sanitizeNotificationRecord(
       quizId: notification.quizId,
       quizTitle: notification.quizTitle,
       assignmentId: notification.assignmentId,
+      attemptId:
+        typeof notification.attemptId === "string" ? notification.attemptId : undefined,
       followUpKind: notification.followUpKind,
     };
   }

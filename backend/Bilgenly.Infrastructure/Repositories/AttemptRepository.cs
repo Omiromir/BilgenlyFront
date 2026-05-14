@@ -27,10 +27,13 @@ public class AttemptRepository : IAttemptRepository
         => await _context.Attempts
             .Where(a => a.UserId == userId)
             .Include(a => a.Quiz)
+            .ThenInclude(q => q.Questions)
+            .ThenInclude(q => q.Answers)
+            .Include(a => a.AttemptAnswers)
             .ToListAsync();
     public async Task<IEnumerable<Attempt>> GetByQuizIdAsync(Guid quizId) 
         => await _context.Attempts
-            .Where(a => a.QuizId == quizId && a.IsCompleted)
+            .Where(a => a.QuizId == quizId)
             .Include(a => a.User)
             .Include(a => a.AttemptAnswers)
             .OrderByDescending(a => a.DateTaken)

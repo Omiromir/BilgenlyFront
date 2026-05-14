@@ -1,4 +1,5 @@
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import {
   BookOpen,
   Clock3,
@@ -372,6 +373,16 @@ export function TeacherQuizLibraryPage() {
     });
   };
 
+  const handleDeleteQuiz = async (quizId: string) => {
+    try {
+      await deleteQuiz(quizId, "teacher");
+    } catch (nextError) {
+      toast.error(
+        nextError instanceof Error ? nextError.message : "Unable to delete quiz.",
+      );
+    }
+  };
+
   const getTeacherActions = (item: QuizLibraryItem): QuizCardAction[] => {
     if (!item.isOwner) {
       return [
@@ -425,7 +436,7 @@ export function TeacherQuizLibraryPage() {
           icon: Trash2,
           variant: "ghost",
           iconDisplay: "icon-only",
-          onClick: () => deleteQuiz(item.id, "teacher"),
+          onClick: () => void handleDeleteQuiz(item.id),
         },
       ];
     }
@@ -453,7 +464,7 @@ export function TeacherQuizLibraryPage() {
           icon: Trash2,
           variant: "ghost",
           iconDisplay: "icon-only",
-          onClick: () => deleteQuiz(item.id, "teacher"),
+          onClick: () => void handleDeleteQuiz(item.id),
         },
       ];
     }
@@ -487,7 +498,7 @@ export function TeacherQuizLibraryPage() {
           icon: Trash2,
           variant: "ghost",
           iconDisplay: "icon-only",
-          onClick: () => deleteQuiz(item.id, "teacher"),
+          onClick: () => void handleDeleteQuiz(item.id),
         },
       ];
   };

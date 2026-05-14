@@ -14,7 +14,7 @@ public class ClassAnalyticsDto
     public int NeedsAttentionCount { get; set; }   
     public double CompletionRate { get; set; }
     public double? AverageScore { get; set; }
-    public int AvgAttemptsUsed { get; set; }
+    public double AvgAttemptsUsed { get; set; }
     public DateTime? Deadline { get; set; }
     public int? MaxAttempts { get; set; }
     public List<StudentAssignmentResultDto> StudentResults { get; set; } = new();

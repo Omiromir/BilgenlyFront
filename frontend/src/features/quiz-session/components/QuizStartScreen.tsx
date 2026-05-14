@@ -12,7 +12,7 @@ import {
   DeadlineBadge,
   QuizStatusBadge,
 } from "../../assignments/AssignmentControls";
-import type { AssignmentConstraintState } from "../../assignments/assignmentConstraints";
+import type { AssignedQuizAvailability } from "../../assignments/assignedQuizAvailability";
 import {
   DashboardBadge,
   DashboardButton,
@@ -35,7 +35,7 @@ import {
 interface QuizStartScreenProps {
   quiz: QuizRecord;
   assignmentContext?: QuizAssignmentContext;
-  assignmentConstraints?: AssignmentConstraintState | null;
+  assignmentConstraints?: AssignedQuizAvailability | null;
   latestInProgressSession?: QuizSessionRecord;
   latestCompletedSession?: QuizSessionRecord;
   onStart?: () => void;
@@ -89,7 +89,10 @@ export function QuizStartScreen({
                 {quiz.visibility === "public" ? "Public quiz" : "Private quiz"}
               </DashboardBadge>
               {assignmentConstraints ? (
-                <QuizStatusBadge status={assignmentConstraints.status} />
+                <QuizStatusBadge
+                  status={assignmentConstraints.status}
+                  label={assignmentConstraints.displayStatusLabel}
+                />
               ) : null}
               {assignmentContext ? (
                 <DeadlineBadge
@@ -101,6 +104,7 @@ export function QuizStartScreen({
                 <AttemptsBadge
                   attemptsUsed={assignmentConstraints.attemptsUsed}
                   maxAttempts={assignmentConstraints.maxAttempts}
+                  isLoading={assignmentConstraints.isLoading}
                 />
               ) : null}
             </div>
@@ -186,6 +190,7 @@ export function QuizStartScreen({
                 attemptsUsed={assignmentConstraints.attemptsUsed}
                 maxAttempts={assignmentConstraints.maxAttempts}
                 status={assignmentConstraints.status}
+                isLoading={assignmentConstraints.isLoading}
               />
             ) : null}
           </div>
@@ -223,15 +228,26 @@ export function QuizStartScreen({
           ) : null}
 
           {!latestInProgressSession && onStart ? (
-            <DashboardButton type="button" size="lg" onClick={onStart}>
+            <DashboardButton
+              type="button"
+              size="lg"
+              onClick={onStart}
+              disabled={assignmentConstraints?.isLoading}
+            >
               <Play className="h-4.5 w-4.5" />
-              {assignmentConstraints ? startLabel : "Start Quiz"}
+              {assignmentConstraints?.isLoading
+                ? "Checking attempts..."
+                : assignmentConstraints
+                  ? startLabel
+                  : "Start Quiz"}
             </DashboardButton>
           ) : null}
 
           {!latestInProgressSession && !onStart && assignmentConstraints ? (
             <DashboardButton type="button" size="lg" variant="secondary" disabled>
-              {assignmentConstraints.status === "expired"
+              {assignmentConstraints.isLoading
+                ? "Checking attempts..."
+                : assignmentConstraints.status === "expired"
                 ? "Deadline Passed"
                 : "No Attempts Remaining"}
             </DashboardButton>

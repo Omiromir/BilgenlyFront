@@ -13,6 +13,8 @@ public class QuizRepository : IQuizRepository
     {
         _context = context;
     }
+    public void Remove(Quiz quiz)
+        => _context.Quizzes.Remove(quiz);
 
     public async Task<Quiz?> GetByIdAsync(Guid id) 
         => await _context.Quizzes

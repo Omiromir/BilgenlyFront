@@ -16,9 +16,17 @@ public class QuizController : ControllerBase
     {
         _quizService = quizService;
     }
-
+    [HttpDelete("{id}")]
+    [Authorize]
+    public async Task<IActionResult> DeleteQuiz(Guid id)
+    {
+        var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+        var (success, error) = await _quizService.DeleteQuizAsync(id, userId);
+        if (!success) return BadRequest(new { message = error });
+        return Ok(new { message = "Quiz deleted" });
+    }
     [HttpPost]
-    [Authorize(Roles = "Teacher")]
+    [Authorize]
     public async Task<IActionResult> CreateQuiz(CreateQuizDto dto)
     {
         var userId = Guid .Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);

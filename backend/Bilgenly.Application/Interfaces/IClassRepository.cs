@@ -14,4 +14,5 @@ public interface IClassRepository
     Task AddAssignmentAsync(Assignment assignment);
     Task SaveChangesAsync();
     void Remove(Class classEntity);
+    void RemoveAssignment(Assignment assignment);
 }

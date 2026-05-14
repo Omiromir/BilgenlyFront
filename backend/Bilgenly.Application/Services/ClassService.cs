@@ -158,6 +158,20 @@ public class ClassService
 
         return (MapAssignmentToDto(assignment, quiz), null);
     }
+    public async Task<(bool Success, string? Error)> RemoveAssignmentAsync(
+        Guid classId, Guid assignmentId, Guid teacherId)
+    {
+        var classEntity = await _classRepository.GetByIdAsync(classId);
+        if (classEntity is null) return (false, "Class not found");
+        if (classEntity.TeacherId != teacherId) return (false, "Access denied");
+
+        var assignment = classEntity.Assignments.FirstOrDefault(a => a.Id == assignmentId);
+        if (assignment is null) return (false, "Assignment not found");
+
+        _classRepository.RemoveAssignment(assignment);
+        await _classRepository.SaveChangesAsync();
+        return (true, null);
+    }
 
     private AssignmentDto MapAssignmentToDto(Assignment a, Quiz quiz) => new()
     {

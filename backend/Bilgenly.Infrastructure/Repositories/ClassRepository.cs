@@ -81,4 +81,6 @@ public class ClassRepository : IClassRepository
 
     public async Task SaveChangesAsync()
         => await _context.SaveChangesAsync();
+    public void RemoveAssignment(Assignment assignment)
+        => _context.Assignments.Remove(assignment);
 }

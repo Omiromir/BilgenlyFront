@@ -20,7 +20,15 @@ public class ClassController : ControllerBase
         _classService = classService;
         _classRepository = classRepository; 
     }
-
+    [HttpDelete("{classId}/students/{studentId}")]
+    [Authorize(Roles = "Teacher")]
+    public async Task<IActionResult> RemoveStudent(Guid classId, Guid studentId)
+    {
+        var teacherId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+        var (success, error) = await _classService.RemoveStudentAsync(classId, studentId, teacherId);
+        if (!success) return BadRequest(new { message = error });
+        return Ok(new { message = "Student removed from class" });
+    }
     [HttpPost]
     [Authorize(Roles = "Teacher")]
     public async Task<IActionResult> CreateClass(CreateClassDto dto)

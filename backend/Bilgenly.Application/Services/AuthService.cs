@@ -89,6 +89,26 @@ public class AuthService
             );
             return new JwtSecurityTokenHandler().WriteToken(token);
         }
+    public async Task<(bool Success, string? Error)> ChangePasswordAsync(
+        Guid userId, ChangePasswordDto dto)
+    {
+        var user = await _userRepository.GetByIdAsync(userId);
+        if (user is null) return (false, "User not found");
+
+        if (!BCrypt.Net.BCrypt.Verify(dto.CurrentPassword, user.PasswordHash))
+            return (false, "Current password is incorrect");
+
+        if (dto.NewPassword.Length < 8)
+            return (false, "New password must be at least 8 characters");
+
+        if (dto.CurrentPassword == dto.NewPassword)
+            return (false, "New password must be different from current password");
+
+        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.NewPassword);
+        await _userRepository.SaveChangesAsync();
+
+        return (true, null);
+    }
     public async Task<(AuthResponseDto? Response, string? Error)> UpdateRoleAsync(
         Guid userId, UpdateRoleDto dto)
     {

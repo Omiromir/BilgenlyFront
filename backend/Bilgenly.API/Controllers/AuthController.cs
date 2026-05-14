@@ -55,5 +55,17 @@ public class AuthController  : ControllerBase
         if (result is null) return BadRequest(new { message = error });
         return Ok(result);
     }
+    [HttpPatch("password")]
+    [Authorize]
+    public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordDto dto)
+    {
+        var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+        var (success, error) = await _authService.ChangePasswordAsync(userId, dto);
+
+        if (!success)
+            return BadRequest(new { message = error });
+
+        return Ok(new { message = "Password updated successfully" });
+    }
     
 }

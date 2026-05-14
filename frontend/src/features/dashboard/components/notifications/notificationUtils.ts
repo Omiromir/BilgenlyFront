@@ -47,6 +47,7 @@ export function buildClassInvitationNotification(
     actionType: "class_invitation",
     relatedClassId: input.relatedClassId,
     relatedClassName: input.relatedClassName,
+    inviteCode: input.inviteCode,
     senderName: input.senderName,
     senderEmail: input.senderEmail,
     studentId: input.studentId,

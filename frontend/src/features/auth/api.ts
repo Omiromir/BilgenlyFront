@@ -1,20 +1,15 @@
 import { apiRequest, getRequestErrorMessage } from "../../lib/apiClient";
 import type {
+  AuthResponse,
+  CompleteRegistrationPayload,
   ResetPasswordFormValues,
   SignInFormValues,
-  SignUpFormValues,
 } from "./types";
 
 const AUTH_TOKEN_KEY = "bilgenly_token";
 const AUTH_ROLE_KEY = "bilgenly_role";
-const ONBOARDING_KEY = "bilgenly_onboarding_done";
 
 export type UserRole = "teacher" | "student" | "moderator";
-
-function saveAuth(token: string, role: string) {
-  localStorage.setItem(AUTH_TOKEN_KEY, token);
-  localStorage.setItem(AUTH_ROLE_KEY, role.toLowerCase());
-}
 
 export interface ChangePasswordInput {
   currentPassword: string;
@@ -33,22 +28,15 @@ export function getRole() {
   return localStorage.getItem(AUTH_ROLE_KEY);
 }
 
-export function isOnboardingDone() {
-    return localStorage.getItem(ONBOARDING_KEY) === "true";
-}
-
-export function markOnboardingDone() {
-    localStorage.setItem(ONBOARDING_KEY, "true");
-}
-
 export function logout() {
   localStorage.removeItem(AUTH_TOKEN_KEY);
   localStorage.removeItem(AUTH_ROLE_KEY);
+  localStorage.removeItem("bilgenly_current_user");
 }
 
 export async function signIn(data: SignInFormValues & { rememberMe: boolean }) {
   try {
-    const result = await apiRequest<{ token: string; role: string }>("/api/auth/login", {
+    const result = await apiRequest<AuthResponse>("/api/auth/login", {
       method: "POST",
       body: {
         email: data.email,
@@ -58,28 +46,28 @@ export async function signIn(data: SignInFormValues & { rememberMe: boolean }) {
       fallbackErrorMessage: "Login failed",
     });
 
-    saveAuth(result.token, result.role);
     return result;
   } catch (error) {
     throw new Error(getRequestErrorMessage(error, "Login failed"));
   }
 }
 
-export async function signUp(data: SignUpFormValues) {
+export async function completeRegistration(payload: CompleteRegistrationPayload) {
+  const { onboarding, registration } = payload;
+
   try {
-    const result = await apiRequest<{ token: string; role: string }>("/api/auth/register", {
+    const result = await apiRequest<AuthResponse>("/api/auth/register", {
       method: "POST",
       body: {
-        username: data.fullName,
-        email: data.email,
-        password: data.password,
-        role: data.role ?? "Student",
+        username: registration.fullName,
+        email: registration.email,
+        password: registration.password,
+        role: onboarding.role.charAt(0).toUpperCase() + onboarding.role.slice(1),
       },
       skipAuth: true,
       fallbackErrorMessage: "Registration failed",
     });
 
-    saveAuth(result.token, result.role);
     return result;
   } catch (error) {
     throw new Error(getRequestErrorMessage(error, "Registration failed"));
@@ -88,20 +76,12 @@ export async function signUp(data: SignUpFormValues) {
 
 export async function updateRole(role: string) {
   try {
-    const result = await apiRequest<{
-      token: string;
-      role: string;
-      userId: string;
-      username: string;
-      email: string;
-    }>("/api/auth/role", {
+    const result = await apiRequest<AuthResponse>("/api/auth/role", {
       method: "PATCH",
       body: { role },
       fallbackErrorMessage: "Failed to update role",
     });
 
-    saveAuth(result.token, result.role);
-    markOnboardingDone();
     return result;
   } catch (error) {
     throw new Error(getRequestErrorMessage(error, "Failed to update role"));
@@ -119,6 +99,7 @@ export async function getMe() {
     username: string;
     email: string;
     role: string;
+    onboardingCompleted: boolean;
   }>("/api/auth/me", {
     fallbackErrorMessage: "Unauthorized",
   });

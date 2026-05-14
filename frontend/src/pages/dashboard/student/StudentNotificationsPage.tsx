@@ -23,7 +23,7 @@ export function StudentNotificationsPage() {
     markNotificationRead,
     updateClassInvitationStatus,
   } = useNotifications();
-  const { respondToClassInvitation } = useTeacherClasses();
+  const { joinClassByInviteCode, respondToClassInvitation } = useTeacherClasses();
   const [feedback, setFeedback] = useState<string | null>(null);
   const studentViewer = currentUser?.role === "student" ? currentUser : null;
   const studentIdentity = {
@@ -66,17 +66,24 @@ export function StudentNotificationsPage() {
     setFeedback(null);
   }, [studentViewer?.id]);
 
-  const handleAcceptInvitation = (notification: ClassInvitationNotification) => {
-    updateClassInvitationStatus(notification.id, "accepted");
-    respondToClassInvitation(
-      notification.relatedClassId,
-      notification.studentId,
-      "accepted",
-      studentIdentity,
-    );
-    setFeedback(
-      `You joined ${notification.relatedClassName}. It now appears in My Classes, and any assigned quizzes are unlocked there and in the Assigned tab of your Quiz Library.`,
-    );
+  const handleAcceptInvitation = async (notification: ClassInvitationNotification) => {
+    try {
+      await joinClassByInviteCode(notification.inviteCode);
+      updateClassInvitationStatus(notification.id, "accepted");
+      respondToClassInvitation(
+        notification.relatedClassId,
+        notification.studentId,
+        "accepted",
+        studentIdentity,
+      );
+      setFeedback(
+        `You joined ${notification.relatedClassName}. It now appears in My Classes, and any assigned quizzes are unlocked there and in the Assigned tab of your Quiz Library.`,
+      );
+    } catch (error) {
+      setFeedback(
+        error instanceof Error ? error.message : "Unable to join that class right now.",
+      );
+    }
   };
 
   const handleDeclineInvitation = (notification: ClassInvitationNotification) => {
@@ -149,7 +156,9 @@ export function StudentNotificationsPage() {
 
         <NotificationList
           notifications={notifications}
-          onAcceptInvitation={handleAcceptInvitation}
+          onAcceptInvitation={(notification) => {
+            void handleAcceptInvitation(notification);
+          }}
           onDeclineInvitation={handleDeclineInvitation}
           onMarkRead={(notification) => markNotificationRead(notification.id)}
         />

@@ -6,9 +6,19 @@ export interface ClassStudentDto {
 }
 
 export interface ClassQuizDto {
+  assignmentId: string;
   quizId: string;
   quizTitle: string;
+  topic: string;
+  questionCount: number;
   assignedAt: string;
+  deadline: string | null;
+  maxAttempts: number | null;
+  allowLateSubmissions: boolean;
+  assignedBy: string;
+  assignedByName: string;
+  visibility: string;
+  status: string;
 }
 
 export interface ClassDto {

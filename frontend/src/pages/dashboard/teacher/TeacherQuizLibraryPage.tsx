@@ -61,6 +61,7 @@ import {
 } from "../../../features/dashboard/components/quiz-library/quizLibraryUtils";
 import { useDashboardPageMeta } from "../../../features/dashboard/hooks/useDashboardPageMeta";
 import { formatCurrentDate } from "../../../features/dashboard/settings/settingsPreferences";
+import { useAuth } from "../../../app/providers/AuthProvider";
 
 type TeacherLibraryTab =
   | "my-quizzes"
@@ -69,6 +70,7 @@ type TeacherLibraryTab =
 
 export function TeacherQuizLibraryPage() {
   const meta = useDashboardPageMeta();
+  const { currentUser } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const { classes, assignQuizToClasses } = useTeacherClasses();
@@ -81,7 +83,11 @@ export function TeacherQuizLibraryPage() {
     toggleSavedQuiz,
   } = useQuizLibrary();
   const { openQuiz } = useQuizLauncher();
-  const teacherQuizLibraryItems = getQuizLibraryItemsForRole(quizzes, "teacher");
+  const teacherQuizLibraryItems = getQuizLibraryItemsForRole(
+    quizzes,
+    "teacher",
+    currentUser?.id,
+  );
   const initialTab = location.state?.libraryTab as TeacherLibraryTab | undefined;
   const [activeTab, setActiveTab] = useState<TeacherLibraryTab>(
     initialTab === "drafts" ||

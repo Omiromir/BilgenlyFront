@@ -77,6 +77,7 @@ import {
   buildQuizJoinCode,
   formatQuizJoinCode,
 } from "../../../quiz-session/quizJoinCode";
+import { useAuth } from "../../../../app/providers/AuthProvider";
 
 const teacherClassStatusToneMap = {
   active: "success",
@@ -287,7 +288,9 @@ interface TeacherClassFormDialogProps {
   mode: "create" | "edit";
   initialValues?: TeacherClassFormValues;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (values: TeacherClassFormValues) => void;
+  onSubmit: (values: TeacherClassFormValues) => Promise<void>;
+  isSubmitting?: boolean;
+  submitError?: string | null;
 }
 
 export function TeacherClassFormDialog({
@@ -296,6 +299,8 @@ export function TeacherClassFormDialog({
   initialValues,
   onOpenChange,
   onSubmit,
+  isSubmitting = false,
+  submitError,
 }: TeacherClassFormDialogProps) {
   const [values, setValues] = useState<TeacherClassFormValues>(
     initialValues ?? emptyTeacherClassFormValues,
@@ -311,15 +316,19 @@ export function TeacherClassFormDialog({
     setNameError("");
   }, [initialValues, open]);
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+
+    if (isSubmitting) {
+      return;
+    }
 
     if (!values.name.trim()) {
       setNameError("Class name is required.");
       return;
     }
 
-    onSubmit(values);
+    await onSubmit(values);
   };
 
   return (
@@ -402,6 +411,17 @@ export function TeacherClassFormDialog({
                 placeholder="Add context for students, learning goals, or how you plan to use this class."
               />
             </label>
+
+            {submitError ? (
+              <div
+                className="rounded-[18px] border border-[var(--dashboard-danger-soft)] bg-[var(--dashboard-danger-soft)]/40 px-4 py-3"
+                role="alert"
+              >
+                <p className="text-sm leading-6 text-[var(--dashboard-danger)]">
+                  {submitError}
+                </p>
+              </div>
+            ) : null}
           </DashboardModalBody>
 
           <DashboardModalFooter>
@@ -410,11 +430,18 @@ export function TeacherClassFormDialog({
               size="lg"
               variant="ghost"
               onClick={() => onOpenChange(false)}
+              disabled={isSubmitting}
             >
               Cancel
             </DashboardButton>
-            <DashboardButton type="submit" size="lg">
-              {mode === "create" ? "Create class" : "Save changes"}
+            <DashboardButton type="submit" size="lg" disabled={isSubmitting}>
+              {isSubmitting
+                ? mode === "create"
+                  ? "Creating class..."
+                  : "Saving changes..."
+                : mode === "create"
+                  ? "Create class"
+                  : "Save changes"}
             </DashboardButton>
           </DashboardModalFooter>
         </form>
@@ -572,6 +599,7 @@ export function AddStudentsDialog({
   onOpenChange,
   onSubmit,
 }: AddStudentsDialogProps) {
+  const { currentUser } = useAuth();
   const [values, setValues] = useState<AddStudentsFormValues>(
     emptyAddStudentsFormValues,
   );
@@ -599,7 +627,9 @@ export function AddStudentsDialog({
     const invalidEmails: string[] = [];
     const duplicateEmails: string[] = [];
     const alreadyAddedEmails: string[] = [];
+    const selfInviteEmails: string[] = [];
     const validEmails: string[] = [];
+    const currentUserEmail = currentUser?.email ? normalizeEmail(currentUser.email) : "";
 
     parsedEmails.forEach((email) => {
       if (validateEmail(email)) {
@@ -616,6 +646,11 @@ export function AddStudentsDialog({
 
       if (existingEmails.has(email)) {
         alreadyAddedEmails.push(email);
+        return;
+      }
+
+      if (currentUserEmail && email === currentUserEmail) {
+        selfInviteEmails.push(email);
         return;
       }
 
@@ -639,6 +674,9 @@ export function AddStudentsDialog({
       nextErrors.push(
         `Already in this class: ${alreadyAddedEmails.join(", ")}.`,
       );
+    }
+    if (selfInviteEmails.length) {
+      nextErrors.push("You cannot invite your own account to this class.");
     }
 
     if (nextErrors.length) {

@@ -76,8 +76,9 @@ function mapClassQuizDtoToTeacherAssignedQuiz(
   existingAssignment?: TeacherClassAssignedQuiz,
 ) {
   const assignmentId =
-    existingAssignment?.assignmentId ??
-    `${teacherClass.id}:${quiz.quizId}` ??
+    quiz.assignmentId ||
+    existingAssignment?.assignmentId ||
+    `${teacherClass.id}:${quiz.quizId}` ||
     createTeacherClassAssignmentId();
 
   return {
@@ -86,16 +87,17 @@ function mapClassQuizDtoToTeacherAssignedQuiz(
     classId: teacherClass.id,
     quizId: quiz.quizId,
     title: quiz.quizTitle,
-    topic: existingAssignment?.topic ?? "",
-    questionCount: existingAssignment?.questionCount ?? 0,
+    topic: quiz.topic || existingAssignment?.topic || "",
+    questionCount: quiz.questionCount || existingAssignment?.questionCount || 0,
     assignedAt: quiz.assignedAt,
-    deadline: existingAssignment?.deadline ?? null,
-    maxAttempts: existingAssignment?.maxAttempts ?? null,
-    allowLateSubmissions: existingAssignment?.allowLateSubmissions ?? false,
-    assignedBy: existingAssignment?.assignedBy ?? "",
-    assignedByName: existingAssignment?.assignedByName ?? "",
+    deadline: quiz.deadline ?? existingAssignment?.deadline ?? null,
+    maxAttempts: quiz.maxAttempts ?? existingAssignment?.maxAttempts ?? null,
+    allowLateSubmissions:
+      quiz.allowLateSubmissions ?? existingAssignment?.allowLateSubmissions ?? false,
+    assignedBy: quiz.assignedBy || existingAssignment?.assignedBy || "",
+    assignedByName: quiz.assignedByName || existingAssignment?.assignedByName || "",
     visibility: "class-members",
-    status: existingAssignment?.status ?? "active",
+    status: quiz.status === "expired" ? "expired" : existingAssignment?.status ?? "active",
   } satisfies TeacherClassAssignedQuiz;
 }
 

@@ -54,6 +54,7 @@ export interface QuizQuestionRecord {
 
 export interface QuizRecord {
   id: string;
+  ownerUserId?: string;
   ownerRole: QuizLibraryOwnerRole;
   ownerName: string;
   sourceQuizId?: string;
@@ -82,6 +83,7 @@ export interface QuizRecord {
 
 export interface QuizLibraryItem {
   id: string;
+  ownerUserId?: string;
   title: string;
   description: string;
   topic: string;

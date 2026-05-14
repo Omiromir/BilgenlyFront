@@ -38,6 +38,7 @@ public class ClassRepository : IClassRepository
     public async Task<IEnumerable<Class>> GetByTeacherIdAsync(Guid teacherId)
         => await _context.Classes
             .Where(c => c.TeacherId == teacherId)
+            .Include(c => c.Teacher)
             .Include(c => c.ClassStudents)
             .ThenInclude(cs => cs.Student)
             .Include(c => c.Assignments) 

@@ -224,7 +224,7 @@ export function TeacherStudentsPage() {
       ].join(","),
       ...filteredRows.map((row) =>
         [
-          escapeCsvValue(row.derivedId),
+          escapeCsvValue(row.studentRef),
           escapeCsvValue(row.student.fullName),
           escapeCsvValue(row.student.email),
           escapeCsvValue(row.genderLabel),

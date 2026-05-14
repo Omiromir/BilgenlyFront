@@ -9,7 +9,6 @@ import {
   getQuizLibraryItemsForRole,
   mapQuizRecordToLibraryItem,
 } from "../../../../app/providers/QuizLibraryProvider";
-import { mockTeacherUser } from "../../mock/mockUsers";
 import type {
   TeacherClassRecord,
   TeacherClassStudent,
@@ -104,8 +103,8 @@ function buildStudentMemberships(
           className: teacherClass.name,
           classSubject: teacherClass.subject,
           classDescription: teacherClass.description,
-          teacherName: mockTeacherUser.fullName,
-          teacherEmail: mockTeacherUser.email,
+          teacherName: teacherClass.teacherName || "Unknown teacher",
+          teacherEmail: "",
           inviteCode: teacherClass.inviteCode,
           status: matchingStudent.status,
           invitationStatus: matchingStudent.invitationStatus,
@@ -146,7 +145,11 @@ function buildAssignedQuizLibraryItems(
         return [];
       }
 
-      const libraryItem = mapQuizRecordToLibraryItem(quizRecord, "student");
+      const libraryItem = mapQuizRecordToLibraryItem(
+        quizRecord,
+        "student",
+        studentIdentity.userId,
+      );
       const assignmentContext = {
         assignmentId: assignment.assignmentId,
         classId: assignment.classId,
@@ -224,7 +227,11 @@ export function buildStudentQuizLibrarySources(
     };
   }
 
-  const studentLibraryItems = getQuizLibraryItemsForRole(quizzes, "student");
+  const studentLibraryItems = getQuizLibraryItemsForRole(
+    quizzes,
+    "student",
+    studentIdentity.userId,
+  );
   const memberships = buildStudentMemberships(classes, studentIdentity);
   const activeMemberships = memberships.filter(
     (membership) => membership.status === "joined",

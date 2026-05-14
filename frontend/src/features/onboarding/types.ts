@@ -1,4 +1,4 @@
-import type { UserRole } from "../../lib/auth";
+import type { OnboardingAnswers } from "../auth/types";
 
 export type StepKey =
   | "signup"
@@ -12,12 +12,10 @@ export type StepKey =
   | "loading"
   | "recommendations";
 
-export interface SelectedAnswers {
-  role?: UserRole;
-  goal?: string;
-  experience?: string;
-  pace?: string;
-}
+export type SelectedAnswers = Pick<
+  OnboardingAnswers,
+  "role" | "goal" | "experience" | "pace"
+>;
 
 export interface ChoiceOption {
   id: string;

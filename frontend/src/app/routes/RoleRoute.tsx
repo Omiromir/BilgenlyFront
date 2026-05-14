@@ -8,7 +8,7 @@ interface RoleRouteProps {
 }
 
 export function RoleRoute({ allowedRoles }: RoleRouteProps) {
-  const { role, isLoading, isAuthenticated } = useAuth();
+  const { role, isLoading, isAuthenticated, onboardingCompleted } = useAuth();
 
   if (isLoading) {
     return <div className="p-6">Loading...</div>;
@@ -16,6 +16,10 @@ export function RoleRoute({ allowedRoles }: RoleRouteProps) {
 
   if (!isAuthenticated || !role) {
     return <Navigate to="/signin" replace />;
+  }
+
+  if (!onboardingCompleted) {
+    return <Navigate to="/onboarding" replace />;
   }
 
   if (!allowedRoles.includes(role)) {

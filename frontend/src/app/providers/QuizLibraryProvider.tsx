@@ -18,6 +18,11 @@ import { isGuidString } from "../../lib/apiClient";
 import { createQuiz as createQuizRequest } from "../../features/dashboard/api/quizzesApi";
 import { useAuth } from "./AuthProvider";
 import { useTeacherClasses } from "./TeacherClassesProvider";
+import {
+  getScopedStorageValue,
+  getUserScopedStorageKey,
+  getUserStorageScope,
+} from "./userScopedStorage";
 
 const QUIZ_LIBRARY_STORAGE_KEY = "bilgenly_quiz_library";
 
@@ -90,7 +95,7 @@ function getOwnerName(
     return currentUserName.trim();
   }
 
-  return role === "teacher" ? "Professor Doe" : "You";
+  return role === "teacher" ? "Unknown teacher" : "You";
 }
 
 function normalizeTags(tags: string[]) {
@@ -133,7 +138,7 @@ function getCorrectAnswerIndexes(question: QuizQuestionRecord) {
   return [question.correctIndex];
 }
 
-function loadQuizLibraryFromStorage() {
+function loadQuizLibraryFromStorage(scope: string) {
   const mergedByQuizId = new Map<string, QuizRecord>();
   const legacyScopedKeys: string[] = [];
   const mergeQuizRecords = (records: QuizRecord[]) => {
@@ -162,7 +167,7 @@ function loadQuizLibraryFromStorage() {
     });
   };
 
-  const sharedValue = localStorage.getItem(QUIZ_LIBRARY_STORAGE_KEY);
+  const sharedValue = getScopedStorageValue(QUIZ_LIBRARY_STORAGE_KEY, scope);
 
   if (sharedValue) {
     try {
@@ -218,11 +223,17 @@ function loadQuizLibraryFromStorage() {
 export function mapQuizRecordToLibraryItem(
   quiz: QuizRecord,
   viewerRole: "teacher" | "student",
+  currentUserId?: string | null,
 ): QuizLibraryItem {
-  const isOwner = quiz.ownerRole === viewerRole;
+  const isOwner = currentUserId
+    ? quiz.ownerUserId
+      ? quiz.ownerUserId === currentUserId
+      : quiz.ownerRole === viewerRole
+    : quiz.ownerRole === viewerRole;
 
   return {
     id: quiz.id,
+    ownerUserId: quiz.ownerUserId,
     title: quiz.title,
     description: quiz.description,
     topic: quiz.topic,
@@ -255,6 +266,7 @@ export function mapQuizRecordToLibraryItem(
 export function getQuizLibraryItemsForRole(
   quizzes: QuizRecord[],
   viewerRole: "teacher" | "student",
+  currentUserId?: string | null,
 ) {
   return quizzes
     .filter((quiz) => {
@@ -264,14 +276,29 @@ export function getQuizLibraryItemsForRole(
 
       return quiz.visibility === "public" && quiz.status === "published-public";
     })
-    .map((quiz) => mapQuizRecordToLibraryItem(quiz, viewerRole));
+    .map((quiz) => mapQuizRecordToLibraryItem(quiz, viewerRole, currentUserId));
 }
 
 export function QuizLibraryProvider({ children }: QuizLibraryProviderProps) {
-  const { currentUser } = useAuth();
+  const { currentUser, role, token } = useAuth();
   const { syncAssignedQuizDetails } = useTeacherClasses();
   const [quizzes, setQuizzes] = useState<QuizRecord[]>([]);
   const [isHydrated, setIsHydrated] = useState(false);
+  const [hydratedScope, setHydratedScope] = useState<string | null>(null);
+  const storageScope = useMemo(
+    () =>
+      getUserStorageScope({
+        userId: currentUser?.id,
+        email: currentUser?.email,
+        role,
+        token,
+      }),
+    [currentUser?.email, currentUser?.id, role, token],
+  );
+  const storageKey = useMemo(
+    () => getUserScopedStorageKey(QUIZ_LIBRARY_STORAGE_KEY, storageScope),
+    [storageScope],
+  );
 
   // Keep sync function up-to-date via ref to avoid infinite loops
   const syncAssignedQuizDetailsRef = useRef(syncAssignedQuizDetails);
@@ -282,10 +309,12 @@ export function QuizLibraryProvider({ children }: QuizLibraryProviderProps) {
   useEffect(() => {
     setQuizzes([]);
     setIsHydrated(false);
+    setHydratedScope(null);
 
-    const savedValue = loadQuizLibraryFromStorage();
+    const savedValue = loadQuizLibraryFromStorage(storageScope);
 
     if (!savedValue) {
+      setHydratedScope(storageScope);
       setIsHydrated(true);
       return;
     }
@@ -296,17 +325,18 @@ export function QuizLibraryProvider({ children }: QuizLibraryProviderProps) {
     } catch {
       setQuizzes([]);
     } finally {
+      setHydratedScope(storageScope);
       setIsHydrated(true);
     }
-  }, []);
+  }, [storageScope]);
 
   useEffect(() => {
-    if (!isHydrated) {
+    if (!isHydrated || hydratedScope !== storageScope) {
       return;
     }
 
-    localStorage.setItem(QUIZ_LIBRARY_STORAGE_KEY, JSON.stringify(quizzes));
-  }, [isHydrated, quizzes]);
+    localStorage.setItem(storageKey, JSON.stringify(quizzes));
+  }, [hydratedScope, isHydrated, quizzes, storageKey, storageScope]);
 
   useEffect(() => {
     if (!isHydrated) {
@@ -331,6 +361,7 @@ export function QuizLibraryProvider({ children }: QuizLibraryProviderProps) {
           id:
             input.existingQuizId ??
             `quiz-${now.getTime()}-${Math.random().toString(36).slice(2, 8)}`,
+          ownerUserId: currentUser?.id,
           ownerRole: input.ownerRole,
           ownerName: getOwnerName(input.ownerRole, currentUser?.fullName),
           title: input.title.trim(),
@@ -386,7 +417,10 @@ export function QuizLibraryProvider({ children }: QuizLibraryProviderProps) {
           throw new Error("Unable to find that quiz in your library.");
         }
 
-        if (sourceQuiz.ownerRole !== "teacher") {
+        if (
+          sourceQuiz.ownerRole !== "teacher" ||
+          (sourceQuiz.ownerUserId && sourceQuiz.ownerUserId !== currentUser?.id)
+        ) {
           throw new Error("Only teacher quizzes can be assigned to classes.");
         }
 
@@ -509,6 +543,7 @@ export function QuizLibraryProvider({ children }: QuizLibraryProviderProps) {
         const duplicate: QuizRecord = {
           ...source,
           id: `quiz-${now.getTime()}-${Math.random().toString(36).slice(2, 8)}`,
+          ownerUserId: currentUser?.id,
           ownerRole: viewerRole,
           ownerName: getOwnerName(viewerRole, currentUser?.fullName),
           sourceQuizId: source.id,
@@ -534,7 +569,7 @@ export function QuizLibraryProvider({ children }: QuizLibraryProviderProps) {
         return duplicate;
       },
     }),
-    [currentUser?.fullName, quizzes],
+    [currentUser?.fullName, currentUser?.id, quizzes],
   );
 
   return (

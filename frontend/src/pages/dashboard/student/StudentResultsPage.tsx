@@ -23,6 +23,7 @@ import {
   dashboardPageClassName,
   dashboardStatsGridClassName,
 } from "../../../features/dashboard/components/DashboardPrimitives";
+import { EmptyStateBlock } from "../../../features/dashboard/components/EmptyStateBlock";
 import { SectionCard } from "../../../features/dashboard/components/SectionCard";
 import { StatCard } from "../../../features/dashboard/components/StatCard";
 import { buildQuizSessionPath, buildQuizSessionSearch } from "../../../features/quiz-session/quizRouting";
@@ -200,6 +201,8 @@ export function StudentResultsPage() {
                 correctCount: 0,
                 incorrectCount: 0,
                 totalQuestions: 0,
+                earnedPoints: 0,
+                totalPoints: 0,
               };
 
           return {
@@ -354,7 +357,7 @@ export function StudentResultsPage() {
                     </p>
                     <p className="text-sm text-[var(--dashboard-text-soft)]">
                       {result.totalPoints
-                        ? formatQuizPoints(result.earnedPoints, result.totalPoints)
+                        ? `Score: ${formatQuizPoints(result.earnedPoints, result.totalPoints)}`
                         : "Summary only"}
                     </p>
                   </div>
@@ -363,11 +366,11 @@ export function StudentResultsPage() {
                 <div className="mt-5 grid gap-4 text-sm text-[var(--dashboard-text-soft)] md:grid-cols-2">
                   <div className={dashboardIconTextRowClassName}>
                     <CheckCircle2 className="h-4 w-4 text-[var(--dashboard-brand)]" />
-                    Points earned: {result.totalPoints ? result.earnedPoints : "--"}
+                    Correct answers: {result.totalQuestions ? `${result.correctCount}/${result.totalQuestions}` : "--"}
                   </div>
                   <div className={dashboardIconTextRowClassName}>
                     <Award className="h-4 w-4 text-[var(--dashboard-brand-strong)]" />
-                    Points remaining: {result.totalPoints ? result.totalPoints - result.earnedPoints : "--"}
+                    Score: {result.totalPoints ? formatQuizPoints(result.earnedPoints, result.totalPoints) : "--"}
                   </div>
                   <div className={dashboardIconTextRowClassName}>
                     <Clock3 className="h-4 w-4 text-[var(--dashboard-brand)]" />
@@ -375,7 +378,7 @@ export function StudentResultsPage() {
                   </div>
                   <div className={dashboardIconTextRowClassName}>
                     <TrendingUp className="h-4 w-4 text-[var(--dashboard-brand)]" />
-                    Source: {session ? (session.assignmentContext ? "Assigned quiz" : session.sourceLabel) : "Analytics summary"}
+                    Percentage: {formatQuizScore(result.percentage)}
                   </div>
                 </div>
 

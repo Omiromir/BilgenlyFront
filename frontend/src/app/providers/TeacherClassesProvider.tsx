@@ -34,7 +34,6 @@ import {
   assignQuizToClass as assignQuizToClassRequest,
   createClass as createClassRequest,
   deleteClass as deleteClassRequest,
-  getClassAssignments,
   getStudentClasses,
   getTeacherClasses,
   joinClassByInviteCode as joinClassByInviteCodeRequest,
@@ -48,12 +47,15 @@ import {
 } from "../../features/dashboard/api/classesAdapters";
 import { getRequestErrorMessage, isGuidString } from "../../lib/apiClient";
 import type { UserRole } from "../../features/auth/api";
+import { useAuth } from "./AuthProvider";
+import {
+  getScopedStorageValue,
+  getUserScopedStorageKey,
+  getUserStorageScope,
+} from "./userScopedStorage";
 
 const TEACHER_CLASSES_STORAGE_KEY = "bilgenly_teacher_classes";
 const HIDDEN_ASSIGNMENTS_STORAGE_KEY = "bilgenly_hidden_class_assignments";
-const AUTH_ROLE_KEY = "bilgenly_role";
-const AUTH_TOKEN_KEY = "bilgenly_token";
-const AUTH_USER_KEY = "bilgenly_current_user";
 
 export interface StudentClassMembershipRecord {
   teacherClass: TeacherClassRecord;
@@ -118,13 +120,6 @@ interface TeacherClassesProviderProps {
   children: ReactNode;
 }
 
-interface StoredAuthUserProfile {
-  userId: string;
-  username: string;
-  email: string;
-  role: string;
-}
-
 function getInitials(name: string) {
   return name
     .split(" ")
@@ -132,29 +127,6 @@ function getInitials(name: string) {
     .join("")
     .toUpperCase()
     .slice(0, 2);
-}
-
-function mapAuthUserToDashboardUser(
-  authUser: StoredAuthUserProfile,
-  fallbackRole: UserRole | null,
-): MockDashboardUser | null {
-  const normalizedRole = authUser.role.toLowerCase() as UserRole;
-  const role = fallbackRole ?? normalizedRole;
-
-  if (role !== "teacher" && role !== "student") {
-    return null;
-  }
-
-  return {
-    id: authUser.userId || `email:${authUser.email.trim().toLowerCase()}`,
-    role,
-    fullName: authUser.username,
-    email: authUser.email,
-    initials: getInitials(authUser.username),
-    joinedLabel: "Join date unavailable",
-    location: "",
-    bio: "",
-  };
 }
 
 function buildFallbackDashboardUser(role: UserRole | null): MockDashboardUser | null {
@@ -173,33 +145,6 @@ function buildFallbackDashboardUser(role: UserRole | null): MockDashboardUser | 
     joinedLabel: "Join date unavailable",
     location: "",
     bio: "",
-  };
-}
-
-function readStoredAuthSnapshot() {
-  const role = localStorage.getItem(AUTH_ROLE_KEY) as UserRole | null;
-  const token = localStorage.getItem(AUTH_TOKEN_KEY);
-  const savedUser = localStorage.getItem(AUTH_USER_KEY);
-
-  let authUser: StoredAuthUserProfile | null = null;
-
-  if (savedUser) {
-    try {
-      authUser = JSON.parse(savedUser) as StoredAuthUserProfile;
-    } catch {
-      authUser = null;
-    }
-  }
-
-  const fallbackUser = buildFallbackDashboardUser(role);
-  const currentUser = authUser
-    ? mapAuthUserToDashboardUser(authUser, role)
-    : fallbackUser;
-
-  return {
-    role,
-    token,
-    currentUser,
   };
 }
 
@@ -370,8 +315,8 @@ function sanitizeTeacherClassRecord(
   };
 }
 
-function loadStoredClasses() {
-  const storedValue = localStorage.getItem(TEACHER_CLASSES_STORAGE_KEY);
+function loadStoredClasses(scope: string) {
+  const storedValue = getScopedStorageValue(TEACHER_CLASSES_STORAGE_KEY, scope);
 
   if (!storedValue) {
     return [];
@@ -397,8 +342,8 @@ function loadStoredClasses() {
   }
 }
 
-function loadHiddenAssignments() {
-  const storedValue = localStorage.getItem(HIDDEN_ASSIGNMENTS_STORAGE_KEY);
+function loadHiddenAssignments(scope: string) {
+  const storedValue = getScopedStorageValue(HIDDEN_ASSIGNMENTS_STORAGE_KEY, scope);
 
   if (!storedValue) {
     return {} as Record<string, string[]>;
@@ -437,18 +382,11 @@ async function loadTeacherClassesFromApi(
   hiddenAssignmentIdsByClass: Record<string, string[]>,
 ) {
   const teacherClasses = await getTeacherClasses();
-  const assignmentsByClass = await Promise.all(
-    teacherClasses.map(
-      async (teacherClass) =>
-        [teacherClass.id, await getClassAssignments(teacherClass.id)] as const,
-    ),
-  );
-  const assignmentMap = new Map(assignmentsByClass);
 
   return teacherClasses.map((teacherClass) =>
     mapClassDtoToTeacherClassRecord(
       teacherClass,
-      assignmentMap.get(teacherClass.id) ?? [],
+      null,
       localClasses.find((candidate) => candidate.id === teacherClass.id) ??
         null,
       new Set(hiddenAssignmentIdsByClass[teacherClass.id] ?? []),
@@ -476,16 +414,32 @@ async function loadStudentClassesFromApi(
 export function TeacherClassesProvider({
   children,
 }: TeacherClassesProviderProps) {
-  const authSnapshot = readStoredAuthSnapshot();
-  const { currentUser, role, token } = authSnapshot;
-  const [classes, setClasses] = useState<TeacherClassRecord[]>(() =>
-    loadStoredClasses(),
+  const { currentUser, role, token } = useAuth();
+  const storageScope = useMemo(
+    () =>
+      getUserStorageScope({
+        userId: currentUser?.id,
+        email: currentUser?.email,
+        role,
+        token,
+      }),
+    [currentUser?.email, currentUser?.id, role, token],
   );
+  const classesStorageKey = useMemo(
+    () => getUserScopedStorageKey(TEACHER_CLASSES_STORAGE_KEY, storageScope),
+    [storageScope],
+  );
+  const hiddenAssignmentsStorageKey = useMemo(
+    () => getUserScopedStorageKey(HIDDEN_ASSIGNMENTS_STORAGE_KEY, storageScope),
+    [storageScope],
+  );
+  const [classes, setClasses] = useState<TeacherClassRecord[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hiddenAssignmentIdsByClass, setHiddenAssignmentIdsByClass] = useState<
     Record<string, string[]>
-  >(() => loadHiddenAssignments());
+  >({});
+  const [hydratedScope, setHydratedScope] = useState<string | null>(null);
   const {
     notifications,
     removeClassInvitationNotification,
@@ -509,15 +463,34 @@ export function TeacherClassesProvider({
   }, [teacherActor]);
 
   useEffect(() => {
-    localStorage.setItem(TEACHER_CLASSES_STORAGE_KEY, JSON.stringify(classes));
-  }, [classes]);
+    setClasses(loadStoredClasses(storageScope));
+    setHiddenAssignmentIdsByClass(loadHiddenAssignments(storageScope));
+    setHydratedScope(storageScope);
+  }, [storageScope]);
 
   useEffect(() => {
+    if (hydratedScope !== storageScope) {
+      return;
+    }
+
+    localStorage.setItem(classesStorageKey, JSON.stringify(classes));
+  }, [classes, classesStorageKey, hydratedScope, storageScope]);
+
+  useEffect(() => {
+    if (hydratedScope !== storageScope) {
+      return;
+    }
+
     localStorage.setItem(
-      HIDDEN_ASSIGNMENTS_STORAGE_KEY,
+      hiddenAssignmentsStorageKey,
       JSON.stringify(hiddenAssignmentIdsByClass),
     );
-  }, [hiddenAssignmentIdsByClass]);
+  }, [
+    hiddenAssignmentIdsByClass,
+    hiddenAssignmentsStorageKey,
+    hydratedScope,
+    storageScope,
+  ]);
 
   useEffect(() => {
     if (role !== "student" || (!studentUserId && !studentEmail) || !notifications.length) {
@@ -588,7 +561,7 @@ export function TeacherClassesProvider({
     setError(null);
 
     try {
-      const localClasses = loadStoredClasses();
+      const localClasses = loadStoredClasses(storageScope);
       const studentIdentity = {
         userId: studentUserId,
         email: studentEmail,
@@ -623,7 +596,14 @@ export function TeacherClassesProvider({
     } finally {
       setIsLoading(false);
     }
-  }, [hiddenAssignmentIdsByClass, role, studentUserId, studentEmail, token]);
+  }, [
+    hiddenAssignmentIdsByClass,
+    role,
+    storageScope,
+    studentUserId,
+    studentEmail,
+    token,
+  ]);
 
   useEffect(() => {
     void refreshClasses();
@@ -785,6 +765,7 @@ export function TeacherClassesProvider({
             recipientEmail: student.email,
             relatedClassId: targetClass.id,
             relatedClassName: targetClass.name,
+            inviteCode: targetClass.inviteCode,
             senderName: teacherActorRef.current.fullName,
             senderEmail: teacherActorRef.current.email,
             studentId: student.id,
@@ -876,6 +857,7 @@ export function TeacherClassesProvider({
           recipientEmail: targetStudent.email,
           relatedClassId: targetClass.id,
           relatedClassName: targetClass.name,
+          inviteCode: targetClass.inviteCode,
           senderName: teacherActorRef.current.fullName,
           senderEmail: teacherActorRef.current.email,
           studentId: targetStudent.id,

@@ -65,7 +65,21 @@ public class AttemptService
             }).OrderBy(q => q.Position).ToList()
         }, null);
     }
-
+    public async Task<IEnumerable<object>> GetAttemptsByQuizAsync(Guid quizId, Guid userId)
+    {
+        var attempts = (await _attemptRepository.GetByUserIdAsync(userId))
+            .Where(a => a.QuizId == quizId)
+            .OrderByDescending(a => a.DateTaken)
+            .Select(a => new
+            {
+                attemptId = a.Id,
+                quizId = a.QuizId,
+                score = a.Score,
+                isCompleted = a.IsCompleted,
+                dateTaken = a.DateTaken
+            });
+        return attempts;
+    }
     public async Task<(AttemptResultDto? Result, string? Error)> SubmitAttemptAsync(
         Guid attemptId, Guid userId, SubmitAttemptDto dto)
     {

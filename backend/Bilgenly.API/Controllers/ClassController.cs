@@ -100,7 +100,7 @@ public class ClassController : ControllerBase
     }
 
     [HttpGet("{classId}/assignments")]
-    [Authorize(Roles = "Teacher")]
+    [Authorize(Roles = "Teacher, Student")]
     public async Task<IActionResult> GetAssignments(Guid classId)
     {
         var assignments = await _classRepository.GetAssignmentsByClassIdAsync(classId);

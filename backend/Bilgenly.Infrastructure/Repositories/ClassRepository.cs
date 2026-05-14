@@ -51,7 +51,7 @@ public class ClassRepository : IClassRepository
             .Include(c => c.Teacher)
             .Include(c => c.ClassStudents)
             .ThenInclude(cs => cs.Student)
-            .Include(c => c.Assignments) 
+            .Include(c => c.Assignments)
             .ThenInclude(a => a.Quiz)
             .OrderByDescending(c => c.UpdatedAt)
             .ToListAsync();

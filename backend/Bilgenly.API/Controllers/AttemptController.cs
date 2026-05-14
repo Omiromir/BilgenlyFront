@@ -42,6 +42,13 @@ public class AttemptController : ControllerBase
 
         return Ok(result);
     }
+    [HttpGet("attempts/quiz/{quizId}")]
+    public async Task<IActionResult> GetAttemptsByQuiz(Guid quizId)
+    {
+        var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+        var attempts = await _attemptService.GetAttemptsByQuizAsync(quizId, userId);
+        return Ok(attempts);
+    }
 
     [HttpGet("attempts/my")]
     public async Task<IActionResult> GetMyAttempts()

@@ -207,17 +207,6 @@ export function SignInForm() {
           Sign Up
         </Link>
       </div>
-
-      <div className="auth-divider">Or</div>
-
-      <button
-        className="auth-secondary"
-        type="button"
-        disabled
-        aria-disabled="true"
-      >
-        Google sign-in unavailable
-      </button>
     </form>
   );
 }

@@ -354,28 +354,29 @@ export function DashboardSettingsPage({
           {activeTab === "account" ? (
             <>
               <SettingsPanel title="Account Information">
+                <div className="space-y-4">
+                  <p className="text-sm text-[var(--dashboard-text-soft)]">
+                    Edit your name, bio, and avatar from My Profile.
+                  </p>
+                </div>
+              </SettingsPanel>
+
+              <SettingsPanel title="Location">
                 <div className="space-y-5">
                   <div className="grid gap-5 lg:grid-cols-2">
-                  {metadata.account.fields.map((field) => (
-                    <FieldRenderer
-                      key={field.id}
-                      field={field}
-                      value={accountValues[field.id as keyof AccountFormValues] ?? ""}
-                      error={
-                        field.id === "fullName" || field.id === "email"
-                          ? accountTouched[field.id as keyof AccountFormErrors]
-                            ? accountErrors[field.id as keyof AccountFormErrors]
-                            : undefined
-                          : undefined
-                      }
-                      onBlur={handleAccountFieldBlur(
-                        field.id as keyof AccountFormValues,
-                      )}
-                      onChange={handleAccountFieldChange(
-                        field.id as keyof AccountFormValues,
-                      )}
-                    />
-                  ))}
+                    {metadata.account.location.map((field) => (
+                      <SelectLikeField
+                        key={field.id}
+                        field={field}
+                        value={accountValues[field.id as keyof AccountFormValues] ?? ""}
+                        onBlur={handleAccountFieldBlur(
+                          field.id as keyof AccountFormValues,
+                        )}
+                        onChange={handleAccountFieldChange(
+                          field.id as keyof AccountFormValues,
+                        )}
+                      />
+                    ))}
                   </div>
 
                   <div className="flex flex-wrap gap-3 pt-1">
@@ -397,24 +398,6 @@ export function DashboardSettingsPage({
                       Cancel
                     </DashboardButton>
                   </div>
-                </div>
-              </SettingsPanel>
-
-              <SettingsPanel title="Location">
-                <div className="grid gap-5 lg:grid-cols-2">
-                  {metadata.account.location.map((field) => (
-                    <SelectLikeField
-                      key={field.id}
-                      field={field}
-                      value={accountValues[field.id as keyof AccountFormValues] ?? ""}
-                      onBlur={handleAccountFieldBlur(
-                        field.id as keyof AccountFormValues,
-                      )}
-                      onChange={handleAccountFieldChange(
-                        field.id as keyof AccountFormValues,
-                      )}
-                    />
-                  ))}
                 </div>
               </SettingsPanel>
             </>

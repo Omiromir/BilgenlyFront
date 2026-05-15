@@ -1,3 +1,13 @@
+// Notifications are stored locally in this browser only — there is no backend
+// notifications service yet. Replace this provider with a real API client once
+// the backend exposes endpoints for list/create/mark-read/preferences.
+//
+// Backend gap (needed later):
+//   GET    /api/notifications                  — list notifications for current user
+//   POST   /api/notifications                  — create a notification (server-side)
+//   PATCH  /api/notifications/{id}/read        — mark as read / unread
+//   PATCH  /api/notifications/preferences      — per-user delivery preferences
+//   class-invite + quiz follow-up notifications, real recipient delivery.
 import {
   createContext,
   type ReactNode,

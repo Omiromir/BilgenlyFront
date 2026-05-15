@@ -29,6 +29,8 @@ export function createDefaultUserSettings({
 }): UserSettings {
   const fullName = user?.fullName ?? "";
   const email = user?.email ?? "";
+  const bio = user?.bio ?? "";
+  const avatarUrl = user?.avatarUrl ?? null;
   const country = getPreferenceDefaultCountry();
 
   return {
@@ -36,12 +38,12 @@ export function createDefaultUserSettings({
       fullName,
       email,
       phoneNumber: "",
-      bio: "",
+      bio,
       country,
       timeZone: getDefaultTimeZone(),
       language: getDefaultLanguage(),
       dateFormat: getDefaultDateFormat(),
-      avatarUrl: null,
+      avatarUrl,
     },
     appearance: {
       themeMode: "light",

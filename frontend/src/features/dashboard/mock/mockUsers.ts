@@ -9,6 +9,7 @@ export interface MockDashboardUser {
   joinedLabel: string;
   location: string;
   bio: string;
+  avatarUrl?: string | null;
 }
 
 export const mockTeacherUser: MockDashboardUser = {

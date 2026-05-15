@@ -38,6 +38,8 @@ export interface AuthResponse {
     email: string;
     role: string;
     onboardingCompleted?: boolean;
+    bio?: string | null;
+    avatarUrl?: string | null;
 }
 
 export interface StoredAuthUserProfile {
@@ -47,6 +49,8 @@ export interface StoredAuthUserProfile {
     role: string;
     onboardingCompleted: boolean;
     onboardingAnswers: OnboardingAnswers | null;
+    bio?: string | null;
+    avatarUrl?: string | null;
 }
 
 export interface ResetPasswordFormValues {

@@ -200,6 +200,11 @@ export function SettingsProvider({ children }: SettingsProviderProps) {
     });
   };
 
+  // saveProfileSettings persists locally only. Name/bio/avatar editing
+  // happens in the Profile page (which calls PATCH /api/auth/profile and
+  // then this updater) — Settings should not edit those fields. Other
+  // settings preferences (country, date format, theme, notifications) are
+  // local-only because no backend settings endpoint exists yet.
   const saveProfileSettings = (profile: UserSettingsProfile) => {
     updateCurrentUserProfile({
       username: profile.fullName,

@@ -698,8 +698,9 @@ export function AddStudentsDialog({
             title="Add students"
             description={
               <>
-                Create one or more class invites for {teacherClass?.name ?? "this class"}.
+                Create one or more in-app class invites for {teacherClass?.name ?? "this class"}.
                 {" "}Paste emails separated by commas, spaces, or new lines.
+                {" "}Email delivery is not connected yet, so invites only appear in the in-app inbox of matching accounts.
               </>
             }
           />

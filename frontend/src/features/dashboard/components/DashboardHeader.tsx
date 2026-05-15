@@ -16,7 +16,6 @@ import { cn } from "../../../components/ui/utils";
 import {
   DashboardBadge,
   DashboardButton,
-  DashboardSearchField,
   DashboardSurface,
   dashboardIconChipVariants,
   dashboardSectionDividerClassName,
@@ -28,6 +27,7 @@ import {
 } from "./notifications/notificationUtils";
 import type { DashboardNotification } from "./notifications/notificationTypes";
 import { useDashboardViewer } from "../hooks/useDashboardViewer";
+import { resolveAvatarUrl } from "../../profile/avatars";
 
 interface DashboardHeaderProps {
   onOpenSidebar: () => void;
@@ -126,7 +126,7 @@ export function DashboardHeader({ onOpenSidebar }: DashboardHeaderProps) {
     .join("")
     .toUpperCase()
     .slice(0, 2);
-  const avatarUrl = dashboardViewer?.avatarUrl ?? null;
+  const avatarUrl = resolveAvatarUrl(dashboardViewer?.avatarUrl ?? null);
   const dropdownBaseClassName =
     "absolute right-0 top-0 z-30 overflow-hidden transition";
 
@@ -146,12 +146,6 @@ export function DashboardHeader({ onOpenSidebar }: DashboardHeaderProps) {
               >
                 <Menu className="h-5 w-5" />
               </DashboardButton>
-
-              <DashboardSearchField
-                containerClassName="hidden w-full max-w-xl lg:block"
-                placeholder="Search..."
-                size="lg"
-              />
             </div>
 
             <div className="flex items-center justify-between gap-4 xl:justify-end">

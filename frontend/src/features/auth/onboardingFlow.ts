@@ -224,5 +224,7 @@ export function buildStoredAuthUserProfile(response: AuthResponse) {
         role: response.role,
         userId: response.userId,
         username: response.username,
+        bio: response.bio,
+        avatarUrl: response.avatarUrl,
     });
 }

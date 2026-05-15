@@ -77,6 +77,16 @@ export function getStudentClasses() {
   });
 }
 
+export function removeStudentFromClass(classId: string, studentId: string) {
+  return apiRequest<{ message: string }>(
+    `/api/classes/${classId}/students/${studentId}`,
+    {
+      method: "DELETE",
+      fallbackErrorMessage: "Unable to remove student from class.",
+    },
+  );
+}
+
 export function joinClassByInviteCode(payload: JoinClassRequest | string) {
   const request = typeof payload === "string" ? { inviteCode: payload } : payload;
 

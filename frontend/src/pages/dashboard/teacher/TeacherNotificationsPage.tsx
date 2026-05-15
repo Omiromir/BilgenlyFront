@@ -78,7 +78,7 @@ export function TeacherNotificationsPage() {
 
       <SectionCard
         title="Teacher Inbox"
-        description="Supported in-app notifications stay here until you review them."
+        description="In-app notifications stay here until you review them. Notifications are stored locally in this browser only — a backend notifications service is not connected yet, so they will not sync across devices or be delivered by email."
         contentClassName="space-y-5"
       >
         <NotificationList

@@ -187,21 +187,31 @@ export function TeacherStudentsPage() {
     setFeedback(
       `${addedStudents.length} ${
         addedStudents.length === 1
-          ? "student now has a class invite"
-          : "students now have class invites"
-      } for ${addTargetClass.name}. In-app notifications were created where preferences allow them.`,
+          ? "in-app class invite was created"
+          : "in-app class invites were created"
+      } for ${addTargetClass.name}. Email delivery is not connected yet — only matching in-app accounts will see the invite.`,
     );
   };
 
-  const handleRemoveStudent = (row: TeacherStudentRosterRow) => {
-    removeStudentFromClass(row.classId, row.student.id);
-    setSelectedRowIds((current) => current.filter((item) => item !== row.rowId));
-    setFeedback(`${row.student.fullName} was removed from ${row.className}.`);
+  const handleRemoveStudent = async (row: TeacherStudentRosterRow) => {
+    try {
+      await removeStudentFromClass(row.classId, row.student.id);
+      setSelectedRowIds((current) => current.filter((item) => item !== row.rowId));
+      setFeedback(`${row.student.fullName} was removed from ${row.className}.`);
+    } catch (error) {
+      setFeedback(
+        error instanceof Error
+          ? error.message
+          : `Unable to remove ${row.student.fullName} from ${row.className}.`,
+      );
+    }
   };
 
   const handleResendInvite = (row: TeacherStudentRosterRow) => {
     resendStudentInvite(row.classId, row.student.id);
-    setFeedback(`Class invite refreshed for ${row.student.fullName}.`);
+    setFeedback(
+      `In-app class invite refreshed for ${row.student.fullName}. Email delivery is not connected yet.`,
+    );
   };
 
   const handleExportCsv = () => {
@@ -558,7 +568,9 @@ export function TeacherStudentsPage() {
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem
-                                  onClick={() => handleRemoveStudent(row)}
+                                  onClick={() => {
+                                    void handleRemoveStudent(row);
+                                  }}
                                   variant="destructive"
                                   disabled={isArchivedClass}
                                 >

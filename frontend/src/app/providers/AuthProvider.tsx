@@ -135,7 +135,7 @@ function mapAuthUserToDashboardUser(
   const normalizedRole = authUser.role.toLowerCase() as UserRole;
   const role = fallbackRole ?? normalizedRole;
 
-  if (role !== "teacher" && role !== "student") {
+  if (role !== "teacher" && role !== "student" && role !== "moderator") {
     return null;
   }
 
@@ -147,7 +147,8 @@ function mapAuthUserToDashboardUser(
     initials: getInitials(authUser.username),
     joinedLabel: "Join date unavailable",
     location: "",
-    bio: "",
+    bio: authUser.bio ?? "",
+    avatarUrl: authUser.avatarUrl ?? null,
   };
 }
 
@@ -253,6 +254,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
         const hydratedUser = buildStoredAuthUserProfile({
           ...user,
           token,
+          bio: user.bio,
+          avatarUrl: user.avatarUrl,
         });
         persistSession(hydratedUser, token);
       } catch (error) {

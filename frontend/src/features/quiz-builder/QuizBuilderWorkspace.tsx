@@ -284,6 +284,7 @@ export function QuizBuilderWorkspace({
   const [generatedBackendQuizId, setGeneratedBackendQuizId] = useState<string | null>(
     null,
   );
+  const [quizDescription, setQuizDescription] = useState<string>("");
   const [reviewSearch, setReviewSearch] = useState("");
   const [publishVisibility, setPublishVisibility] =
     useState<QuizLibraryVisibility>("private");
@@ -381,6 +382,7 @@ export function QuizBuilderWorkspace({
     }
 
     setQuizTitle(editingQuiz.title);
+    setQuizDescription(editingQuiz.description ?? "");
     setQuestionCount(editingQuiz.questionCount);
     setFocus(editingQuiz.topic);
     setPublishVisibility(editingQuiz.visibility);
@@ -1062,7 +1064,9 @@ export function QuizBuilderWorkspace({
       existingQuizId: generatedBackendQuizId ?? editingQuiz?.id,
       ownerRole: mode,
       title: resolvedQuizTitle,
-      description: buildQuizDescription(parsedSource.extractedText, topic),
+      description:
+        quizDescription.trim() ||
+        buildQuizDescription(parsedSource.extractedText, topic),
       topic,
       difficulty: getQuizDifficulty(normalizedQuestions.length),
       language: resolvedLanguage,
@@ -1097,6 +1101,10 @@ export function QuizBuilderWorkspace({
   }
 
   async function saveQuizRecord(targetStatus: QuizLibraryStatus) {
+    if (!resolvedQuizTitle.trim()) {
+      throw new Error("Quiz title is required.");
+    }
+
     const payload = buildQuizSavePayload(targetStatus);
 
     if (!payload) {
@@ -1318,7 +1326,7 @@ export function QuizBuilderWorkspace({
                   />
                   <div className="border-b border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-elevated)] px-5 py-4 xl:col-span-2 xl:px-6">
                     <div className="flex flex-wrap items-center justify-between gap-4">
-                      <div className="flex min-w-0 items-center gap-3">
+                      <div className="flex min-w-0 flex-1 items-start gap-3">
                         <DashboardButton
                           type="button"
                           variant="ghost"
@@ -1329,9 +1337,37 @@ export function QuizBuilderWorkspace({
                         >
                           <ChevronRight className="h-4.5 w-4.5 rotate-180" />
                         </DashboardButton>
-                        <h2 className="truncate text-[1.35rem] font-semibold text-[var(--dashboard-text-strong)]">
-                          {resolvedQuizTitle}
-                        </h2>
+                        <div className="min-w-0 flex-1 space-y-2">
+                          <input
+                            type="text"
+                            value={quizTitle}
+                            onChange={(event) => setQuizTitle(event.target.value)}
+                            placeholder="Quiz title"
+                            aria-label="Quiz title"
+                            className={cn(
+                              dashboardInputVariants({ size: "lg" }),
+                              "h-11 w-full border-0 bg-transparent px-0 text-[1.35rem] font-semibold text-[var(--dashboard-text-strong)] shadow-none focus-visible:ring-0",
+                            )}
+                          />
+                          {!quizTitle.trim() ? (
+                            <p className="text-xs text-[var(--dashboard-danger)]">
+                              Quiz title is required.
+                            </p>
+                          ) : null}
+                          <textarea
+                            value={quizDescription}
+                            onChange={(event) =>
+                              setQuizDescription(event.target.value)
+                            }
+                            placeholder="Add a short description for this quiz (optional)."
+                            aria-label="Quiz description"
+                            rows={2}
+                            className={cn(
+                              dashboardTextareaVariants({ size: "sm" }),
+                              "min-h-[44px] w-full border-0 bg-transparent px-0 text-sm text-[var(--dashboard-text-soft)] shadow-none focus-visible:ring-0",
+                            )}
+                          />
+                        </div>
                       </div>
 
                       <div className="flex flex-wrap items-center justify-end gap-2">

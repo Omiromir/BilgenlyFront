@@ -1,7 +1,6 @@
 import {
   BookOpen,
   CalendarDays,
-  Camera,
   Clock3,
   type LucideIcon,
   Mail,
@@ -9,11 +8,14 @@ import {
   Medal,
   TrendingUp,
 } from "../../../components/icons/AppIcons";
-import { useRef } from "react";
 import { Input } from "../../../components/ui/input";
 import { Textarea } from "../../../components/ui/textarea";
 import { cn } from "../../../components/ui/utils";
 import { useProfile } from "../hooks/useProfile";
+import {
+  STATIC_AVATAR_OPTIONS,
+  resolveAvatarUrl,
+} from "../../profile/avatars";
 import type {
   ProfileStat,
 } from "../profile/profileTypes";
@@ -44,15 +46,13 @@ export function DashboardProfilePage({
     formErrors,
     isEditing,
     isSaving,
-    isDirty,
     canSave,
     startEditing,
     cancelEditing,
     saveProfile,
     updateField,
-    updateAvatarFile,
+    selectStaticAvatar,
   } = useProfile();
-  const avatarInputRef = useRef<HTMLInputElement | null>(null);
 
   if (!profile) {
     return (
@@ -62,9 +62,7 @@ export function DashboardProfilePage({
     );
   }
 
-  const handleOpenAvatarPicker = () => {
-    avatarInputRef.current?.click();
-  };
+  const resolvedAvatarUrl = resolveAvatarUrl(formValues.avatarUrl);
   const displayInitials = formValues.fullName
     .split(" ")
     .map((part) => part[0])
@@ -75,17 +73,6 @@ export function DashboardProfilePage({
   return (
     <div className={dashboardPageClassName}>
       <DashboardPageHeader title={title} subtitle={subtitle} />
-
-      <input
-        ref={avatarInputRef}
-        type="file"
-        accept="image/png,image/jpeg,image/webp,image/gif"
-        className="hidden"
-        onChange={(event) => {
-          updateAvatarFile(event.target.files?.[0] ?? null);
-          event.target.value = "";
-        }}
-      />
 
       <DashboardSurface asChild radius="lg" padding="none" className="overflow-hidden">
         <section>
@@ -99,9 +86,9 @@ export function DashboardProfilePage({
               <div className="min-w-0 flex flex-col gap-5 md:flex-row md:items-start">
                 <div className="-mt-16 relative h-[108px] w-[108px] shrink-0 rounded-full bg-[var(--dashboard-surface-elevated)] p-1 shadow-[var(--dashboard-shadow-card)] ring-1 ring-[var(--dashboard-border-soft)]">
                   <div className="flex h-full w-full items-center justify-center overflow-hidden rounded-full bg-[var(--dashboard-surface)] text-[40px] font-semibold text-[var(--dashboard-brand)]">
-                    {formValues.avatarUrl ? (
+                    {resolvedAvatarUrl ? (
                       <img
-                        src={formValues.avatarUrl}
+                        src={resolvedAvatarUrl}
                         alt={`${profile.name} avatar`}
                         className="h-full w-full object-cover"
                       />
@@ -109,14 +96,6 @@ export function DashboardProfilePage({
                       displayInitials || profile.initials
                     )}
                   </div>
-                  <DashboardButton
-                    type="button"
-                    size="iconSm"
-                    className="absolute bottom-2 right-1"
-                    onClick={handleOpenAvatarPicker}
-                  >
-                    <Camera className="h-4 w-4" />
-                  </DashboardButton>
                 </div>
 
                 <div className="min-w-0 flex-1 space-y-4 pt-1 md:pt-5">
@@ -203,6 +182,43 @@ export function DashboardProfilePage({
                 </DashboardButton>
               )}
             </div>
+
+            {isEditing ? (
+              <div className={cn("mt-6 border-t pt-5", dashboardSectionDividerClassName)}>
+                <h3 className="text-[1.05rem] font-semibold text-[var(--dashboard-text-strong)]">
+                  Choose your avatar
+                </h3>
+                <p className="mt-1 text-sm text-[var(--dashboard-text-soft)]">
+                  Pick one of the four preset avatars.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-3">
+                  {STATIC_AVATAR_OPTIONS.map((option) => {
+                    const isSelected = formValues.avatarUrl === option.id;
+                    return (
+                      <button
+                        key={option.id}
+                        type="button"
+                        onClick={() => selectStaticAvatar(option.id)}
+                        aria-pressed={isSelected}
+                        aria-label={option.label}
+                        className={cn(
+                          "h-16 w-16 overflow-hidden rounded-full border-2 transition",
+                          isSelected
+                            ? "border-[var(--dashboard-brand)] ring-2 ring-[var(--dashboard-brand)]/40"
+                            : "border-[var(--dashboard-border-soft)] hover:border-[var(--dashboard-border)]",
+                        )}
+                      >
+                        <img
+                          src={option.src}
+                          alt={option.label}
+                          className="h-full w-full object-cover"
+                        />
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
 
             <div className={cn("mt-6 border-t pt-5", dashboardSectionDividerClassName)}>
               <h3 className="text-[1.55rem] font-semibold text-[var(--dashboard-text-strong)]">Bio</h3>

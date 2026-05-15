@@ -47,11 +47,7 @@ export interface SettingsScreenMetadata {
 
 export const dashboardSettingsMetadata: SettingsScreenMetadata = {
   account: {
-    fields: [
-      { id: "fullName", label: "Full Name" },
-      { id: "email", label: "Email" },
-      { id: "bio", label: "Bio", kind: "textarea" },
-    ],
+    fields: [],
     location: [
       {
         id: "country",

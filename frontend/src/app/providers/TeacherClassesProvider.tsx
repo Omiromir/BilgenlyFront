@@ -38,6 +38,7 @@ import {
   getTeacherClasses,
   joinClassByInviteCode as joinClassByInviteCodeRequest,
   removeClassAssignment as removeClassAssignmentRequest,
+  removeStudentFromClass as removeStudentFromClassRequest,
   updateClass as updateClassRequest,
 } from "../../features/dashboard/api/classesApi";
 import {
@@ -78,7 +79,7 @@ interface TeacherClassesContextValue {
     classId: string,
     emails: string[],
   ) => TeacherClassStudent[];
-  removeStudentFromClass: (classId: string, studentId: string) => void;
+  removeStudentFromClass: (classId: string, studentId: string) => Promise<void>;
   resendStudentInvite: (classId: string, studentId: string) => void;
   respondToClassInvitation: (
     classId: string,
@@ -756,7 +757,7 @@ export function TeacherClassesProvider({
 
         return newStudents;
       },
-      removeStudentFromClass: (classId, studentId) => {
+      removeStudentFromClass: async (classId, studentId) => {
         const targetClass = classes.find((item) => item.id === classId);
 
         if (!targetClass || targetClass.status !== "active") {
@@ -768,6 +769,27 @@ export function TeacherClassesProvider({
           null;
 
         if (!targetStudent) {
+          return;
+        }
+
+        const backendStudentId = targetStudent.linkedUserId ?? targetStudent.id;
+
+        if (isGuidString(classId) && isGuidString(backendStudentId)) {
+          try {
+            await removeStudentFromClassRequest(classId, backendStudentId);
+          } catch (nextError) {
+            setError(
+              getRequestErrorMessage(
+                nextError,
+                "Unable to remove student from class.",
+              ),
+            );
+            throw nextError;
+          }
+
+          removeClassInvitationNotification(classId, studentId);
+          await refreshClasses();
+          setError(null);
           return;
         }
 

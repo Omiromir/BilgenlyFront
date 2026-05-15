@@ -5,6 +5,8 @@ import { useQuizLibrary } from "../../../app/providers/QuizLibraryProvider";
 import { useQuizSessions } from "../../../app/providers/QuizSessionProvider";
 import { useSettings } from "../../../app/providers/SettingsProvider";
 import { useTeacherClasses } from "../../../app/providers/TeacherClassesProvider";
+import { updateProfile as updateProfileRequest } from "../../profile/api";
+import { isStaticAvatarId } from "../../profile/avatars";
 import { getProfileInitials } from "../settings/userSettings";
 import type {
   ProfileActivityItem,
@@ -22,13 +24,6 @@ import {
 } from "../../quiz-session/quizSessionUtils";
 
 const MAX_BIO_LENGTH = 280;
-const MAX_AVATAR_FILE_SIZE_BYTES = 1024 * 1024;
-const ALLOWED_AVATAR_TYPES = new Set([
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-  "image/gif",
-]);
 
 interface ProfileActivityEvent {
   title: string;
@@ -51,7 +46,7 @@ interface UseProfileResult {
     field: TField,
     value: ProfileFormValues[TField],
   ) => void;
-  updateAvatarFile: (file: File | null) => void;
+  selectStaticAvatar: (avatarId: string) => void;
 }
 
 function buildRoleLabel(role: string | null | undefined) {
@@ -493,16 +488,28 @@ export function useProfile(): UseProfileResult {
     setIsSaving(true);
 
     try {
+      const trimmedFullName = formValues.fullName.trim();
+      const trimmedBio = formValues.bio.trim();
+      const avatarUrl = formValues.avatarUrl;
+
+      const response = await updateProfileRequest({
+        username: trimmedFullName,
+        bio: trimmedBio,
+        avatarUrl: isStaticAvatarId(avatarUrl) ? avatarUrl : null,
+      });
+
       saveProfileSettings({
         ...settings.profile,
-        fullName: formValues.fullName.trim(),
-        email: formValues.email.trim(),
-        bio: formValues.bio.trim(),
+        fullName: response.username || trimmedFullName,
+        email: settings.profile.email,
+        bio: response.bio ?? trimmedBio,
         country: formValues.location.trim(),
-        avatarUrl: formValues.avatarUrl,
+        avatarUrl: response.avatarUrl ?? avatarUrl,
       });
       setIsEditing(false);
       toast.success("Profile updated.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to update profile.");
     } finally {
       setIsSaving(false);
     }
@@ -528,40 +535,12 @@ export function useProfile(): UseProfileResult {
         [field]: value,
       } as ProfileFormValues));
     },
-    updateAvatarFile: (file) => {
-      if (!file) {
-        setFormValues((current) => ({
-          ...current,
-          avatarUrl: persistedFormValues.avatarUrl,
-        }));
-        return;
-      }
-
-      if (!ALLOWED_AVATAR_TYPES.has(file.type)) {
-        toast.error("Use a PNG, JPG, WEBP, or GIF image for your avatar.");
-        return;
-      }
-
-      if (file.size > MAX_AVATAR_FILE_SIZE_BYTES) {
-        toast.error("Avatar image must be 1 MB or smaller.");
-        return;
-      }
-
-      const reader = new FileReader();
-      reader.onload = () => {
-        const nextAvatarUrl =
-          typeof reader.result === "string" ? reader.result : null;
-
-        setFormValues((current) => ({
-          ...current,
-          avatarUrl: nextAvatarUrl,
-        }));
-        setIsEditing(true);
-      };
-      reader.onerror = () => {
-        toast.error("Unable to read that image. Try a different file.");
-      };
-      reader.readAsDataURL(file);
+    selectStaticAvatar: (avatarId: string) => {
+      setFormValues((current) => ({
+        ...current,
+        avatarUrl: avatarId,
+      }));
+      setIsEditing(true);
     },
   };
 }

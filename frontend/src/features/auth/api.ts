@@ -100,6 +100,8 @@ export async function getMe() {
     email: string;
     role: string;
     onboardingCompleted: boolean;
+    bio?: string | null;
+    avatarUrl?: string | null;
   }>("/api/auth/me", {
     fallbackErrorMessage: "Unauthorized",
   });

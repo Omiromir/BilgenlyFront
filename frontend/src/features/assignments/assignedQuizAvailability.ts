@@ -160,12 +160,12 @@ function getPrimaryActionLabel(input: {
     return "Resume Assigned Quiz";
   }
 
-  if (input.status === "in_progress") {
-    return "Assigned Quiz In Progress";
-  }
-
   if (input.canStart) {
     return "Start Assigned Quiz";
+  }
+
+  if (input.status === "in_progress") {
+    return "Assigned Quiz In Progress";
   }
 
   if (input.canReview) {
@@ -232,16 +232,19 @@ export function buildAssignedQuizAvailability({
     getTimestamp(deadline) > 0 &&
     now > getTimestamp(deadline);
   const hasCompletedAttempt = completedAttempts.length > 0;
+  // hasInProgressAttempt reflects any in-progress state (local or backend) for display/chips
   const hasInProgressAttempt = Boolean(activeAttempt || inProgressAttempt);
   const hasAttemptsLeft =
     normalizedMaxAttempts === null || (attemptsRemaining ?? 0) > 0;
   const exhaustedAttempts = normalizedMaxAttempts !== null && !hasAttemptsLeft;
   const canResume = Boolean(activeAttempt) && !deadlinePassed && !isLoading;
   const canResolveNewAttempt = !isLoading && !error;
+  // Only a LOCAL in-progress session blocks canStart — orphaned backend attempts do not,
+  // because partial answers live only in localStorage and can't be recovered without a local session.
   const canStart =
     canResolveNewAttempt &&
     !deadlinePassed &&
-    !hasInProgressAttempt &&
+    !activeAttempt &&
     hasAttemptsLeft;
   const canReview =
     Boolean(latestCompletedSession) ||

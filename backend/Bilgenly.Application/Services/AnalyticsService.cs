@@ -301,10 +301,10 @@ public class AnalyticsService
                 : (double?)null;
             var status = exhausted
                 ? "attempts_exhausted"
-                : attemptsUsed > 0
-                    ? "completed"
-                    : hasInProgressAttempt
-                        ? "in_progress"
+                : hasInProgressAttempt
+                    ? "in_progress"
+                    : attemptsUsed > 0
+                        ? "completed"
                         : deadlinePassed
                             ? "expired"
                             : "active";

@@ -1,6 +1,7 @@
 import {
   createContext,
   type ReactNode,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -335,6 +336,18 @@ export function NotificationsProvider({
   const [notifications, setNotifications] = useState<DashboardNotification[]>([]);
   const [isHydrated, setIsHydrated] = useState(false);
 
+  const fetchFromBackend = useCallback(() => {
+    if (!hasAuthToken()) return;
+    getMyNotifications()
+      .then((dtos) => {
+        const fromBackend = dtos
+          .map(fromBackendDto)
+          .filter((n): n is DashboardNotification => n !== null);
+        setNotifications(sortDashboardNotifications(fromBackend));
+      })
+      .catch(() => {});
+  }, []);
+
   useEffect(() => {
     if (hasAuthToken()) {
       getMyNotifications()
@@ -374,6 +387,24 @@ export function NotificationsProvider({
       }
     }
   }, []);
+
+  useEffect(() => {
+    if (!isHydrated || !hasAuthToken()) return;
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        fetchFromBackend();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    const interval = setInterval(fetchFromBackend, 30_000);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      clearInterval(interval);
+    };
+  }, [isHydrated, fetchFromBackend]);
 
   useEffect(() => {
     if (!isHydrated) {

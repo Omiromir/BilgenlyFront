@@ -1,13 +1,3 @@
-// Notifications are stored locally in this browser only — there is no backend
-// notifications service yet. Replace this provider with a real API client once
-// the backend exposes endpoints for list/create/mark-read/preferences.
-//
-// Backend gap (needed later):
-//   GET    /api/notifications                  — list notifications for current user
-//   POST   /api/notifications                  — create a notification (server-side)
-//   PATCH  /api/notifications/{id}/read        — mark as read / unread
-//   PATCH  /api/notifications/preferences      — per-user delivery preferences
-//   class-invite + quiz follow-up notifications, real recipient delivery.
 import {
   createContext,
   type ReactNode,
@@ -23,8 +13,9 @@ import {
 } from "../../features/dashboard/components/notifications/notificationUtils";
 import type {
   ClassInvitationNotificationInput,
-  DashboardNotification,
   ClassInvitationNotificationStatus,
+  DashboardNotification,
+  QuizFollowUpKind,
   QuizFollowUpNotificationInput,
 } from "../../features/dashboard/components/notifications/notificationTypes";
 import {
@@ -32,8 +23,71 @@ import {
   getSettingsStorageScope,
   readUserSettings,
 } from "../../features/dashboard/settings/userSettings";
+import type { BackendNotificationDto } from "../../features/dashboard/api/notificationsApi";
+import {
+  createQuizFollowUpNotification,
+  deleteNotificationApi,
+  deleteNotificationsForClassApi,
+  getMyNotifications,
+  markAllNotificationsReadApi,
+  markNotificationReadApi,
+  updateNotificationStatusApi,
+  upsertClassInvitationNotification,
+} from "../../features/dashboard/api/notificationsApi";
 
 const NOTIFICATIONS_STORAGE_KEY = "bilgenly_notifications";
+const AUTH_TOKEN_KEY = "bilgenly_token";
+
+function hasAuthToken() {
+  return Boolean(localStorage.getItem(AUTH_TOKEN_KEY));
+}
+
+function fromBackendDto(dto: BackendNotificationDto): DashboardNotification | null {
+  const base = {
+    id: dto.id,
+    recipientUserId: dto.recipientUserId,
+    recipientEmail: dto.recipientEmail,
+    title: dto.title,
+    message: dto.message,
+    createdAt: dto.createdAt,
+    updatedAt: dto.updatedAt,
+    read: dto.read,
+    relatedClassId: dto.relatedClassId,
+    relatedClassName: dto.relatedClassName,
+    senderName: dto.senderName,
+    senderEmail: dto.senderEmail,
+    studentId: dto.studentId,
+    studentName: dto.studentName,
+    studentEmail: dto.studentEmail,
+  };
+
+  if (dto.type === "class_invitation") {
+    return {
+      ...base,
+      type: "class_invitation",
+      actionType: "class_invitation",
+      inviteCode: dto.inviteCode ?? "",
+      status: (dto.status as ClassInvitationNotificationStatus) ?? "pending",
+    };
+  }
+
+  if (dto.type === "quiz_follow_up") {
+    if (!dto.quizId || !dto.quizTitle || !dto.assignmentId || !dto.followUpKind) return null;
+    return {
+      ...base,
+      type: "quiz_follow_up",
+      actionType: "open_assigned_quiz",
+      status: "sent",
+      quizId: dto.quizId,
+      quizTitle: dto.quizTitle,
+      assignmentId: dto.assignmentId,
+      attemptId: dto.attemptId ?? undefined,
+      followUpKind: dto.followUpKind as QuizFollowUpKind,
+    };
+  }
+
+  return null;
+}
 
 interface NotificationsContextValue {
   notifications: DashboardNotification[];
@@ -282,28 +336,42 @@ export function NotificationsProvider({
   const [isHydrated, setIsHydrated] = useState(false);
 
   useEffect(() => {
-    const savedValue = localStorage.getItem(NOTIFICATIONS_STORAGE_KEY);
-
-    if (!savedValue) {
+    if (hasAuthToken()) {
+      getMyNotifications()
+        .then((dtos) => {
+          const fromBackend = dtos
+            .map(fromBackendDto)
+            .filter((n): n is DashboardNotification => n !== null);
+          setNotifications(sortDashboardNotifications(fromBackend));
+        })
+        .catch(() => {
+          hydrateFromLocalStorage();
+        })
+        .finally(() => {
+          setIsHydrated(true);
+        });
+    } else {
+      hydrateFromLocalStorage();
       setIsHydrated(true);
-      return;
     }
 
-    try {
-      const parsed = JSON.parse(savedValue) as Partial<DashboardNotification>[];
-      setNotifications(
-        Array.isArray(parsed)
-          ? sortDashboardNotifications(
-              parsed
-                .map(sanitizeNotificationRecord)
-                .filter((item): item is DashboardNotification => item !== null),
-            )
-          : [],
-      );
-    } catch {
-      setNotifications([]);
-    } finally {
-      setIsHydrated(true);
+    function hydrateFromLocalStorage() {
+      const savedValue = localStorage.getItem(NOTIFICATIONS_STORAGE_KEY);
+      if (!savedValue) return;
+      try {
+        const parsed = JSON.parse(savedValue) as Partial<DashboardNotification>[];
+        setNotifications(
+          Array.isArray(parsed)
+            ? sortDashboardNotifications(
+                parsed
+                  .map(sanitizeNotificationRecord)
+                  .filter((item): item is DashboardNotification => item !== null),
+              )
+            : [],
+        );
+      } catch {
+        setNotifications([]);
+      }
     }
   }, []);
 
@@ -418,6 +486,28 @@ export function NotificationsProvider({
           ),
         );
 
+        if (hasAuthToken()) {
+          upsertClassInvitationNotification({
+            type: "class_invitation",
+            recipientUserId: input.recipientUserId,
+            recipientEmail: input.recipientEmail,
+            title: nextNotification.title,
+            message: nextNotification.message,
+            actionType: "class_invitation",
+            relatedClassId: input.relatedClassId,
+            relatedClassName: input.relatedClassName,
+            inviteCode: input.inviteCode,
+            senderName: input.senderName,
+            senderEmail: input.senderEmail,
+            studentId: input.studentId,
+            studentName: input.studentName,
+            studentEmail: input.studentEmail,
+            status: "pending",
+            createdAt: nextNotification.createdAt,
+            existingId: existingNotification?.id,
+          }).catch(() => {});
+        }
+
         return nextNotification;
       },
       sendQuizFollowUpNotification: (input) => {
@@ -440,6 +530,31 @@ export function NotificationsProvider({
           sortDashboardNotifications([nextNotification, ...current]),
         );
 
+        if (hasAuthToken()) {
+          createQuizFollowUpNotification({
+            type: "quiz_follow_up",
+            recipientUserId: input.recipientUserId,
+            recipientEmail: input.recipientEmail,
+            title: nextNotification.title,
+            message: nextNotification.message,
+            actionType: "open_assigned_quiz",
+            relatedClassId: input.relatedClassId,
+            relatedClassName: input.relatedClassName,
+            senderName: input.senderName,
+            senderEmail: input.senderEmail,
+            studentId: input.studentId,
+            studentName: input.studentName,
+            studentEmail: input.studentEmail,
+            status: "sent",
+            quizId: input.quizId,
+            quizTitle: input.quizTitle,
+            assignmentId: input.assignmentId,
+            attemptId: input.attemptId,
+            followUpKind: input.followUpKind,
+            createdAt: nextNotification.createdAt,
+          }).catch(() => {});
+        }
+
         return nextNotification;
       },
       markNotificationRead: (notificationId) => {
@@ -456,6 +571,9 @@ export function NotificationsProvider({
             ),
           ),
         );
+        if (hasAuthToken()) {
+          markNotificationReadApi(notificationId).catch(() => {});
+        }
       },
       markAllNotificationsRead: (recipientUserId) => {
         setNotifications((current) =>
@@ -470,6 +588,9 @@ export function NotificationsProvider({
             ),
           ),
         );
+        if (hasAuthToken()) {
+          markAllNotificationsReadApi().catch(() => {});
+        }
       },
       updateClassInvitationStatus: (notificationId, status) => {
         setNotifications((current) =>
@@ -481,8 +602,17 @@ export function NotificationsProvider({
             ),
           ),
         );
+        if (hasAuthToken()) {
+          updateNotificationStatusApi(notificationId, status).catch(() => {});
+        }
       },
       updateClassInvitationStatusByStudent: (relatedClassId, studentId, status) => {
+        const target = notifications.find(
+          (n) =>
+            n.type === "class_invitation" &&
+            n.relatedClassId === relatedClassId &&
+            n.studentId === studentId,
+        );
         setNotifications((current) =>
           sortDashboardNotifications(
             current.map((notification) =>
@@ -494,8 +624,17 @@ export function NotificationsProvider({
             ),
           ),
         );
+        if (hasAuthToken() && target) {
+          updateNotificationStatusApi(target.id, status).catch(() => {});
+        }
       },
       removeClassInvitationNotification: (relatedClassId, studentId) => {
+        const target = notifications.find(
+          (n) =>
+            n.type === "class_invitation" &&
+            n.relatedClassId === relatedClassId &&
+            n.studentId === studentId,
+        );
         setNotifications((current) =>
           current.filter(
             (notification) =>
@@ -506,6 +645,9 @@ export function NotificationsProvider({
               ),
           ),
         );
+        if (hasAuthToken() && target) {
+          deleteNotificationApi(target.id).catch(() => {});
+        }
       },
       syncClassInvitationMetadata: (relatedClassId, metadata) => {
         setNotifications((current) =>
@@ -545,6 +687,9 @@ export function NotificationsProvider({
             (notification) => notification.relatedClassId !== relatedClassId,
           ),
         );
+        if (hasAuthToken()) {
+          deleteNotificationsForClassApi(relatedClassId).catch(() => {});
+        }
       },
     }),
     [notifications],

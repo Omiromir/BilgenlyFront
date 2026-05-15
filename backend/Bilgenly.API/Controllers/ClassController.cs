@@ -13,13 +13,35 @@ namespace Bilgenly.API.Controllers;
 public class ClassController : ControllerBase
 {
     private readonly ClassService _classService;
-    private readonly IClassRepository _classRepository; 
+    private readonly IClassRepository _classRepository;
+    private readonly ClassInvitationService _classInvitationService;
 
-    public ClassController(ClassService classService, IClassRepository classRepository) 
+    public ClassController(ClassService classService, IClassRepository classRepository, ClassInvitationService classInvitationService)
     {
         _classService = classService;
-        _classRepository = classRepository; 
+        _classInvitationService = classInvitationService;
+        _classRepository = classRepository;
     }
+
+    [HttpPost("{classId:guid}/invite")]
+    [Authorize(Roles = "Teacher")]
+    public async Task<IActionResult> SendInvitations(Guid classId, [FromBody] SendBulkClassInvitationsDto dto)
+    {
+        var teacherId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+        var (sent, failed, error) = await _classInvitationService.SendInvitationsAsync(classId, dto.Emails, teacherId);
+        if (error is not null) return BadRequest(new { message = error });
+        return Ok(new { sent, failed });
+    }
+
+    [HttpGet("{classId:guid}/invitations")]
+    [Authorize(Roles = "Teacher")]
+    public async Task<IActionResult> GetInvitations(Guid classId)
+    {
+        var teacherId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+        var results = await _classInvitationService.GetInvitationsForClassAsync(classId, teacherId);
+        return Ok(results);
+    }
+
     [HttpDelete("{classId}/students/{studentId}")]
     [Authorize(Roles = "Teacher")]
     public async Task<IActionResult> RemoveStudent(Guid classId, Guid studentId)

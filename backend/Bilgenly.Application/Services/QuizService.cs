@@ -71,6 +71,45 @@ public class QuizService
         await _quizRepository.SaveChangesAsync();
         return (true, null);
     }
+
+    public async Task<(QuizDto? Result, string? Error)> UpdateQuizAsync(
+        Guid quizId, UpdateQuizDto dto, Guid userId)
+    {
+        var quiz = await _quizRepository.GetByIdAsync(quizId);
+        if (quiz is null) return (null, "Quiz not found");
+        if (quiz.UserId != userId) return (null, "Access denied");
+
+        if (string.IsNullOrWhiteSpace(dto.Title))
+            return (null, "Title is required");
+        if (!dto.Questions.Any())
+            return (null, "At least one question is required");
+
+        quiz.Title = dto.Title.Trim();
+        quiz.Description = dto.Description.Trim();
+        quiz.IsPublic = dto.IsPublic;
+
+        quiz.Questions.Clear();
+        quiz.Questions = dto.Questions.Select((q, index) => new Question
+        {
+            Id = q.Id ?? Guid.NewGuid(),
+            QuizId = quiz.Id,
+            Text = q.Text,
+            QuestionType = q.QuestionType,
+            Explanation = q.Explanation,
+            Position = q.Position > 0 ? q.Position : index + 1,
+            Answers = q.Answers.Select(a => new Answer
+            {
+                Id = a.Id ?? Guid.NewGuid(),
+                Text = a.Text,
+                IsCorrect = a.IsCorrect
+            }).ToList()
+        }).ToList();
+
+        await _quizRepository.SaveChangesAsync();
+
+        var username = quiz.User?.Username ?? "";
+        return (MapToDto(quiz, username), null);
+    }
     private QuizDto MapToDto(Quiz quiz, string username) => new()
     {
         Id = quiz.Id,

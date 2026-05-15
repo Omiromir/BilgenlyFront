@@ -30,6 +30,62 @@ import {
   syncFormattingPreferences,
 } from "../../features/dashboard/settings/settingsPreferences";
 import { changePassword, revokeSessionById } from "../../features/auth/api";
+import { getMyPreferences, saveMyPreferences } from "../../features/dashboard/api/preferencesApi";
+import type { UserPreferencesDto } from "../../features/dashboard/api/preferencesApi";
+import {
+  SETTINGS_DATE_FORMAT_OPTIONS,
+  SETTINGS_LANGUAGE_OPTIONS,
+  SETTINGS_TIME_ZONE_OPTIONS,
+} from "../../features/dashboard/settings/settingsPreferences";
+
+type AnySettingsArray = readonly string[];
+function safeFromOptions<T extends AnySettingsArray>(
+  options: T,
+  value: string,
+  fallback: T[number],
+): T[number] {
+  return (options as readonly string[]).includes(value)
+    ? (value as T[number])
+    : fallback;
+}
+
+function applyBackendPreferences(
+  settings: UserSettings,
+  prefs: UserPreferencesDto,
+): UserSettings {
+  const themeMode: "light" | "dark" | "system" =
+    prefs.themeMode === "light" || prefs.themeMode === "dark" || prefs.themeMode === "system"
+      ? prefs.themeMode
+      : settings.appearance.themeMode;
+
+  return {
+    ...settings,
+    appearance: {
+      ...settings.appearance,
+      themeMode,
+    },
+    profile: {
+      ...settings.profile,
+      language: safeFromOptions(SETTINGS_LANGUAGE_OPTIONS, prefs.language, settings.profile.language),
+      dateFormat: safeFromOptions(SETTINGS_DATE_FORMAT_OPTIONS, prefs.dateFormat, settings.profile.dateFormat),
+      timeZone: safeFromOptions(SETTINGS_TIME_ZONE_OPTIONS, prefs.timeZone, settings.profile.timeZone),
+    },
+    notifications: {
+      email: {
+        quizAssignments: prefs.notifyEmailQuizAssignments,
+        gradingUpdates: prefs.notifyEmailGradingUpdates,
+        achievementAlerts: prefs.notifyEmailAchievementAlerts,
+        deadlineReminders: prefs.notifyEmailDeadlineReminders,
+      },
+      push: {
+        realTimeUpdates: prefs.notifyPushRealTimeUpdates,
+        weeklySummaries: prefs.notifyPushWeeklySummaries,
+      },
+    },
+  };
+}
+
+const AUTH_TOKEN_KEY_SETTINGS = "bilgenly_token";
 
 interface PasswordUpdateInput {
   currentPassword: string;
@@ -137,11 +193,25 @@ export function SettingsProvider({ children }: SettingsProviderProps) {
     }
     hydratedStorageScopeRef.current = storageScope;
 
-    setLoadedState({
-      scope: storageScope,
-      settings: scopedSettingsSnapshot,
-    });
-    setIsHydrated(true);
+    const localSettings = scopedSettingsSnapshot;
+
+    if (localStorage.getItem(AUTH_TOKEN_KEY_SETTINGS)) {
+      getMyPreferences()
+        .then((prefs) => {
+          const merged = applyBackendPreferences(localSettings, prefs);
+          writeUserSettings(storageScope, merged);
+          setLoadedState({ scope: storageScope, settings: merged });
+        })
+        .catch(() => {
+          setLoadedState({ scope: storageScope, settings: localSettings });
+        })
+        .finally(() => {
+          setIsHydrated(true);
+        });
+    } else {
+      setLoadedState({ scope: storageScope, settings: localSettings });
+      setIsHydrated(true);
+    }
   }, [scopedSettingsSnapshot, storageScope]);
 
   const settings =
@@ -193,6 +263,22 @@ export function SettingsProvider({ children }: SettingsProviderProps) {
           : scopedSettingsSnapshot;
       const nextSettings = updater(baseSettings);
       writeUserSettings(storageScope, nextSettings);
+
+      if (localStorage.getItem(AUTH_TOKEN_KEY_SETTINGS)) {
+        saveMyPreferences({
+          themeMode: nextSettings.appearance.themeMode,
+          language: nextSettings.profile.language,
+          dateFormat: nextSettings.profile.dateFormat,
+          timeZone: nextSettings.profile.timeZone,
+          notifyEmailQuizAssignments: nextSettings.notifications.email.quizAssignments,
+          notifyEmailGradingUpdates: nextSettings.notifications.email.gradingUpdates,
+          notifyEmailAchievementAlerts: nextSettings.notifications.email.achievementAlerts,
+          notifyEmailDeadlineReminders: nextSettings.notifications.email.deadlineReminders,
+          notifyPushRealTimeUpdates: nextSettings.notifications.push.realTimeUpdates,
+          notifyPushWeeklySummaries: nextSettings.notifications.push.weeklySummaries,
+        }).catch(() => {});
+      }
+
       return {
         scope: storageScope,
         settings: nextSettings,
@@ -200,11 +286,6 @@ export function SettingsProvider({ children }: SettingsProviderProps) {
     });
   };
 
-  // saveProfileSettings persists locally only. Name/bio/avatar editing
-  // happens in the Profile page (which calls PATCH /api/auth/profile and
-  // then this updater) — Settings should not edit those fields. Other
-  // settings preferences (country, date format, theme, notifications) are
-  // local-only because no backend settings endpoint exists yet.
   const saveProfileSettings = (profile: UserSettingsProfile) => {
     updateCurrentUserProfile({
       username: profile.fullName,

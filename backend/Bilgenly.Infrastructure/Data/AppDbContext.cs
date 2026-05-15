@@ -15,7 +15,10 @@ public class AppDbContext : DbContext
     public DbSet<Assignment> Assignments => Set<Assignment>();
     public DbSet<Badge> Badges => Set<Badge>();
     public DbSet<UserBadge> UserBadges => Set<UserBadge>();
-    
+    public DbSet<Notification> Notifications => Set<Notification>();
+    public DbSet<Report> Reports => Set<Report>();
+    public DbSet<UserPreferences> UserPreferences => Set<UserPreferences>();
+    public DbSet<ClassInvitation> ClassInvitations => Set<ClassInvitation>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -82,6 +85,66 @@ public class AppDbContext : DbContext
             e.HasOne(ub => ub.Badge)
                 .WithMany()
                 .HasForeignKey(ub => ub.BadgeId);
+        });
+
+        modelBuilder.Entity<ClassInvitation>(e =>
+        {
+            e.HasKey(i => i.Id);
+            e.HasOne(i => i.Class)
+                .WithMany()
+                .HasForeignKey(i => i.ClassId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(i => i.Teacher)
+                .WithMany()
+                .HasForeignKey(i => i.TeacherId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasIndex(i => new { i.ClassId, i.RecipientEmail });
+        });
+
+        modelBuilder.Entity<UserPreferences>(e =>
+        {
+            e.HasKey(p => p.UserId);
+            e.HasOne(p => p.User)
+                .WithMany()
+                .HasForeignKey(p => p.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<Report>(e =>
+        {
+            e.HasKey(r => r.Id);
+            e.HasOne(r => r.Reporter)
+                .WithMany()
+                .HasForeignKey(r => r.ReporterId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(r => r.ReportedQuiz)
+                .WithMany()
+                .HasForeignKey(r => r.ReportedQuizId)
+                .IsRequired(false)
+                .OnDelete(DeleteBehavior.SetNull);
+            e.HasOne(r => r.ReportedUser)
+                .WithMany()
+                .HasForeignKey(r => r.ReportedUserId)
+                .IsRequired(false)
+                .OnDelete(DeleteBehavior.SetNull);
+            e.HasOne(r => r.Reviewer)
+                .WithMany()
+                .HasForeignKey(r => r.ReviewerId)
+                .IsRequired(false)
+                .OnDelete(DeleteBehavior.SetNull);
+            e.HasIndex(r => r.Status);
+        });
+
+        modelBuilder.Entity<Notification>(e =>
+        {
+            e.HasKey(n => n.Id);
+            e.HasOne(n => n.Recipient)
+                .WithMany()
+                .HasForeignKey(n => n.RecipientUserId)
+                .IsRequired(false)
+                .OnDelete(DeleteBehavior.SetNull);
+            e.HasIndex(n => n.RecipientUserId);
+            e.HasIndex(n => n.RecipientEmail);
         });
     }
     

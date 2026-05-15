@@ -140,6 +140,64 @@ public class AnalyticsService
             Attempts = summaries
         }, null);
     }
+    public async Task<(StudentSummaryDto? Result, string? Error)> GetStudentSummaryForTeacherAsync(
+        Guid studentId, Guid teacherId)
+    {
+        var teacherClasses = (await _classRepository.GetByTeacherIdAsync(teacherId)).ToList();
+
+        var studentClasses = teacherClasses
+            .Where(c => c.ClassStudents.Any(cs => cs.StudentId == studentId))
+            .ToList();
+
+        if (!studentClasses.Any())
+            return (null, "Access denied or student not in any of your classes");
+
+        var teacherQuizIds = teacherClasses
+            .SelectMany(c => c.Assignments)
+            .Select(a => a.QuizId)
+            .ToHashSet();
+
+        var allAttempts = (await _attemptRepository.GetByUserIdAsync(studentId))
+            .Where(a => a.IsCompleted && teacherQuizIds.Contains(a.QuizId))
+            .ToList();
+
+        var studentName = studentClasses
+            .SelectMany(c => c.ClassStudents)
+            .FirstOrDefault(cs => cs.StudentId == studentId)
+            ?.Student?.Username ?? "Unknown";
+
+        var studentEmail = studentClasses
+            .SelectMany(c => c.ClassStudents)
+            .FirstOrDefault(cs => cs.StudentId == studentId)
+            ?.Student?.Email ?? "";
+
+        var completedQuizIds = allAttempts.Select(a => a.QuizId).Distinct().Count();
+        var avgGrade = allAttempts.Any()
+            ? Math.Round(allAttempts.Average(a => a.Score), 1)
+            : 0;
+
+        var status = !allAttempts.Any()
+            ? "no_results"
+            : avgGrade < 60
+                ? "needs_review"
+                : "active";
+
+        return (new StudentSummaryDto
+        {
+            StudentId = studentId,
+            StudentName = studentName,
+            StudentEmail = studentEmail,
+            AverageGradePercent = avgGrade,
+            CompletedQuizzesCount = completedQuizIds,
+            AttemptsCount = allAttempts.Count,
+            LatestAttemptAt = allAttempts.Any()
+                ? allAttempts.Max(a => a.DateTaken)
+                : null,
+            ClassesCount = studentClasses.Count,
+            Status = status
+        }, null);
+    }
+
     public async Task<(ClassAnalyticsDto? Result, string? Error)> GetClassAnalyticsAsync(
         Guid assignmentId, Guid teacherId)
     {

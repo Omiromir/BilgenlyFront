@@ -9,4 +9,5 @@ public interface IQuizRepository
     Task AddAsync(Quiz quiz);
     Task SaveChangesAsync();
     void Remove(Quiz quiz);
+    Task<IEnumerable<Quiz>> GetHiddenQuizzesAsync();
 }

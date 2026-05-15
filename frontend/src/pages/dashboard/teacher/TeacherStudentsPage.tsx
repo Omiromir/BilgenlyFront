@@ -1,4 +1,4 @@
-import { useDeferredValue, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router";
 import {
   Download,
@@ -26,6 +26,8 @@ import {
   TableRow,
 } from "../../../components/ui/table";
 import { useTeacherClasses } from "../../../app/providers/TeacherClassesProvider";
+import { getStudentSummaryForTeacher } from "../../../features/dashboard/api/analyticsApi";
+import type { StudentSummaryDto } from "../../../features/dashboard/api/dashboardApiTypes";
 import {
   DashboardButton,
   dashboardPageClassName,
@@ -79,11 +81,22 @@ function buildStudentReference(student: TeacherClassStudent) {
   return compactId ? compactId.toUpperCase() : "—";
 }
 
-function buildStudentRosterMetadata(student: TeacherClassStudent) {
+function buildStudentRosterMetadata(
+  student: TeacherClassStudent,
+  summaries: Map<string, StudentSummaryDto>,
+) {
+  const linkedId = student.linkedUserId ?? "";
+  const summary = linkedId ? summaries.get(linkedId) : undefined;
+  const averageGradeLabel = summary
+    ? summary.attemptsCount === 0
+      ? "No results"
+      : `${Math.round(summary.averageGradePercent)}%`
+    : "—";
+
   return {
     studentRef: buildStudentReference(student),
     genderLabel: "—",
-    averageGradeLabel: "—",
+    averageGradeLabel,
     missingDaysLabel: "—",
   } satisfies Pick<
     TeacherStudentRosterRow,
@@ -102,6 +115,43 @@ export function TeacherStudentsPage() {
     () => classes.filter((teacherClass) => teacherClass.status === "active"),
     [classes],
   );
+
+  const [studentSummaries, setStudentSummaries] = useState<Map<string, StudentSummaryDto>>(
+    new Map(),
+  );
+  const fetchedIdsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    const linkedUserIds = Array.from(
+      new Set(
+        classes
+          .flatMap((c) => c.students)
+          .map((s) => s.linkedUserId)
+          .filter((id): id is string => Boolean(id) && !fetchedIdsRef.current.has(id)),
+      ),
+    );
+
+    if (!linkedUserIds.length) return;
+
+    linkedUserIds.forEach((id) => fetchedIdsRef.current.add(id));
+
+    Promise.allSettled(
+      linkedUserIds.map((id) =>
+        getStudentSummaryForTeacher(id).then((summary) => ({ id, summary })),
+      ),
+    ).then((results) => {
+      setStudentSummaries((prev) => {
+        const next = new Map(prev);
+        results.forEach((result) => {
+          if (result.status === "fulfilled") {
+            next.set(result.value.id, result.value.summary);
+          }
+        });
+        return next;
+      });
+    });
+  }, [classes]);
+
   const [classFilter, setClassFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] =
     useState<"all" | TeacherClassStudentStatus>("all");
@@ -117,7 +167,7 @@ export function TeacherStudentsPage() {
     () =>
       classes.flatMap((teacherClass) =>
         teacherClass.students.map((student) => {
-          const metadata = buildStudentRosterMetadata(student);
+          const metadata = buildStudentRosterMetadata(student, studentSummaries);
 
           return {
             rowId: `${teacherClass.id}-${student.id}`,
@@ -131,7 +181,7 @@ export function TeacherStudentsPage() {
           };
         }),
       ),
-    [classes],
+    [classes, studentSummaries],
   );
 
   const filteredRows = useMemo(() => {
@@ -140,11 +190,19 @@ export function TeacherStudentsPage() {
         deferredClassFilter === "all" ? true : row.classId === deferredClassFilter;
       const matchesStatus =
         statusFilter === "all" ? true : row.student.status === statusFilter;
-      const matchesGrade = gradeFilter === "all";
+      const summary = row.student.linkedUserId
+        ? studentSummaries.get(row.student.linkedUserId)
+        : undefined;
+      const avgGrade = summary?.averageGradePercent ?? null;
+      const matchesGrade =
+        gradeFilter === "all" ||
+        (gradeFilter === "high" && avgGrade !== null && avgGrade >= 80) ||
+        (gradeFilter === "mid" && avgGrade !== null && avgGrade >= 60 && avgGrade < 80) ||
+        (gradeFilter === "needs-attention" && avgGrade !== null && avgGrade < 60);
 
       return matchesClass && matchesStatus && matchesGrade;
     });
-  }, [deferredClassFilter, gradeFilter, rosterRows, statusFilter]);
+  }, [deferredClassFilter, gradeFilter, rosterRows, statusFilter, studentSummaries]);
 
   const totalStudentsLabel = new Set(
     rosterRows.map((row) => row.student.email.trim().toLowerCase()),
@@ -187,31 +245,21 @@ export function TeacherStudentsPage() {
     setFeedback(
       `${addedStudents.length} ${
         addedStudents.length === 1
-          ? "in-app class invite was created"
-          : "in-app class invites were created"
-      } for ${addTargetClass.name}. Email delivery is not connected yet — only matching in-app accounts will see the invite.`,
+          ? "student now has a class invite"
+          : "students now have class invites"
+      } for ${addTargetClass.name}. In-app notifications were created where preferences allow them.`,
     );
   };
 
-  const handleRemoveStudent = async (row: TeacherStudentRosterRow) => {
-    try {
-      await removeStudentFromClass(row.classId, row.student.id);
-      setSelectedRowIds((current) => current.filter((item) => item !== row.rowId));
-      setFeedback(`${row.student.fullName} was removed from ${row.className}.`);
-    } catch (error) {
-      setFeedback(
-        error instanceof Error
-          ? error.message
-          : `Unable to remove ${row.student.fullName} from ${row.className}.`,
-      );
-    }
+  const handleRemoveStudent = (row: TeacherStudentRosterRow) => {
+    removeStudentFromClass(row.classId, row.student.id);
+    setSelectedRowIds((current) => current.filter((item) => item !== row.rowId));
+    setFeedback(`${row.student.fullName} was removed from ${row.className}.`);
   };
 
   const handleResendInvite = (row: TeacherStudentRosterRow) => {
     resendStudentInvite(row.classId, row.student.id);
-    setFeedback(
-      `In-app class invite refreshed for ${row.student.fullName}. Email delivery is not connected yet.`,
-    );
+    setFeedback(`Class invite refreshed for ${row.student.fullName}.`);
   };
 
   const handleExportCsv = () => {
@@ -374,12 +422,18 @@ export function TeacherStudentsPage() {
               <label>
                 <select
                   value={gradeFilter}
-                  onChange={() => setGradeFilter("all")}
-                  disabled
+                  onChange={(e) =>
+                    setGradeFilter(
+                      e.target.value as "all" | "high" | "mid" | "needs-attention",
+                    )
+                  }
                   className={`${dashboardSelectVariants({ size: "md" })} h-10 min-w-[130px] rounded-[12px] border-[var(--dashboard-border-soft)] bg-[var(--dashboard-surface-elevated)] px-3 text-sm`}
-                  aria-label="Average grade data is unavailable"
+                  aria-label="Filter by average grade"
                 >
-                  <option value="all">Avg. grade unavailable</option>
+                  <option value="all">All grades</option>
+                  <option value="high">High (≥80%)</option>
+                  <option value="mid">Mid (60–79%)</option>
+                  <option value="needs-attention">Needs attention (&lt;60%)</option>
                 </select>
               </label>
 
@@ -568,9 +622,7 @@ export function TeacherStudentsPage() {
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem
-                                  onClick={() => {
-                                    void handleRemoveStudent(row);
-                                  }}
+                                  onClick={() => handleRemoveStudent(row)}
                                   variant="destructive"
                                   disabled={isArchivedClass}
                                 >

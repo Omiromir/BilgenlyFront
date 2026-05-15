@@ -42,4 +42,10 @@ public class QuizRepository : IQuizRepository
         => await _context.Quizzes.AddAsync(quiz);
     public async Task SaveChangesAsync()
         => await _context.SaveChangesAsync();
+    public async Task<IEnumerable<Quiz>> GetHiddenQuizzesAsync()
+        => await _context.Quizzes
+            .Where(q => q.IsHidden)
+            .Include(q => q.User)
+            .OrderByDescending(q => q.CreatedAt)
+            .ToListAsync();
 }

@@ -22,4 +22,6 @@ public class UserRepository : IUserRepository
         => await _context.SaveChangesAsync();
     public async Task<User?> GetByIdAsync(Guid id)
         => await _context.Users.FirstOrDefaultAsync(u => u.Id == id);
+    public async Task<IEnumerable<User>> GetSuspendedUsersAsync()
+        => await _context.Users.Where(u => u.IsSuspended).ToListAsync();
 }
